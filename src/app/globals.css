@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 100px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+/* أنيميشن الظهور */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-out;
+}
+
+/* تحسين inputs والخانات */
+@layer components {
+  .form-input {
+    @apply w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition duration-300 font-medium;
+  }
+
+  .form-select {
+    @apply w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition duration-300 font-medium appearance-none;
+  }
+
+  .form-textarea {
+    @apply w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition duration-300 font-medium resize-none;
+  }
+
+  .btn-primary {
+    @apply px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 font-bold shadow-lg shadow-indigo-500/30 hover:scale-105 hover:shadow-xl;
+  }
+
+  .btn-secondary {
+    @apply px-8 py-4 bg-white border-2 border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-all duration-300 font-bold hover:scale-105 hover:shadow-lg;
+  }
+
+  .unit-card {
+    @apply bg-white rounded-2xl border-2 border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden;
+  }
+
+  .floor-header {
+    @apply bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white p-6 cursor-pointer hover:shadow-lg transition-all duration-300;
+  }
+
+  .step-indicator {
+    @apply flex items-center justify-between;
+  }
+}
+
+/* تحسينات للنصوص */
+@layer base {
+  h1 {
+    @apply text-gray-900 font-bold;
+  }
+
+  h2 {
+    @apply text-gray-800 font-bold;
+  }
+
+  h3 {
+    @apply text-gray-700 font-bold;
+  }
+
+  label {
+    @apply text-gray-700 font-medium;
+  }
+
+  p {
+    @apply text-gray-600;
+  }
+}
+
+/* تأثيرات الـ focus */
+input:focus,
+select:focus,
+textarea:focus {
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* تحسين الـ scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Animation للـ gradient backgrounds */
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.gradient-animated {
+  background-size: 200% 200%;
+  animation: gradient-shift 15s ease infinite;
+}
+
+/* تحسينات للـ buttons */
+button {
+  @apply transition-all duration-300;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+/* تأثيرات الـ transitions */
+.transition-smooth {
+  @apply transition-all duration-500;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
