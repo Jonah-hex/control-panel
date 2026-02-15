@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'نظام حجوزات العماير',
+  title: 'عماير Pro',
   description: 'نظام متكامل لإدارة العماير والوحدات السكنية',
 }
 
