@@ -183,6 +183,15 @@ export default function NewBuildingPage() {
     phone: '',
     yearBuilt: new Date().getFullYear(),
     
+    // حقول جديدة - حالة البناء ومعلومات البناء
+    buildStatus: 'ready' as 'ready' | 'under_construction' | 'finishing' | 'new_project',
+    landArea: 0,
+    buildingLicenseNumber: '',
+    
+    // معلومات التأمين
+    insuranceAvailable: false,
+    insurancePolicyNumber: '',
+    
     // الحارس
     guardName: '',
     guardPhone: '',
@@ -545,6 +554,11 @@ export default function NewBuildingPage() {
             street_type: formData.streetType,
             phone: formData.phone || null,
             year_built: formData.yearBuilt,
+            build_status: formData.buildStatus,
+            land_area: formData.landArea || null,
+            building_license_number: formData.buildingLicenseNumber || null,
+            insurance_available: formData.insuranceAvailable,
+            insurance_policy_number: formData.insuranceAvailable ? formData.insurancePolicyNumber : null,
             guard_name: formData.guardName || null,
             guard_phone: formData.guardPhone || null,
             guard_id_number: formData.guardIdNumber || null,
@@ -940,6 +954,120 @@ export default function NewBuildingPage() {
                       placeholder="اكتب وصفاً للعمارة..."
                     />
                   </div>
+
+                  {/* حالة البناء */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      حالة البناء <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition pointer-events-none">
+                        <Building2 className="w-5 h-5" />
+                      </div>
+                      <select
+                        value={formData.buildStatus}
+                        onChange={(e) => setFormData({...formData, buildStatus: e.target.value as any})}
+                        required
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition appearance-none text-gray-700"
+                      >
+                        <option value="ready">جاهز</option>
+                        <option value="under_construction">تحت الإنشاء</option>
+                        <option value="finishing">تشطيب</option>
+                        <option value="new_project">أرض مشروع جديد</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* مساحة الأرض */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      مساحة الأرض (م²)
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
+                        <Ruler className="w-5 h-5" />
+                      </div>
+                      <input
+                        type="number"
+                        value={formData.landArea || ''}
+                        onChange={(e) => setFormData({...formData, landArea: parseFloat(e.target.value) || 0})}
+                        step="0.01"
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                        placeholder="مثال: 500.50"
+                      />
+                    </div>
+                  </div>
+
+                  {/* رقم رخصة البناء */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      رقم رخصة البناء <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <input
+                        type="text"
+                        value={formData.buildingLicenseNumber}
+                        onChange={(e) => setFormData({...formData, buildingLicenseNumber: e.target.value})}
+                        required
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                        placeholder="مثال: 12345/2023"
+                      />
+                    </div>
+                  </div>
+
+                  {/* حالة التأمين - اختيار نعم/لا */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      هل يوجد تأمين على المبنى؟
+                    </label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          value="yes"
+                          checked={formData.insuranceAvailable === true}
+                          onChange={() => setFormData({...formData, insuranceAvailable: true})}
+                          className="w-4 h-4 accent-indigo-500"
+                        />
+                        <span className="text-gray-700">نعم</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          value="no"
+                          checked={formData.insuranceAvailable === false}
+                          onChange={() => setFormData({...formData, insuranceAvailable: false, insurancePolicyNumber: ''})}
+                          className="w-4 h-4 accent-indigo-500"
+                        />
+                        <span className="text-gray-700">لا</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* رقم بوليصة التأمين - يظهر فقط إذا كان هناك تأمين */}
+                  {formData.insuranceAvailable && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">
+                        رقم بوليصة التأمين <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative group">
+                        <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
+                          <Shield className="w-5 h-5" />
+                        </div>
+                        <input
+                          type="text"
+                          value={formData.insurancePolicyNumber}
+                          onChange={(e) => setFormData({...formData, insurancePolicyNumber: e.target.value})}
+                          required={formData.insuranceAvailable}
+                          className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                          placeholder="مثال: POL-2023-12345"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
