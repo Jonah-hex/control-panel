@@ -741,7 +741,7 @@ export default function NewBuildingPage() {
       </div>
 
       {/* Steps Indicator - تصميم عصري */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-[49px]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-[56px]">
         <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl p-8 mb-8 border border-white/20">
           <div className="relative">
             {trackTotalPx > 0 ? (
