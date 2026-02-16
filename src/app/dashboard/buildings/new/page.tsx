@@ -173,7 +173,8 @@ export default function NewBuildingPage() {
     totalFloors: 1,
     totalUnits: 0,
     reservedUnits: 0,
-    entrances: 1,
+    frontEntrances: 1,
+    backEntrances: 0,
     parkingSlots: 0,
     elevators: 1,
     buildingFacing: 'north' as 'north' | 'south' | 'east' | 'west' | 'northeast' | 'northwest' | 'southeast' | 'southwest',
@@ -555,7 +556,8 @@ export default function NewBuildingPage() {
             total_floors: floors.length,
             total_units: totalUnits,
             reserved_units: formData.reservedUnits,
-            entrances: formData.entrances,
+            front_entrances: formData.frontEntrances,
+            back_entrances: formData.backEntrances,
             parking_slots: formData.parkingSlots,
             elevators: formData.elevators,
             street_type: formData.streetType,
@@ -1299,10 +1301,10 @@ export default function NewBuildingPage() {
                     </div>
                   </div>
 
-                  {/* عدد المداخل */}
+                  {/* عدد المداخل الأمامية */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      عدد المداخل
+                      عدد المداخل الأمامية
                     </label>
                     <div className="relative group">
                       <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition">
@@ -1310,9 +1312,28 @@ export default function NewBuildingPage() {
                       </div>
                       <input
                         type="number"
-                        value={formData.entrances}
-                        onChange={(e) => setFormData({...formData, entrances: parseInt(e.target.value) || 1})}
+                        value={formData.frontEntrances}
+                        onChange={(e) => setFormData({...formData, frontEntrances: parseInt(e.target.value) || 1})}
                         min="1"
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* عدد المداخل الخلفية */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      عدد المداخل الخلفية
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition">
+                        <DoorOpen className="w-5 h-5" />
+                      </div>
+                      <input
+                        type="number"
+                        value={formData.backEntrances}
+                        onChange={(e) => setFormData({...formData, backEntrances: parseInt(e.target.value) || 0})}
+                        min="0"
                         className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none transition"
                       />
                     </div>
