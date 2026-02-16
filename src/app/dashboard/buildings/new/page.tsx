@@ -1209,7 +1209,7 @@ export default function NewBuildingPage() {
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold text-gray-800">تفاصيل العمارة</h2>
-                      <p className="text-xs text-gray-500">المداخل - المواقف - الواجهة - المصاعد</p>
+                      <p className="text-xs text-gray-500">المواقف - الواجهة - المصاعد</p>
                     </div>
                   </div>
                 </div>
