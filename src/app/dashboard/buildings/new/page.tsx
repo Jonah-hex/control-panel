@@ -52,6 +52,7 @@ import {
   Moon,
   Star,
   Sparkles,
+  Zap,
   Paintbrush,
   Ruler,
   Weight,
