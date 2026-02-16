@@ -7,28 +7,53 @@
 CREATE TABLE buildings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(255) NOT NULL,
-  address TEXT NOT NULL,
+  plot_number VARCHAR(100),
+  neighborhood VARCHAR(255),
+  address TEXT,
   description TEXT,
   total_floors INTEGER DEFAULT 1,
   total_units INTEGER DEFAULT 0,
   reserved_units INTEGER DEFAULT 0,
-  entrances INTEGER DEFAULT 1,
   parking_slots INTEGER DEFAULT 0,
+  driver_rooms INTEGER DEFAULT 0,
   elevators INTEGER DEFAULT 1,
   street_type VARCHAR(50) DEFAULT 'one',
   building_facing VARCHAR(50) DEFAULT 'north',
   year_built INTEGER,
   phone VARCHAR(20),
+  
+  -- حالة البناء ومعلومات البناء
+  build_status VARCHAR(50) DEFAULT 'ready',
+  deed_number VARCHAR(100),
+  land_area DECIMAL(10, 2),
+  building_license_number VARCHAR(100),
+  
+  -- معلومات التأمين
+  insurance_available BOOLEAN DEFAULT FALSE,
+  insurance_policy_number VARCHAR(100),
+  
+  -- عدادات المياه والكهرباء
+  has_main_water_meter BOOLEAN DEFAULT FALSE,
+  water_meter_number VARCHAR(100),
+  has_main_electricity_meter BOOLEAN DEFAULT FALSE,
+  electricity_meter_number VARCHAR(100),
+  
+  -- معلومات الحارس
   guard_name VARCHAR(255),
   guard_phone VARCHAR(20),
   guard_id_number VARCHAR(20),
   guard_shift VARCHAR(50),
+  
+  -- الموقع
   latitude DECIMAL(10, 8),
   longitude DECIMAL(11, 8),
   google_maps_link TEXT,
+  
+  -- بيانات إضافية
   image_urls TEXT[],
   floors_data JSONB,
   owner_association JSONB,
+  
   owner_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
