@@ -1283,64 +1283,7 @@ export default function NewBuildingPage() {
                     </div>
                   </div>
 
-                  {/* الوحدات المحجوزة مع مؤشر الأداء */}
-                  <div className="col-span-3 mt-6">
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                          <Calendar className="w-5 h-5 text-blue-600" />
-                          الوحدات المحجوزة
-                        </label>
-                        <span className="text-sm font-bold text-blue-700 bg-blue-100 px-3 py-1 rounded-full">
-                          {formData.reservedUnits} / {formData.totalUnits > 0 ? formData.totalUnits : '—'}
-                        </span>
-                      </div>
-                      <div className="flex gap-3 items-end">
-                        <div className="flex-1">
-                          <div className="relative group mb-3">
-                            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition">
-                              <Calendar className="w-5 h-5" />
-                            </div>
-                            <input
-                              type="number"
-                              value={formData.reservedUnits}
-                              onChange={(e) => {
-                                const reserved = Math.min(parseInt(e.target.value) || 0, formData.totalUnits)
-                                setFormData({...formData, reservedUnits: Math.max(0, reserved)})
-                              }}
-                              max={formData.totalUnits || 0}
-                              min="0"
-                              className="w-full pr-14 pl-4 py-4 bg-white border-2 border-blue-200 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition"
-                              placeholder="عدد الوحدات المحجوزة"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* مؤشر الأداء البصري */}
-                      {formData.totalUnits > 0 && (
-                        <div className="mt-4">
-                          <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500"
-                              style={{width: `${(formData.reservedUnits / formData.totalUnits) * 100}%`}}
-                            />
-                          </div>
-                          <div className="flex justify-between items-center mt-2">
-                            <span className="text-xs text-gray-600">نسبة الحجز</span>
-                            <span className="text-sm font-bold text-blue-700">
-                              {Math.round((formData.reservedUnits / formData.totalUnits) * 100)}%
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                      {formData.totalUnits === 0 && (
-                        <div className="text-xs text-gray-500 text-center py-3">
-                          أضف الوحدات أولاً لتحديد الوحدات المحجوزة
-                        </div>
-                      )}
-                    </div>
-                  </div>
+
 
                 </div>
               </div>
