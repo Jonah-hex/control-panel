@@ -636,7 +636,7 @@ export default function NewBuildingPage() {
 
   const steps = [
     { number: 1, title: 'معلومات العمارة', icon: Building2, description: 'البيانات الأساسية' },
-    { number: 2, title: 'تفاصيل العمارة', icon: Home, description: 'المداخل والمواقف والواجهة' },
+    { number: 2, title: 'تفاصيل العمارة', icon: Home, description: 'الادوار والمواقف والواجهة' },
     { number: 3, title: 'الوحدات السكنية', icon: Grid, description: 'إضافة وتفاصيل الشقق' },
     { number: 4, title: 'معلومات إضافية', icon: Users, description: 'الحارس والصور' },
     { number: 5, title: 'اتحاد الملاك', icon: Award, description: 'معلومات الاتحاد' },
