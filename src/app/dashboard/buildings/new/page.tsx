@@ -174,6 +174,7 @@ export default function NewBuildingPage() {
     totalUnits: 0,
     reservedUnits: 0,
     parkingSlots: 0,
+    driverRooms: 0,
     elevators: 1,
     buildingFacing: 'north' as 'north' | 'south' | 'east' | 'west' | 'northeast' | 'northwest' | 'southeast' | 'southwest',
     streetType: 'one' as 'one' | 'two',
@@ -555,6 +556,7 @@ export default function NewBuildingPage() {
             total_units: totalUnits,
             reserved_units: formData.reservedUnits,
             parking_slots: formData.parkingSlots,
+            driver_rooms: formData.driverRooms,
             elevators: formData.elevators,
             street_type: formData.streetType,
             phone: formData.phone || null,
@@ -1310,6 +1312,25 @@ export default function NewBuildingPage() {
                         type="number"
                         value={formData.parkingSlots}
                         onChange={(e) => setFormData({...formData, parkingSlots: parseInt(e.target.value) || 0})}
+                        min="0"
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* عدد غرف السائقين */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      عدد غرف السائقين
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition">
+                        <Bed className="w-5 h-5" />
+                      </div>
+                      <input
+                        type="number"
+                        value={formData.driverRooms}
+                        onChange={(e) => setFormData({...formData, driverRooms: parseInt(e.target.value) || 0})}
                         min="0"
                         className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none transition"
                       />
