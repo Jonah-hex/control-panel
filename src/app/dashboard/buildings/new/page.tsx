@@ -941,20 +941,6 @@ export default function NewBuildingPage() {
                     </div>
                   </div>
 
-                  {/* الوصف */}
-                  <div className="col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      وصف العمارة
-                    </label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData({...formData, description: e.target.value})}
-                      rows={4}
-                      className="w-full px-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
-                      placeholder="اكتب وصفاً للعمارة..."
-                    />
-                  </div>
-
                   {/* حالة البناء */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -1068,6 +1054,20 @@ export default function NewBuildingPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* الوصف */}
+                  <div className="col-span-2">
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      وصف العمارة
+                    </label>
+                    <textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData({...formData, description: e.target.value})}
+                      rows={4}
+                      className="w-full px-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                      placeholder="اكتب وصفاً للعمارة..."
+                    />
+                  </div>
                 </div>
               </div>
             )}
