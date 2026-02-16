@@ -1013,10 +1013,10 @@ export default function NewBuildingPage() {
                     </div>
                   </div>
 
-                  {/* حالة التأمين - اختيار نعم/لا */}
+                  {/* حالة التأمين */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      هل يوجد تأمين على المبنى؟
+                      هل يوجد تأمين على المبنى
                     </label>
                     <div className="flex gap-4">
                       <label className="flex items-center gap-2 cursor-pointer">
@@ -1040,36 +1040,36 @@ export default function NewBuildingPage() {
                         <span className="text-gray-700">لا</span>
                       </label>
                     </div>
+
+                    {/* رقم بوليصة التأمين - يظهر فقط إذا كان هناك تأمين */}
+                    {formData.insuranceAvailable && (
+                      <div className="mt-4 animate-fadeIn">
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                          رقم بوليصة التأمين <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative group">
+                          <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
+                            <Shield className="w-5 h-5" />
+                          </div>
+                          <input
+                            type="text"
+                            value={formData.insurancePolicyNumber}
+                            onChange={(e) => setFormData({...formData, insurancePolicyNumber: e.target.value})}
+                            required={formData.insuranceAvailable}
+                            className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                            placeholder="مثال: POL-2023-12345"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* رقم بوليصة التأمين - يظهر فقط إذا كان هناك تأمين */}
-                  {formData.insuranceAvailable && (
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-3">
-                        رقم بوليصة التأمين <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative group">
-                        <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
-                          <Shield className="w-5 h-5" />
-                        </div>
-                        <input
-                          type="text"
-                          value={formData.insurancePolicyNumber}
-                          onChange={(e) => setFormData({...formData, insurancePolicyNumber: e.target.value})}
-                          required={formData.insuranceAvailable}
-                          className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
-                          placeholder="مثال: POL-2023-12345"
-                        />
-                      </div>
-                    </div>
-                  )}
-
                   {/* عداد المياه الرئيسي */}
-                  <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl">
+                  <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
                       هل يوجد عداد مياه رئيسي
                     </label>
-                    <div className="flex gap-4 mb-4">
+                    <div className="flex gap-4">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="radio"
@@ -1094,7 +1094,7 @@ export default function NewBuildingPage() {
 
                     {/* رقم عداد المياه */}
                     {formData.hasMainWaterMeter && (
-                      <div className="mt-4 p-4 bg-white rounded-xl border-2 border-indigo-200 animate-fadeIn">
+                      <div className="mt-4 animate-fadeIn">
                         <label className="block text-sm font-semibold text-gray-700 mb-3">
                           رقم عداد المياه (اختياري)
                         </label>
@@ -1115,11 +1115,11 @@ export default function NewBuildingPage() {
                   </div>
 
                   {/* عداد الكهرباء الرئيسي */}
-                  <div className="p-6 bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-2xl">
+                  <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
                       هل يوجد عداد كهرباء رئيسي
                     </label>
-                    <div className="flex gap-4 mb-4">
+                    <div className="flex gap-4">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="radio"
@@ -1144,7 +1144,7 @@ export default function NewBuildingPage() {
 
                     {/* رقم عداد الكهرباء */}
                     {formData.hasMainElectricityMeter && (
-                      <div className="mt-4 p-4 bg-white rounded-xl border-2 border-orange-200 animate-fadeIn">
+                      <div className="mt-4 animate-fadeIn">
                         <label className="block text-sm font-semibold text-gray-700 mb-3">
                           رقم عداد الكهرباء (اختياري)
                         </label>
