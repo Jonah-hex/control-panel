@@ -1370,7 +1370,7 @@ export default function NewBuildingPage() {
                           key={option.value}
                           type="button"
                           onClick={() => setFormData({...formData, streetType: option.value as any})}
-                          className={`p-3 rounded-xl border-2 transition-all duration-300 flex items-center justify-center gap-2 ${
+                          className={`py-4 px-3 rounded-xl border-2 transition-all duration-300 flex items-center justify-center gap-2 ${
                             formData.streetType === option.value
                               ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
                               : 'border-gray-200 hover:border-gray-300 text-gray-600'
