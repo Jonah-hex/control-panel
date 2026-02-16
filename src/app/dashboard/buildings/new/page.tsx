@@ -1065,11 +1065,11 @@ export default function NewBuildingPage() {
                   )}
 
                   {/* عداد المياه الرئيسي */}
-                  <div>
+                  <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl">
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      هل يوجد عداد مياه ررئيسي؟
+                      هل يوجد عداد مياه رئيسي
                     </label>
-                    <div className="flex gap-4">
+                    <div className="flex gap-4 mb-4">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="radio"
@@ -1091,35 +1091,35 @@ export default function NewBuildingPage() {
                         <span className="text-gray-700">لا</span>
                       </label>
                     </div>
+
+                    {/* رقم عداد المياه */}
+                    {formData.hasMainWaterMeter && (
+                      <div className="mt-4 p-4 bg-white rounded-xl border-2 border-indigo-200 animate-fadeIn">
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                          رقم عداد المياه (اختياري)
+                        </label>
+                        <div className="relative group">
+                          <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
+                            <Hash className="w-5 h-5" />
+                          </div>
+                          <input
+                            type="text"
+                            value={formData.waterMeterNumber}
+                            onChange={(e) => setFormData({...formData, waterMeterNumber: e.target.value})}
+                            className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                            placeholder="مثال: W-12345678"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* رقم عداد المياه */}
-                  {formData.hasMainWaterMeter && (
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-3">
-                        رقم عداد المياه (اختياري)
-                      </label>
-                      <div className="relative group">
-                        <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
-                          <Hash className="w-5 h-5" />
-                        </div>
-                        <input
-                          type="text"
-                          value={formData.waterMeterNumber}
-                          onChange={(e) => setFormData({...formData, waterMeterNumber: e.target.value})}
-                          className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
-                          placeholder="مثال: W-12345678"
-                        />
-                      </div>
-                    </div>
-                  )}
-
                   {/* عداد الكهرباء الرئيسي */}
-                  <div>
+                  <div className="p-6 bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-2xl">
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      هل يوجد عداد كهرباء ررئيسي؟
+                      هل يوجد عداد كهرباء رئيسي
                     </label>
-                    <div className="flex gap-4">
+                    <div className="flex gap-4 mb-4">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="radio"
@@ -1141,28 +1141,28 @@ export default function NewBuildingPage() {
                         <span className="text-gray-700">لا</span>
                       </label>
                     </div>
-                  </div>
 
-                  {/* رقم عداد الكهرباء */}
-                  {formData.hasMainElectricityMeter && (
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-3">
-                        رقم عداد الكهرباء (اختياري)
-                      </label>
-                      <div className="relative group">
-                        <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
-                          <Zap className="w-5 h-5" />
+                    {/* رقم عداد الكهرباء */}
+                    {formData.hasMainElectricityMeter && (
+                      <div className="mt-4 p-4 bg-white rounded-xl border-2 border-orange-200 animate-fadeIn">
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                          رقم عداد الكهرباء (اختياري)
+                        </label>
+                        <div className="relative group">
+                          <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
+                            <Zap className="w-5 h-5" />
+                          </div>
+                          <input
+                            type="text"
+                            value={formData.electricityMeterNumber}
+                            onChange={(e) => setFormData({...formData, electricityMeterNumber: e.target.value})}
+                            className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                            placeholder="مثال: E-87654321"
+                          />
                         </div>
-                        <input
-                          type="text"
-                          value={formData.electricityMeterNumber}
-                          onChange={(e) => setFormData({...formData, electricityMeterNumber: e.target.value})}
-                          className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
-                          placeholder="مثال: E-87654321"
-                        />
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* الوصف */}
                   <div className="col-span-2">
