@@ -995,7 +995,7 @@ export default function NewBuildingPage() {
                   </div>
 
                   {/* مساحة الأرض */}
-                  <div className="col-span-2">
+                  <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
                       مساحة الأرض (م²)
                     </label>
