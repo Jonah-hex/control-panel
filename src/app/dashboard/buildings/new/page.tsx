@@ -1211,14 +1211,14 @@ export default function NewBuildingPage() {
             {/* Step 2: تفاصيل العمارة */}
             {currentStep === 2 && (
               <div className="space-y-8 animate-fadeIn">
-                <div className="border-t-4 border-emerald-500 pt-6">
+                <div className="border-t-4 border-emerald-400/40 pt-6">
                   <div className="flex items-center gap-4 mb-2">
-                    <div className="w-9 h-9 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                    <div className="w-9 h-9 bg-gradient-to-br from-emerald-400/80 to-teal-400/80 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-400/20 backdrop-blur-sm">
                       <Home className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <h2 className="text-2xl font-bold text-gray-800">تفاصيل العمارة</h2>
-                      <p className="text-xs text-gray-500">المواقف - الواجهة - المصاعد</p>
+                      <h2 className="text-2xl font-bold text-gray-700">تفاصيل العمارة</h2>
+                      <p className="text-xs text-gray-500/80">المواقف - الواجهة - المصاعد</p>
                     </div>
                   </div>
                 </div>
@@ -1226,11 +1226,11 @@ export default function NewBuildingPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   {/* عدد الأدوار مع نظام الدور */}
                   <div className="col-span-1">
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    <label className="block text-sm font-semibold text-gray-600 mb-3">
                       عدد الأدوار
                     </label>
                     <div className="relative group">
-                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition">
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-emerald-400/60 group-focus-within:text-emerald-500 transition">
                         <Layers className="w-5 h-5" />
                       </div>
                       <input
@@ -1276,18 +1276,18 @@ export default function NewBuildingPage() {
                           }
                         }}
                         min="1"
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none transition"
+                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition shadow-sm hover:shadow-md"
                       />
                     </div>
                   </div>
 
                   {/* عدد الشقق في الدور */}
                   <div className="col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    <label className="block text-sm font-semibold text-gray-600 mb-3">
                       عدد الشقق في الدور
                     </label>
                     <div className="relative group">
-                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition pointer-events-none">
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-emerald-400/60 group-focus-within:text-emerald-500 transition pointer-events-none">
                         <Grid className="w-5 h-5" />
                       </div>
                       <select
@@ -1297,7 +1297,7 @@ export default function NewBuildingPage() {
                             updateFloorPlan(floor.number, e.target.value as any)
                           })
                         }}
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none transition appearance-none text-gray-700 font-medium"
+                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition appearance-none text-gray-700 font-medium shadow-sm hover:shadow-md"
                       >
                         <option value="4shuqq">٤ شقق</option>
                         <option value="3shuqq">٣ شقق</option>
@@ -1308,11 +1308,11 @@ export default function NewBuildingPage() {
 
                   {/* عدد مواقف السيارات */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    <label className="block text-sm font-semibold text-gray-600 mb-3">
                       عدد مواقف السيارات
                     </label>
                     <div className="relative group">
-                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition">
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-emerald-400/60 group-focus-within:text-emerald-500 transition">
                         <ParkingCircle className="w-5 h-5" />
                       </div>
                       <input
@@ -1320,18 +1320,18 @@ export default function NewBuildingPage() {
                         value={formData.parkingSlots}
                         onChange={(e) => setFormData({...formData, parkingSlots: parseInt(e.target.value) || 0})}
                         min="0"
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none transition"
+                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition shadow-sm hover:shadow-md"
                       />
                     </div>
                   </div>
 
                   {/* عدد غرف السائقين */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    <label className="block text-sm font-semibold text-gray-600 mb-3">
                       عدد غرف السائقين
                     </label>
                     <div className="relative group">
-                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition">
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-emerald-400/60 group-focus-within:text-emerald-500 transition">
                         <Bed className="w-5 h-5" />
                       </div>
                       <input
@@ -1339,18 +1339,18 @@ export default function NewBuildingPage() {
                         value={formData.driverRooms}
                         onChange={(e) => setFormData({...formData, driverRooms: parseInt(e.target.value) || 0})}
                         min="0"
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none transition"
+                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition shadow-sm hover:shadow-md"
                       />
                     </div>
                   </div>
 
                   {/* عدد المصاعد */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    <label className="block text-sm font-semibold text-gray-600 mb-3">
                       عدد المصاعد
                     </label>
                     <div className="relative group">
-                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition">
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-emerald-400/60 group-focus-within:text-emerald-500 transition">
                         <ArrowUp className="w-5 h-5" />
                       </div>
                       <input
@@ -1358,14 +1358,14 @@ export default function NewBuildingPage() {
                         value={formData.elevators}
                         onChange={(e) => setFormData({...formData, elevators: parseInt(e.target.value) || 1})}
                         min="0"
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none transition"
+                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition shadow-sm hover:shadow-md"
                       />
                     </div>
                   </div>
 
                   {/* واجهة العمارة */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    <label className="block text-sm font-semibold text-gray-600 mb-3">
                       واجهة العمارة
                     </label>
                     <div className="grid grid-cols-2 gap-3">
@@ -1377,10 +1377,10 @@ export default function NewBuildingPage() {
                           key={option.value}
                           type="button"
                           onClick={() => setFormData({...formData, streetType: option.value as any})}
-                          className={`py-4 px-3 rounded-xl border-2 transition-all duration-300 flex items-center justify-center gap-2 ${
+                          className={`py-4 px-3 rounded-xl border-2 transition-all duration-300 flex items-center justify-center gap-2 backdrop-blur-md shadow-sm hover:shadow-md ${
                             formData.streetType === option.value
-                              ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
-                              : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                              ? 'bg-emerald-100/60 border-emerald-400/60 text-emerald-700'
+                              : 'bg-white/50 border-emerald-200/30 hover:border-emerald-300/50 text-gray-600'
                           }`}
                         >
                           <option.icon className="w-4 h-4" />
@@ -1392,17 +1392,17 @@ export default function NewBuildingPage() {
 
                   {/* اتجاه العمارة */}
                   <div className="col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    <label className="block text-sm font-semibold text-gray-600 mb-3">
                       اتجاه العمارة
                     </label>
                     <div className="relative group">
-                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition pointer-events-none">
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-emerald-400/60 group-focus-within:text-emerald-500 transition pointer-events-none">
                         <Compass className="w-5 h-5" />
                       </div>
                       <select
                         value={formData.buildingFacing}
                         onChange={(e) => setFormData({...formData, buildingFacing: e.target.value as any})}
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none transition appearance-none text-gray-700 font-medium"
+                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition appearance-none text-gray-700 font-medium shadow-sm hover:shadow-md"
                       >
                         <option value="north">شمال</option>
                         <option value="south">جنوب</option>
