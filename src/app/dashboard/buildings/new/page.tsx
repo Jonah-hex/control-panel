@@ -185,6 +185,7 @@ export default function NewBuildingPage() {
     
     // حقول جديدة - حالة البناء ومعلومات البناء
     buildStatus: 'ready' as 'ready' | 'under_construction' | 'finishing' | 'new_project',
+    deedNumber: '',
     landArea: 0,
     buildingLicenseNumber: '',
     
@@ -973,8 +974,28 @@ export default function NewBuildingPage() {
                     </div>
                   </div>
 
-                  {/* مساحة الأرض */}
+                  {/* رقم الصك */}
                   <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      رقم الصك <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <input
+                        type="text"
+                        value={formData.deedNumber}
+                        onChange={(e) => setFormData({...formData, deedNumber: e.target.value})}
+                        required
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                        placeholder="مثال: 123456789"
+                      />
+                    </div>
+                  </div>
+
+                  {/* مساحة الأرض */}
+                  <div className="col-span-2">
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
                       مساحة الأرض (م²)
                     </label>
@@ -985,10 +1006,9 @@ export default function NewBuildingPage() {
                       <input
                         type="number"
                         value={formData.landArea || ''}
-                        onChange={(e) => setFormData({...formData, landArea: parseFloat(e.target.value) || 0})}
-                        step="0.01"
+                        onChange={(e) => setFormData({...formData, landArea: parseInt(e.target.value) || 0})}
                         className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
-                        placeholder="مثال: 500.50"
+                        placeholder="مثال: 500"
                       />
                     </div>
                   </div>
