@@ -950,11 +950,14 @@ export default function NewBuildingPage() {
                       <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition pointer-events-none">
                         <Building2 className="w-5 h-5" />
                       </div>
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none group-focus-within:text-indigo-500 transition">
+                        <ChevronDown className="w-5 h-5 text-gray-500 group-focus-within:text-indigo-500 animate-bounce" style={{animationDuration: '0.6s'}} />
+                      </div>
                       <select
                         value={formData.buildStatus}
                         onChange={(e) => setFormData({...formData, buildStatus: e.target.value as any})}
                         required
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition appearance-none text-gray-700"
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition appearance-none text-gray-700 cursor-pointer"
                       >
                         <option value="ready">جاهز</option>
                         <option value="under_construction">تحت الإنشاء</option>
