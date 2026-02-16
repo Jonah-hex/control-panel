@@ -192,6 +192,12 @@ export default function NewBuildingPage() {
     insuranceAvailable: false,
     insurancePolicyNumber: '',
     
+    // عدادات المياه والكهرباء
+    hasMainWaterMeter: false,
+    waterMeterNumber: '',
+    hasMainElectricityMeter: false,
+    electricityMeterNumber: '',
+    
     // الحارس
     guardName: '',
     guardPhone: '',
@@ -1053,6 +1059,106 @@ export default function NewBuildingPage() {
                           required={formData.insuranceAvailable}
                           className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
                           placeholder="مثال: POL-2023-12345"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* عداد المياه الرئيسي */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      هل يوجد عداد مياه ررئيسي؟
+                    </label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          value="yes"
+                          checked={formData.hasMainWaterMeter === true}
+                          onChange={() => setFormData({...formData, hasMainWaterMeter: true})}
+                          className="w-4 h-4 accent-indigo-500"
+                        />
+                        <span className="text-gray-700">نعم</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          value="no"
+                          checked={formData.hasMainWaterMeter === false}
+                          onChange={() => setFormData({...formData, hasMainWaterMeter: false, waterMeterNumber: ''})}
+                          className="w-4 h-4 accent-indigo-500"
+                        />
+                        <span className="text-gray-700">لا</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* رقم عداد المياه */}
+                  {formData.hasMainWaterMeter && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">
+                        رقم عداد المياه (اختياري)
+                      </label>
+                      <div className="relative group">
+                        <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
+                          <Hash className="w-5 h-5" />
+                        </div>
+                        <input
+                          type="text"
+                          value={formData.waterMeterNumber}
+                          onChange={(e) => setFormData({...formData, waterMeterNumber: e.target.value})}
+                          className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                          placeholder="مثال: W-12345678"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* عداد الكهرباء الرئيسي */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      هل يوجد عداد كهرباء ررئيسي؟
+                    </label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          value="yes"
+                          checked={formData.hasMainElectricityMeter === true}
+                          onChange={() => setFormData({...formData, hasMainElectricityMeter: true})}
+                          className="w-4 h-4 accent-indigo-500"
+                        />
+                        <span className="text-gray-700">نعم</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          value="no"
+                          checked={formData.hasMainElectricityMeter === false}
+                          onChange={() => setFormData({...formData, hasMainElectricityMeter: false, electricityMeterNumber: ''})}
+                          className="w-4 h-4 accent-indigo-500"
+                        />
+                        <span className="text-gray-700">لا</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* رقم عداد الكهرباء */}
+                  {formData.hasMainElectricityMeter && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">
+                        رقم عداد الكهرباء (اختياري)
+                      </label>
+                      <div className="relative group">
+                        <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
+                          <Zap className="w-5 h-5" />
+                        </div>
+                        <input
+                          type="text"
+                          value={formData.electricityMeterNumber}
+                          onChange={(e) => setFormData({...formData, electricityMeterNumber: e.target.value})}
+                          className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                          placeholder="مثال: E-87654321"
                         />
                       </div>
                     </div>
