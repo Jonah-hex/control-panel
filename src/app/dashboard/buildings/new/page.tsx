@@ -165,6 +165,7 @@ export default function NewBuildingPage() {
     // معلومات أساسية
     name: '',
     plotNumber: '',
+    neighborhood: '',
     description: '',
     
     // تفاصيل العمارة المتقدمة
@@ -453,6 +454,12 @@ export default function NewBuildingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (currentStep < steps.length) {
+      setError('يرجى إكمال جميع الخطوات ثم تأكيد الحفظ من الخطوة الأخيرة')
+      return
+    }
+
     setLoading(true)
     setError('')
     setSuccess('')
@@ -466,7 +473,7 @@ export default function NewBuildingPage() {
       }
 
       if (!formData.name || !formData.plotNumber) {
-        throw new Error('الرجاء إدخال اسم العمارة ورقم قطعة الأرض')
+        throw new Error('الرجاء إدخال اسم العمارة ورقم القطعة')
       }
 
       const totalUnits = floors.reduce((sum, floor) => sum + floor.units.length, 0)
@@ -476,7 +483,8 @@ export default function NewBuildingPage() {
         .insert([
           {
             name: formData.name,
-            address: formData.plotNumber,
+            plot_number: formData.plotNumber,
+            neighborhood: formData.neighborhood,
             description: formData.description || null,
             total_floors: floors.length,
             total_units: totalUnits,
@@ -829,10 +837,10 @@ export default function NewBuildingPage() {
                     </div>
                   </div>
 
-                  {/* العنوان */}
-                  <div className="col-span-2">
+                  {/* رقم القطعة */}
+                  <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-3">
-                        رقم قطعة الأرض (رقم المشروع) <span className="text-red-500">*</span>
+                        رقم القطعة <span className="text-red-500">*</span>
                       </label>
                     <div className="relative group">
                       <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
@@ -845,6 +853,26 @@ export default function NewBuildingPage() {
                         required
                         className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
                           placeholder="مثال: قطعة 12/34 أو 12345"
+                      />
+                    </div>
+                  </div>
+
+                  {/* الحي */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      الحي <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
+                        <MapPin className="w-5 h-5" />
+                      </div>
+                      <input
+                        type="text"
+                        value={formData.neighborhood}
+                        onChange={(e) => setFormData({...formData, neighborhood: e.target.value})}
+                        required
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                        placeholder="مثال: حي النزهة"
                       />
                     </div>
                   </div>

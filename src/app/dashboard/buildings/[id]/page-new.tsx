@@ -3,21 +3,35 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import {
   Building2,
   ArrowLeft,
   Edit2,
+  MapPin,
+  Phone,
+  Calendar,
   Home,
+  Users,
   Grid3x3,
+  Map,
   Save,
   X,
   AlertCircle,
   CheckCircle,
+  Eye,
+  EyeOff,
+  Plus,
   Trash2,
+  Edit,
+  DollarSign,
   Maximize2,
   Wind,
-  Users
+  User,
+  Shield,
+  FileText,
+  Clock,
+  Award
 } from 'lucide-react'
 
 interface Building {
@@ -31,7 +45,6 @@ interface Building {
   entrances: number
   parking_slots: number
   elevators: number
-  driver_rooms: number
   year_built: number | null
   phone: string | null
   guard_name: string | null
@@ -77,7 +90,10 @@ export default function BuildingDetailPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [formData, setFormData] = useState<Partial<Building>>({})
+  const [editingUnit, setEditingUnit] = useState<Unit | null>(null)
+  const [showUnitModal, setShowUnitModal] = useState(false)
 
+  const router = useRouter()
   const params = useParams()
   const buildingId = params.id as string
   const supabase = createClient()
@@ -101,6 +117,7 @@ export default function BuildingDetailPage() {
       setBuilding(data)
       setFormData(data)
 
+      // Fetch units
       const { data: unitsData, error: unitsError } = await supabase
         .from('units')
         .select('*')
@@ -143,7 +160,6 @@ export default function BuildingDetailPage() {
           entrances: formData.entrances,
           parking_slots: formData.parking_slots,
           elevators: formData.elevators,
-          driver_rooms: formData.driver_rooms,
           year_built: formData.year_built,
           phone: formData.phone,
           guard_name: formData.guard_name,
@@ -393,11 +409,11 @@ export default function BuildingDetailPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">غرف السائقين</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">هاتف المبنى</label>
                   <input
-                    type="number"
-                    value={formData.driver_rooms || ''}
-                    onChange={(e) => handleInputChange('driver_rooms', parseInt(e.target.value))}
+                    type="tel"
+                    value={formData.phone || ''}
+                    onChange={(e) => handleInputChange('phone', e.target.value)}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -421,6 +437,7 @@ export default function BuildingDetailPage() {
                 <InfoRow label="رقم القطعة" value={building.plot_number} />
                 <InfoRow label="الحي" value={building.neighborhood || '-'} />
                 <InfoRow label="سنة البناء" value={building.year_built?.toString() || '-'} />
+                <InfoRow label="هاتف المبنى" value={building.phone || '-'} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <StatCard label="الأدوار" value={building.total_floors} icon={Grid3x3} />
@@ -428,7 +445,6 @@ export default function BuildingDetailPage() {
                 <StatCard label="المصاعد" value={building.elevators} icon={Wind} />
                 <StatCard label="المداخل" value={building.entrances} icon={Maximize2} />
                 <StatCard label="المواقف" value={building.parking_slots} icon={Wind} />
-                <StatCard label="غرف السائقين" value={building.driver_rooms} icon={Users} />
               </div>
               {building.description && (
                 <div className="md:col-span-2">
@@ -504,66 +520,21 @@ export default function BuildingDetailPage() {
 // Helper Components
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="group relative">
-      <div className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-white to-slate-50 rounded-lg p-4 border border-slate-200 hover:border-blue-300 transition-all duration-300 hover:shadow-md">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">{label}</p>
-        <p className="text-lg font-bold text-slate-900 truncate relative z-10">{value}</p>
-      </div>
+    <div>
+      <p className="text-sm font-medium text-slate-600 mb-1">{label}</p>
+      <p className="text-slate-900">{value}</p>
     </div>
   )
 }
 
 function StatCard({ label, value, icon: Icon }: { label: string; value: number; icon: any }) {
   return (
-    <div className="relative group">
-      <style>{`
-        @keyframes shimmer {
-          0% { background-position: -1000px 0; }
-          100% { background-position: 1000px 0; }
-        }
-        @keyframes floatIn {
-          0% { 
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          100% { 
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .stat-card {
-          animation: floatIn 0.6s ease-out;
-          position: relative;
-          overflow: hidden;
-        }
-        .stat-card::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: -100%;
-          width: 100%;
-          height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-          transition: left 0.5s;
-        }
-        .stat-card:hover::before {
-          left: 100%;
-        }
-        .stat-card:hover {
-          transform: scale(1.08) translateY(-8px);
-          box-shadow: 0 20px 30px -10px rgba(59, 130, 246, 0.3);
-        }
-      `}</style>
-      <div className="stat-card bg-gradient-to-br from-blue-50 via-blue-100 to-blue-50 rounded-xl p-5 border-2 border-blue-200 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-2xl">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-bold text-blue-700 uppercase tracking-wide">{label}</p>
-          <Icon className="w-5 h-5 text-blue-600 group-hover:rotate-12 transition-transform" />
-        </div>
-        <p className="text-3xl font-black text-blue-900">{value}</p>
-        <div className="mt-2 h-1 bg-gradient-to-r from-blue-300 to-transparent rounded-full opacity-60"></div>
+    <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm font-medium text-blue-700">{label}</p>
+        <Icon className="w-4 h-4 text-blue-600" />
       </div>
+      <p className="text-2xl font-bold text-blue-900">{value}</p>
     </div>
   )
 }
-

@@ -1,7 +1,10 @@
 // src/app/page.tsx
+'use client'
+
+import { useEffect } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { 
   Building2, 
   Home as HomeIcon, 
@@ -17,13 +20,23 @@ import {
   Clock
 } from 'lucide-react'
 
-export default async function HomePage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+export default function HomePage() {
+  const router = useRouter()
+  const supabase = createClient()
 
-  if (user) {
-    redirect('/dashboard')
-  }
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          router.push('/dashboard')
+        }
+      } catch (error) {
+        console.error('Error checking user:', error)
+      }
+    }
+    checkUser()
+  }, [router, supabase.auth])
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950">

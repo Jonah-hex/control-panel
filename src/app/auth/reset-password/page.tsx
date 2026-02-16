@@ -1,71 +1,48 @@
-// src/app/signup/page.tsx
+// src/app/auth/reset-password/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, Building2, ArrowRight, Chrome } from 'lucide-react'
-import { validatePasswordStrength, validateEmail } from '@/lib/validation-utils'
+import { Eye, EyeOff, Lock, AlertCircle, CheckCircle, Building2, ArrowRight } from 'lucide-react'
 
-export default function SignupPage() {
-  const [fullName, setFullName] = useState('')
-  const [email, setEmail] = useState('')
+export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [agreeToTerms, setAgreeToTerms] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [passwordStrength, setPasswordStrength] = useState(0)
-  const [passwordErrors, setPasswordErrors] = useState<string[]>([])
   
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
   // حساب قوة كلمة المرور
   useEffect(() => {
     if (!password) {
       setPasswordStrength(0)
-      setPasswordErrors([])
       return
     }
     
-    const validation = validatePasswordStrength(password)
-    const strengthMap = { 'weak': 0, 'fair': 2, 'good': 3, 'strong': 4, 'very-strong': 5 }
-    setPasswordStrength(strengthMap[validation.strength] || 0)
-    setPasswordErrors(validation.errors)
+    let strength = 0
+    if (password.length >= 8) strength++
+    if (password.length >= 12) strength++
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++
+    if (/\d/.test(password)) strength++
+    if (/[^a-zA-Z\d]/.test(password)) strength++
+    
+    setPasswordStrength(Math.min(strength, 5))
   }, [password])
 
-  const handleSignup = async (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
     setSuccess('')
-
-    // التحقق من الاسم
-    if (!fullName.trim()) {
-      setError('يرجى إدخال اسمك الكامل')
-      setLoading(false)
-      return
-    }
-
-    // التحقق من البريد الإلكتروني
-    if (!validateEmail(email)) {
-      setError('يرجى إدخال بريد إلكتروني صحيح')
-      setLoading(false)
-      return
-    }
-
-    // التحقق من كلمة المرور
-    const pwValidation = validatePasswordStrength(password)
-    if (!pwValidation.isValid) {
-      setError(pwValidation.errors[0])
-      setLoading(false)
-      return
-    }
 
     // التحقق من تطابق كلمات المرور
     if (password !== confirmPassword) {
@@ -74,60 +51,28 @@ export default function SignupPage() {
       return
     }
 
-    // التحقق من الموافقة على الشروط
-    if (!agreeToTerms) {
-      setError('يرجى الموافقة على شروط الاستخدام والسياسة الخصوصية')
+    // التحقق من قوة كلمة المرور
+    if (passwordStrength < 3) {
+      setError('كلمة المرور ضعيفة جداً. يجب استخدام أحرف كبيرة وصغيرة وأرقام')
       setLoading(false)
       return
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            created_at: new Date().toISOString(),
-          },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        }
+      const { error } = await supabase.auth.updateUser({
+        password: password
       })
 
       if (error) throw error
-      
-      setSuccess('تم إنشاء الحساب بنجاح! يرجى التحقق من بريدك الإلكتروني')
-      
-      // تنظيف النموذج
+
+      setSuccess('تم تحديث كلمة المرور بنجاح! جاري إعادة التوجيه...')
       setTimeout(() => {
-        setEmail('')
-        setPassword('')
-        setConfirmPassword('')
-        setFullName('')
-      }, 1500)
+        router.push('/dashboard')
+        router.refresh()
+      }, 2000)
       
     } catch (error: any) {
-      setError(error.message || 'حدث خطأ أثناء إنشاء الحساب')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSocialSignup = async (provider: 'google') => {
-    setLoading(true)
-    setError('')
-
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        }
-      })
-
-      if (error) throw error
-    } catch (error: any) {
-      setError(`فشل الاشتراك عبر Google`)
+      setError(error.message || 'فشل تحديث كلمة المرور. يرجى المحاولة مجدداً')
     } finally {
       setLoading(false)
     }
@@ -173,11 +118,11 @@ export default function SignupPage() {
           <div className="text-center mb-10 animate-slideInUp" style={{animationDelay: '0.1s'}}>
             <div className="flex justify-center mb-4">
               <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                <Building2 className="w-8 h-8 text-white" />
+                <Lock className="w-8 h-8 text-white" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">إنشاء حساب جديد</h1>
-            <p className="text-slate-400">انضم إلى منصة عماير Pro</p>
+            <h1 className="text-3xl font-bold text-white mb-2">تعيين كلمة المرور الجديدة</h1>
+            <p className="text-slate-400">أنشئ كلمة مرور قوية وآمنة</p>
           </div>
 
           {/* Error Alert */}
@@ -196,50 +141,13 @@ export default function SignupPage() {
             </div>
           )}
 
-          {/* Signup Form */}
-          <form onSubmit={handleSignup} className="space-y-5 animate-slideInUp" style={{animationDelay: '0.3s'}}>
+          {/* Reset Password Form */}
+          <form onSubmit={handleResetPassword} className="space-y-6 animate-slideInUp" style={{animationDelay: '0.3s'}}>
             
-            {/* Full Name Input */}
-            <div className="relative group">
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                الاسم الكامل
-              </label>
-              <div className="relative">
-                <User className="absolute right-3 top-3.5 w-5 h-5 text-slate-500 group-focus-within:text-blue-400 transition" />
-                <input
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="أحمد محمد"
-                  className="w-full pr-10 pl-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition duration-300"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Email Input */}
-            <div className="relative group">
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                البريد الإلكتروني
-              </label>
-              <div className="relative">
-                <Mail className="absolute right-3 top-3.5 w-5 h-5 text-slate-500 group-focus-within:text-blue-400 transition" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  className="w-full pr-10 pl-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition duration-300"
-                  dir="ltr"
-                  required
-                />
-              </div>
-            </div>
-
             {/* Password Input */}
             <div className="relative group">
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                كلمة المرور
+                كلمة المرور الجديدة
               </label>
               <div className="relative">
                 <Lock className="absolute right-3 top-3.5 w-5 h-5 text-slate-500 group-focus-within:text-blue-400 transition" />
@@ -276,19 +184,31 @@ export default function SignupPage() {
                       style={{width: `${(passwordStrength / 5) * 100}%`}}
                     ></div>
                   </div>
-
-                  {/* Password Requirements */}
-                  {passwordErrors.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {passwordErrors.map((error, idx) => (
-                        <p key={idx} className="text-xs text-orange-400 flex items-center gap-1">
-                          <span>⚠</span> {error}
-                        </p>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )}
+
+              {/* Password Requirements */}
+              <div className="mt-3 space-y-1">
+                <p className="text-xs text-slate-400 mb-2">متطلبات كلمة المرور:</p>
+                <div className="space-y-1">
+                  <div className={`flex items-center gap-2 text-xs ${password.length >= 8 ? 'text-green-400' : 'text-slate-500'}`}>
+                    <div className={`w-2 h-2 rounded-full ${password.length >= 8 ? 'bg-green-400' : 'bg-slate-600'}`}></div>
+                    8 أحرف على الأقل
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs ${/[a-z]/.test(password) && /[A-Z]/.test(password) ? 'text-green-400' : 'text-slate-500'}`}>
+                    <div className={`w-2 h-2 rounded-full ${/[a-z]/.test(password) && /[A-Z]/.test(password) ? 'bg-green-400' : 'bg-slate-600'}`}></div>
+                    أحرف كبيرة وصغيرة
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs ${/\d/.test(password) ? 'text-green-400' : 'text-slate-500'}`}>
+                    <div className={`w-2 h-2 rounded-full ${/\d/.test(password) ? 'bg-green-400' : 'bg-slate-600'}`}></div>
+                    أرقام
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs ${/[^a-zA-Z\d]/.test(password) ? 'text-green-400' : 'text-slate-500'}`}>
+                    <div className={`w-2 h-2 rounded-full ${/[^a-zA-Z\d]/.test(password) ? 'bg-green-400' : 'bg-slate-600'}`}></div>
+                    رموز خاصة (!@#$%^&*)
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Confirm Password Input */}
@@ -325,76 +245,31 @@ export default function SignupPage() {
               )}
             </div>
 
-            {/* Terms and Conditions */}
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={agreeToTerms}
-                onChange={(e) => setAgreeToTerms(e.target.checked)}
-                className="w-4 h-4 mt-1 rounded border border-slate-600 bg-slate-700 checked:bg-blue-600 checked:border-blue-500 cursor-pointer flex-shrink-0"
-              />
-              <span className="text-xs text-slate-400 group-hover:text-slate-300 transition leading-relaxed">
-                أوافق على{' '}
-                <a href="#" className="text-blue-400 hover:text-blue-300">شروط الاستخدام</a>{' '}
-                و{' '}
-                <a href="#" className="text-blue-400 hover:text-blue-300">سياسة الخصوصية</a>
-              </span>
-            </label>
-
-            {/* Signup Button */}
+            {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading || !fullName || !email || !password || !confirmPassword || !agreeToTerms}
-              className="w-full btn-gradient text-white py-3 rounded-lg font-bold text-base transition duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-blue-400/30"
+              disabled={loading || !password || !confirmPassword || password !== confirmPassword}
+              className="w-full btn-gradient text-white py-3 rounded-lg font-bold text-base transition duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed border border-blue-400/30"
             >
-              {loading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  جاري الإنشاء...
-                </>
-              ) : (
-                'إنشاء حساب'
-              )}
+              {loading ? 'جاري التحديث...' : 'تحديث كلمة المرور'}
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="relative my-8 animate-slideInUp" style={{animationDelay: '0.4s'}}>
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-700/50"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-gradient-to-b from-slate-800/50 via-slate-900/50 to-slate-950/50 text-slate-500">أو</span>
-            </div>
-          </div>
-
-          {/* Social Signup */}
-          <div className="space-y-3 animate-slideInUp" style={{animationDelay: '0.5s'}}>
-            <button
-              onClick={() => handleSocialSignup('google')}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 hover:border-slate-600/50 text-white py-3 rounded-lg font-medium transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Chrome className="w-5 h-5" />
-              Google
-            </button>
-          </div>
-
           {/* Footer */}
-          <div className="mt-8 pt-8 border-t border-slate-700/50 text-center animate-slideInUp" style={{animationDelay: '0.6s'}}>
+          <div className="mt-8 pt-8 border-t border-slate-700/50 text-center animate-slideInUp" style={{animationDelay: '0.4s'}}>
             <p className="text-slate-400 text-sm">
-              لديك حساب بالفعل؟{' '}
+              تذكرت كلمتك؟{' '}
               <Link href="/login" className="text-blue-400 hover:text-blue-300 font-medium transition">
-                دخول
+                عد إلى تسجيل الدخول
               </Link>
             </p>
           </div>
         </div>
 
         {/* Security Info */}
-        <div className="mt-6 p-4 rounded-lg bg-slate-800/30 border border-slate-700/50 text-center animate-slideInUp" style={{animationDelay: '0.7s'}}>
+        <div className="mt-6 p-4 rounded-lg bg-slate-800/30 border border-slate-700/50 text-center animate-slideInUp" style={{animationDelay: '0.5s'}}>
           <p className="text-xs text-slate-500">
-            🔒 بيانات تسجيلك آمنة ومشفرة بشكل كامل
+            🔒 تحديثك لكلمة المرور آمن تماماً ومشفر بشكل كامل
           </p>
         </div>
       </div>

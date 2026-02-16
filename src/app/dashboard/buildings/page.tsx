@@ -8,7 +8,8 @@ import { Plus, ArrowLeft, Building2, MapPin, Users, DollarSign, Search, Edit, Tr
 interface Building {
   id: string
   name: string
-  address: string
+  plot_number: string
+  neighborhood?: string
   total_units: number
   total_floors: number
   owner_id: string
@@ -67,7 +68,8 @@ export default function BuildingsPage() {
 
   const filteredBuildings = buildings.filter(building =>
     building.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    building.address.toLowerCase().includes(searchTerm.toLowerCase())
+    building.plot_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    building.neighborhood?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   // Sort by newest first (last added)
@@ -161,57 +163,74 @@ export default function BuildingsPage() {
             )}
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow p-4 border border-gray-200">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full text-sm divide-y divide-gray-200">
+              <table className="w-full text-sm">
                 <thead>
-                    <tr className="bg-gradient-to-r from-slate-50 to-white text-slate-600">
-                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">الاسم</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">العنوان</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">الأدوار</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">الوحدات</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">الإجراءات</th>
+                    <tr className="bg-gradient-to-r from-slate-50 to-white text-slate-700 border-b border-gray-200">
+                      <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider w-[25%]">الاسم</th>
+                      <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider w-[15%]">رقم القطعة</th>
+                      <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider w-[20%]">الحي</th>
+                      <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider w-[8%]">الأدوار</th>
+                      <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider w-[8%]">الوحدات</th>
+                      <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider w-[24%]">الإجراءات</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {displayedBuildings.map((b) => (
-                    <tr key={b.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 align-top">
-                        <div className="flex items-center gap-3 justify-end">
-                          <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                            <Building2 className="w-5 h-5 text-indigo-600" />
+                    <tr key={b.id} className="hover:bg-slate-50 transition-colors duration-150">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+                            <Building2 className="w-6 h-6 text-white" />
                           </div>
-                          <div className="text-right">
-                            <div className="font-semibold text-gray-800">{b.name}</div>
+                          <div className="text-right min-w-0 flex-1">
+                            <div className="font-bold text-gray-900 truncate">{b.name}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-700">{b.address}</td>
-                      <td className="px-4 py-3 text-center font-medium text-gray-800">{b.total_floors}</td>
-                      <td className="px-4 py-3 text-center font-medium text-gray-800">{b.total_units}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 text-gray-700">
+                          <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          <span className="truncate">{b.plot_number}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-gray-700 truncate">{b.neighborhood || '-'}</span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="font-semibold text-gray-700">
+                          {b.total_floors}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="font-semibold text-gray-700">
+                          {b.total_units}
+                        </span>
+                      </td>
                       
-                      <td className="px-4 py-3 text-center">
-                        <div className="inline-flex items-center gap-2">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center gap-2">
                           <Link
                             href={`/dashboard/buildings/${b.id}`}
-                            className="p-2 bg-gradient-to-r from-white to-white/70 text-blue-600 rounded-full hover:scale-110 transform transition shadow-md border border-gray-100"
-                            aria-label="عرض"
+                            className="p-2 text-blue-600 hover:text-blue-700 rounded-full hover:bg-blue-50 hover:scale-110 transform transition"
+                            title="عرض التفاصيل"
                           >
                             <Eye className="w-4 h-4" />
                           </Link>
 
                           <Link
                             href={`/dashboard/buildings/edit/${b.id}`}
-                            className="p-2 bg-gradient-to-r from-white to-white/70 text-indigo-600 rounded-full hover:scale-110 transform transition shadow-md border border-gray-100"
-                            aria-label="تعديل"
+                            className="p-2 text-indigo-600 hover:text-indigo-700 rounded-full hover:bg-indigo-50 hover:scale-110 transform transition"
+                            title="تعديل"
                           >
                             <Edit className="w-4 h-4" />
                           </Link>
 
                           <button
                             onClick={() => deleteBuilding(b.id)}
-                            className="p-2 bg-gradient-to-r from-white to-white/70 text-red-600 rounded-full hover:scale-110 transform transition shadow-md border border-gray-100"
-                            aria-label="حذف"
+                            className="p-2 text-red-600 hover:text-red-700 rounded-full hover:bg-red-50 hover:scale-110 transform transition"
+                            title="حذف"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
