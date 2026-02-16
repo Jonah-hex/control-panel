@@ -784,7 +784,7 @@ export default function NewBuildingPage() {
                     currentStep >= step.number ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'
                   }`}
                 >
-                  <div className={`w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center mb-3 mt-[5px] transition-transform duration-300 ${
+                  <div className={`w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center mb-3 mt-[10px] transition-transform duration-300 ${
                     currentStep > step.number
                       ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white scale-110 shadow-xl shadow-green-500/20'
                       : currentStep === step.number
