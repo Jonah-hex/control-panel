@@ -452,6 +452,55 @@ export default function NewBuildingPage() {
     setFormData(prev => ({ ...prev, totalUnits: total }))
   }
 
+  // إضافة دالة نسخ الدور لجميع الأدوار - Quick Add
+  const copyFloorToAll = (sourceFloorNumber: number) => {
+    const sourceFloor = floors.find(f => f.number === sourceFloorNumber)
+    if (!sourceFloor || sourceFloor.units.length === 0) {
+      alert('الدور خالٍ من الوحدات!')
+      return
+    }
+
+    if (!confirm(`هل أنت متأكد من نسخ هذا الدور \u0625لى جميع الأدوار الأخرى؟ \n\nسيتم استبدال جميع الوحدات في الأدوار الأخرى.`)) {
+      return
+    }
+
+    setFloors(floors.map(floor => {
+      if (floor.number === sourceFloorNumber) return floor
+      
+      const newUnits = sourceFloor.units.map((unit, index) => ({
+        ...unit,
+        unitNumber: `${floor.number}${String(index + 1).padStart(2, '0')}`,
+        floor: floor.number
+      }))
+
+      return {
+        ...floor,
+        units: newUnits,
+        floorPlan: sourceFloor.floorPlan,
+        unitsPerFloor: sourceFloor.unitsPerFloor
+      }
+    }))
+
+    setSuccess(`تم نسخ الدور ${sourceFloorNumber} إلى جميع الأدوار بنجاح!`)
+    setTimeout(() => setSuccess(''), 3000)
+  }
+
+  // إضافة وحدات بشكل سريع - Quick Add Units
+  const quickAddUnits = () => {
+    if (floors.length === 0) {
+      alert('الرجاء إضافة دور واحد على الأقل')
+      return
+    }
+
+    const floor1 = floors[0]
+    if (floor1.units.length === 0) {
+      alert('الرجاء إضافة وحدة واحدة على الأقل في الدور الأول كنموذج')
+      return
+    }
+
+    copyFloorToAll(1)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -639,28 +688,28 @@ export default function NewBuildingPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100" dir="rtl">
-      {/* الشريط العلوي - مطابق لمظهر لوحة التحكم */}
-      <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20 backdrop-blur-lg bg-white/80">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50" dir="rtl">
+      {/* الشريط العلوي - تصميم محسّن */}
+      <div className="bg-white/90 shadow-lg border-b-2 border-indigo-100 sticky top-0 z-20 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
             <div className="flex items-center gap-4">
-              <Link href="/dashboard/buildings" className="inline-flex items-center p-2 rounded-full hover:bg-gray-100 transition">
-                <span className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-md text-white">
-                  <ArrowLeft className="w-5 h-5 text-white" />
+              <Link href="/dashboard/buildings" className="inline-flex items-center p-2 rounded-2xl hover:bg-indigo-50 transition-all duration-300 group">
+                <span className="w-12 h-12 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/30 group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
+                  <ArrowLeft className="w-6 h-6 text-white" />
                 </span>
               </Link>
 
               <div>
-                <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-                  <span className="w-10 h-10 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 rounded-2xl flex items-center justify-center text-white shadow-xl">
-                    <Building2 className="w-5 h-5" />
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-3">
+                  <span className="w-12 h-12 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-500/30 animate-pulse">
+                    <Building2 className="w-6 h-6" />
                   </span>
                   إضافة عمارة جديدة
                 </h1>
-                <p className="text-xs text-gray-500 flex items-center gap-2">
-                  <Info className="w-3 h-3 text-gray-400" />
-                  أدخل جميع تفاصيل العمارة والوحدات السكنية
+                <p className="text-xs text-gray-600 flex items-center gap-2 mt-1">
+                  <Sparkles className="w-3 h-3 text-indigo-400 animate-pulse" />
+                  أدخل جميع تفاصيل العمارة والوحدات السكنية بطريقة سهلة وسريعة
                 </p>
               </div>
             </div>
@@ -668,22 +717,22 @@ export default function NewBuildingPage() {
             <div className="flex items-center gap-3">
               <Link
                 href="/dashboard"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-gray-200 hover:shadow-md transition transform hover:-translate-y-0.5"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-white rounded-2xl border-2 border-gray-200 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-300 group"
               >
-                <span className="w-9 h-9 rounded-full bg-slate-50 flex items-center justify-center">
-                  <ArrowLeft className="w-4 h-4 text-slate-800" />
+                <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center group-hover:from-indigo-100 group-hover:to-purple-100 transition-all">
+                  <Home className="w-5 h-5 text-gray-700 group-hover:text-indigo-600 transition-colors" />
                 </span>
-                <span className="text-sm font-semibold text-slate-800">لوحة التحكم</span>
+                <span className="text-sm font-bold text-gray-700 group-hover:text-indigo-600 transition-colors">الرئيسية</span>
               </Link>
 
               <Link
                 href="/dashboard/buildings"
-                className="inline-flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-700 text-white rounded-full shadow-2xl hover:shadow-xl transform transition hover:-translate-y-0.5"
+                className="inline-flex items-center gap-3 px-5 py-2.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-2xl shadow-xl shadow-indigo-500/30 hover:shadow-2xl transform transition-all duration-300 hover:-translate-y-1 hover:scale-105"
               >
-                <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
-                  <Building2 className="w-4 h-4 text-white" />
+                <span className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-white" />
                 </span>
-                <span className="text-sm font-semibold">قائمة العماير</span>
+                <span className="text-sm font-bold">قائمة العماير</span>
               </Link>
             </div>
           </div>
@@ -1168,49 +1217,81 @@ export default function NewBuildingPage() {
             {/* Step 3: الوحدات السكنية - تصميم محسّن */}
             {currentStep === 3 && (
               <div className="space-y-6 animate-fadeIn">
-                <div className="border-t-4 border-orange-500 pt-6">
-                  <div className="flex items-center gap-4 mb-2">
-                    <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/30">
-                      <Grid className="w-5 h-5 text-white" />
+                <div className="border-t-4 border-gradient-to-r from-orange-500 to-amber-500 pt-6 rounded-t-2xl">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-gradient-to-br from-orange-500 via-amber-500 to-yellow-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/40 animate-pulse">
+                        <Grid className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">الوحدات السكنية</h2>
+                        <p className="text-xs text-gray-600 flex items-center gap-2 mt-1">
+                          <Sparkles className="w-3 h-3 text-amber-500" />
+                          أضف وحدات دقيقة مع جميع التفاصيل بشكل سريع وسهل
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-800">الوحدات السكنية</h2>
-                      <p className="text-xs text-gray-500">أضف وحدات دقيقة مع جميع التفاصيل</p>
-                    </div>
+
+                    {/* Quick Add Button - إضافة سريعة */}
+                    <button
+                      type="button"
+                      onClick={quickAddUnits}
+                      className="group relative inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all duration-300 hover:scale-105 overflow-hidden"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                      <Zap className="w-5 h-5 relative z-10 group-hover:rotate-12 transition-transform" />
+                      <span className="relative z-10 font-bold">تطبيق الدور الأول على الكل</span>
+                      <Sparkles className="w-4 h-4 relative z-10 animate-pulse" />
+                    </button>
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-6 mb-6 shadow-sm">
+                <div className="bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 border-2 border-amber-200 rounded-2xl p-6 mb-6 shadow-md hover:shadow-lg transition-shadow">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 text-amber-800">
-                      <Info className="w-5 h-5" />
-                      <p className="text-sm"><span className="font-bold text-xl mr-2 text-amber-900">{floors.reduce((sum, floor) => sum + floor.units.length, 0)}</span> وحدة إجمالاً</p>
+                    <div className="flex items-center gap-3 text-amber-900">
+                      <div className="w-12 h-12 bg-gradient-to-br from-amber-600 to-orange-600 rounded-xl flex items-center justify-center shadow-md">
+                        <Info className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold flex items-center gap-2">
+                          <span className="text-3xl text-amber-900">{floors.reduce((sum, floor) => sum + floor.units.length, 0)}</span>
+                          <span>وحدة إجمالاً</span>
+                        </p>
+                        <p className="text-xs text-amber-700 mt-1">موزعة على {floors.length} {floors.length === 1 ? 'دور' : 'أدوار'}</p>
+                      </div>
                     </div>
-                    <div className="text-xs text-amber-700 bg-white px-3 py-1 rounded-full">
-                      {floors.map(f => f.units.length).join(' + ')}
+                    <div className="flex gap-2">
+                      {floors.map((f, idx) => (
+                        <div key={idx} className="text-xs bg-white text-amber-700 px-3 py-2 rounded-xl shadow-sm font-bold border border-amber-200 hover:bg-amber-50 transition-colors">
+                          د{f.number}: {f.units.length}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
 
                 {floors.map((floor) => (
-                  <div key={floor.number} className="border-2 border-gray-200 rounded-2xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300">
+                  <div key={floor.number} className="border-2 border-gray-200 rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-1">
                     {/* رأس الدور - تصميم محسّن */}
                     <div
-                      className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white p-6 cursor-pointer hover:shadow-lg transition-all duration-300"
+                      className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white p-6 cursor-pointer hover:shadow-2xl transition-all duration-300 relative overflow-hidden group"
                       onClick={() => setExpandedFloor(expandedFloor === floor.number ? null : floor.number)}
                     >
-                      <div className="flex items-center justify-between">
+                      {/* Animated Background */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                      
+                      <div className="flex items-center justify-between relative z-10">
                         <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg border border-white/30">
-                            <Layers className="w-6 h-6 text-white" />
+                          <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-xl border-2 border-white/30 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                            <Layers className="w-7 h-7 text-white" />
                           </div>
                           <div>
-                            <h3 className="font-bold text-xl">الدور {floor.number}</h3>
-                            <div className="flex items-center gap-3 mt-1">
-                              <span className="text-sm bg-white/20 backdrop-blur px-3 py-1 rounded-full">
-                                {floor.units.length} وحدات
+                            <h3 className="font-black text-2xl">الدور {floor.number}</h3>
+                            <div className="flex items-center gap-3 mt-2">
+                              <span className="text-sm bg-white/20 backdrop-blur px-4 py-1.5 rounded-full font-bold shadow-sm">
+                                {floor.units.length} {floor.units.length === 1 ? 'وحدة' : 'وحدات'}
                               </span>
-                              <span className="text-sm text-white/90">
+                              <span className="text-sm text-white/90 font-medium">
                                 نظام: {
                                   floor.floorPlan === '4shuqq' ? '٤ شقق' :
                                   floor.floorPlan === '3shuqq' ? '٣ شقق' : 'شقتين'
@@ -1224,12 +1305,23 @@ export default function NewBuildingPage() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
+                              copyFloorToAll(floor.number)
+                            }}
+                            className="group/btn p-3 bg-emerald-500/30 backdrop-blur-sm text-white rounded-xl hover:bg-emerald-500/50 transition-all hover:scale-110 border border-white/30 shadow-lg"
+                            title="نسخ هذا الدور لجميع الأدوار"
+                          >
+                            <Copy className="w-5 h-5 group-hover/btn:rotate-12 transition-transform" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
                               addUnit(floor.number)
                             }}
-                            className="p-3 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition-all hover:scale-110 border border-white/30"
+                            className="group/btn p-3 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition-all hover:scale-110 border border-white/30 shadow-lg"
                             title="إضافة وحدة جديدة"
                           >
-                            <Plus className="w-5 h-5" />
+                            <Plus className="w-5 h-5 group-hover/btn:rotate-90 transition-transform" />
                           </button>
                           <button
                             type="button"
@@ -1237,17 +1329,17 @@ export default function NewBuildingPage() {
                               e.stopPropagation()
                               removeFloor(floor.number)
                             }}
-                            className="p-3 bg-red-500/30 backdrop-blur-sm text-white rounded-xl hover:bg-red-500/50 transition-all hover:scale-110 border border-white/30"
+                            className="group/btn p-3 bg-red-500/30 backdrop-blur-sm text-white rounded-xl hover:bg-red-500/50 transition-all hover:scale-110 border border-white/30 shadow-lg"
                             title="حذف الدور"
                           >
-                            <Trash2 className="w-5 h-5" />
+                            <Trash2 className="w-5 h-5 group-hover/btn:rotate-12 transition-transform" />
                           </button>
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
                             }}
-                            className="p-3 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition-all"
+                            className="p-3 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition-all shadow-lg"
                           >
                             {expandedFloor === floor.number ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                           </button>
