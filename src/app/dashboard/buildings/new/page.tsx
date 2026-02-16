@@ -138,6 +138,7 @@ interface Unit {
   kitchens: number
   maidRoom: boolean
   driverRoom: boolean
+  entrances: number
   acType: 'split' | 'window' | 'splitWindow' | 'central' | 'none'
   status: 'available' | 'sold' | 'reserved'
   price: number
@@ -315,6 +316,7 @@ export default function NewBuildingPage() {
         kitchens: 1,
         maidRoom: false,
         driverRoom: false,
+        entrances: 1,
         acType: 'split',
         status: 'available',
         price: 0
@@ -370,6 +372,7 @@ export default function NewBuildingPage() {
             kitchens: 1,
             maidRoom: false,
             driverRoom: false,
+            entrances: 1,
             acType: 'split',
             status: 'available',
             price: 0
@@ -409,6 +412,7 @@ export default function NewBuildingPage() {
           kitchens: 1,
           maidRoom: false,
           driverRoom: false,
+          entrances: 1,
           acType: 'split',
           status: 'available',
           price: 0
@@ -1258,6 +1262,7 @@ export default function NewBuildingPage() {
                                   kitchens: 1,
                                   maidRoom: false,
                                   driverRoom: false,
+                                  entrances: 1,
                                   acType: 'split',
                                   status: 'available',
                                   price: 0
@@ -1425,16 +1430,16 @@ export default function NewBuildingPage() {
             {/* Step 3: الوحدات السكنية - تصميم محسّن */}
             {currentStep === 3 && (
               <div className="space-y-6 animate-fadeIn">
-                <div className="border-t-4 border-gradient-to-r from-orange-500 to-amber-500 pt-6 rounded-t-2xl">
+                <div className="border-t-4 border-emerald-400/40 pt-6 rounded-t-2xl">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-gradient-to-br from-orange-500 via-amber-500 to-yellow-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/40 animate-pulse">
+                      <div className="w-12 h-12 bg-gradient-to-br from-emerald-400/80 to-teal-400/80 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-400/20 backdrop-blur-sm">
                         <Grid className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">الوحدات السكنية</h2>
-                        <p className="text-xs text-gray-600 flex items-center gap-2 mt-1">
-                          <Sparkles className="w-3 h-3 text-amber-500" />
+                        <h2 className="text-2xl font-bold text-gray-700">الوحدات السكنية</h2>
+                        <p className="text-xs text-gray-500/80 flex items-center gap-2 mt-1">
+                          <Sparkles className="w-3 h-3 text-emerald-500/70" />
                           أضف وحدات دقيقة مع جميع التفاصيل بشكل سريع وسهل
                         </p>
                       </div>
@@ -1444,33 +1449,33 @@ export default function NewBuildingPage() {
                     <button
                       type="button"
                       onClick={quickAddUnits}
-                      className="group relative inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all duration-300 hover:scale-105 overflow-hidden"
+                      className="group relative inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-emerald-500/90 to-teal-500/90 text-white rounded-2xl shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:shadow-emerald-500/30 transition-all duration-300 hover:scale-105 overflow-hidden backdrop-blur-sm"
                     >
                       <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                       <Zap className="w-5 h-5 relative z-10 group-hover:rotate-12 transition-transform" />
                       <span className="relative z-10 font-bold">تطبيق الدور الأول على الكل</span>
-                      <Sparkles className="w-4 h-4 relative z-10 animate-pulse" />
+                      <Sparkles className="w-4 h-4 relative z-10" />
                     </button>
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 border-2 border-amber-200 rounded-2xl p-6 mb-6 shadow-md hover:shadow-lg transition-shadow">
+                <div className="bg-gradient-to-br from-emerald-50/50 via-teal-50/50 to-cyan-50/50 border-2 border-emerald-200/30 rounded-2xl p-6 mb-6 shadow-sm hover:shadow-md transition-shadow backdrop-blur-sm">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 text-amber-900">
-                      <div className="w-12 h-12 bg-gradient-to-br from-amber-600 to-orange-600 rounded-xl flex items-center justify-center shadow-md">
+                    <div className="flex items-center gap-3 text-emerald-900">
+                      <div className="w-12 h-12 bg-gradient-to-br from-emerald-400/80 to-teal-400/80 rounded-xl flex items-center justify-center shadow-md">
                         <Info className="w-6 h-6 text-white" />
                       </div>
                       <div>
                         <p className="text-lg font-bold flex items-center gap-2">
-                          <span className="text-3xl text-amber-900">{floors.reduce((sum, floor) => sum + floor.units.length, 0)}</span>
-                          <span>وحدة إجمالاً</span>
+                          <span className="text-3xl text-emerald-700">{floors.reduce((sum, floor) => sum + floor.units.length, 0)}</span>
+                          <span className="text-gray-600">وحدة إجمالاً</span>
                         </p>
-                        <p className="text-xs text-amber-700 mt-1">موزعة على {floors.length} {floors.length === 1 ? 'دور' : 'أدوار'}</p>
+                        <p className="text-xs text-emerald-600/80 mt-1">موزعة على {floors.length} {floors.length === 1 ? 'دور' : 'أدوار'}</p>
                       </div>
                     </div>
                     <div className="flex gap-2">
                       {floors.map((f, idx) => (
-                        <div key={idx} className="text-xs bg-white text-amber-700 px-3 py-2 rounded-xl shadow-sm font-bold border border-amber-200 hover:bg-amber-50 transition-colors">
+                        <div key={idx} className="text-xs bg-white/70 backdrop-blur-sm text-emerald-700 px-3 py-2 rounded-xl shadow-sm font-bold border border-emerald-200/50 hover:bg-white/90 transition-colors">
                           د{f.number}: {f.units.length}
                         </div>
                       ))}
@@ -1479,24 +1484,21 @@ export default function NewBuildingPage() {
                 </div>
 
                 {floors.map((floor) => (
-                  <div key={floor.number} className="border-2 border-gray-200 rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-1">
+                  <div key={floor.number} className="border-2 border-emerald-200/30 rounded-3xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-500 backdrop-blur-sm">
                     {/* رأس الدور - تصميم محسّن */}
                     <div
-                      className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white p-6 cursor-pointer hover:shadow-2xl transition-all duration-300 relative overflow-hidden group"
-                      onClick={() => setExpandedFloor(expandedFloor === floor.number ? null : floor.number)}
+                      className="bg-gradient-to-r from-emerald-400/70 via-teal-400/70 to-cyan-400/70 text-white p-6 hover:from-emerald-400/80 hover:via-teal-400/80 hover:to-cyan-400/80 transition-all duration-300 relative overflow-hidden group backdrop-blur-md"
                     >
                       {/* Animated Background */}
                       <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                       
                       <div className="flex items-center justify-between relative z-10">
                         <div className="flex items-center gap-4">
-                          <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-xl border-2 border-white/30 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
-                            <Layers className="w-7 h-7 text-white" />
-                          </div>
+                          <Layers className="w-7 h-7 text-white/90" />
                           <div>
-                            <h3 className="font-black text-2xl">الدور {floor.number}</h3>
+                            <h3 className="font-bold text-xl">الدور {floor.number}</h3>
                             <div className="flex items-center gap-3 mt-2">
-                              <span className="text-sm bg-white/20 backdrop-blur px-4 py-1.5 rounded-full font-bold shadow-sm">
+                              <span className="text-sm bg-white/20 backdrop-blur px-4 py-1.5 rounded-full font-medium shadow-sm">
                                 {floor.units.length} {floor.units.length === 1 ? 'وحدة' : 'وحدات'}
                               </span>
                               <span className="text-sm text-white/90 font-medium">
@@ -1515,10 +1517,10 @@ export default function NewBuildingPage() {
                               e.stopPropagation()
                               copyFloorToAll(floor.number)
                             }}
-                            className="group/btn p-3 bg-emerald-500/30 backdrop-blur-sm text-white rounded-xl hover:bg-emerald-500/50 transition-all hover:scale-110 border border-white/30 shadow-lg"
+                            className="group/btn p-2.5 text-white rounded-lg hover:bg-white/20 transition-all hover:scale-110"
                             title="نسخ هذا الدور لجميع الأدوار"
                           >
-                            <Copy className="w-5 h-5 group-hover/btn:rotate-12 transition-transform" />
+                            <Copy className="w-4.5 h-4.5 group-hover/btn:rotate-12 transition-transform" />
                           </button>
                           <button
                             type="button"
@@ -1526,10 +1528,10 @@ export default function NewBuildingPage() {
                               e.stopPropagation()
                               addUnit(floor.number)
                             }}
-                            className="group/btn p-3 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition-all hover:scale-110 border border-white/30 shadow-lg"
+                            className="group/btn p-2.5 text-white rounded-lg hover:bg-white/20 transition-all hover:scale-110"
                             title="إضافة وحدة جديدة"
                           >
-                            <Plus className="w-5 h-5 group-hover/btn:rotate-90 transition-transform" />
+                            <Plus className="w-4.5 h-4.5 group-hover/btn:rotate-90 transition-transform" />
                           </button>
                           <button
                             type="button"
@@ -1537,17 +1539,18 @@ export default function NewBuildingPage() {
                               e.stopPropagation()
                               removeFloor(floor.number)
                             }}
-                            className="group/btn p-3 bg-red-500/30 backdrop-blur-sm text-white rounded-xl hover:bg-red-500/50 transition-all hover:scale-110 border border-white/30 shadow-lg"
+                            className="group/btn p-2.5 text-white rounded-lg hover:bg-white/20 transition-all hover:scale-110"
                             title="حذف الدور"
                           >
-                            <Trash2 className="w-5 h-5 group-hover/btn:rotate-12 transition-transform" />
+                            <Trash2 className="w-4.5 h-4.5 group-hover/btn:rotate-12 transition-transform" />
                           </button>
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
+                              setExpandedFloor(expandedFloor === floor.number ? null : floor.number)
                             }}
-                            className="p-3 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition-all shadow-lg"
+                            className="p-2.5 text-white rounded-lg hover:bg-white/20 transition-all"
                           >
                             {expandedFloor === floor.number ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                           </button>
@@ -1559,24 +1562,21 @@ export default function NewBuildingPage() {
                     {expandedFloor === floor.number && (
                       <div className="p-6 space-y-5 bg-gray-50/50">
                         {floor.units.map((unit, unitIndex) => (
-                          <div key={unitIndex} className="bg-white rounded-2xl border-2 border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
+                          <div key={unitIndex} className="bg-white/70 backdrop-blur-sm rounded-2xl border-2 border-emerald-200/30 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
                             {/* رأس الوحدة */}
-                            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b-2 border-gray-200 p-5 flex items-center justify-between cursor-pointer hover:bg-purple-100/50 transition-colors"
-                              onClick={() => setExpandedUnit(expandedUnit === `${floor.number}-${unitIndex}` ? null : `${floor.number}-${unitIndex}`)}>
+                            <div className="bg-gradient-to-r from-emerald-50/60 to-teal-50/60 border-b-2 border-emerald-200/30 p-5 flex items-center justify-between backdrop-blur-sm">
                               <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-md">
-                                  <Home className="w-6 h-6 text-white" />
-                                </div>
+                                <Home className="w-6 h-6 text-emerald-600/80" />
                                 <div>
-                                  <h4 className="font-bold text-gray-900 text-lg">الوحدة {unit.unitNumber}</h4>
+                                  <h4 className="font-bold text-gray-700 text-lg">الوحدة {unit.unitNumber}</h4>
                                   <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                                    <span className="text-xs bg-blue-100/70 backdrop-blur-sm text-blue-700 px-2 py-1 rounded-full font-medium">
                                       {unit.type === 'apartment' ? 'شقة' : unit.type === 'studio' ? 'استوديو' : unit.type === 'duplex' ? 'دوبلكس' : 'بنتهاوس'}
                                     </span>
-                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                      unit.status === 'available' ? 'bg-green-100 text-green-700' :
-                                      unit.status === 'reserved' ? 'bg-yellow-100 text-yellow-700' :
-                                      'bg-red-100 text-red-700'
+                                    <span className={`text-xs px-2 py-1 rounded-full font-medium backdrop-blur-sm ${
+                                      unit.status === 'available' ? 'bg-green-100/70 text-green-700' :
+                                      unit.status === 'reserved' ? 'bg-yellow-100/70 text-yellow-700' :
+                                      'bg-red-100/70 text-red-700'
                                     }`}>
                                       {unit.status === 'available' ? 'متاح' : unit.status === 'reserved' ? 'محجوز' : 'مباع'}
                                     </span>
@@ -1590,7 +1590,7 @@ export default function NewBuildingPage() {
                                     e.stopPropagation()
                                     duplicateUnit(floor.number, unitIndex)
                                   }}
-                                  className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-all hover:scale-110 shadow-sm"
+                                  className="p-2 text-blue-600 rounded-lg hover:bg-blue-100/50 transition-all hover:scale-110"
                                   title="نسخ الوحدة"
                                 >
                                   <Copy className="w-4 h-4" />
@@ -1601,7 +1601,7 @@ export default function NewBuildingPage() {
                                     e.stopPropagation()
                                     removeUnit(floor.number, unitIndex)
                                   }}
-                                  className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-all hover:scale-110 shadow-sm"
+                                  className="p-2 text-red-600 rounded-lg hover:bg-red-100/50 transition-all hover:scale-110"
                                   title="حذف الوحدة"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -1610,8 +1610,9 @@ export default function NewBuildingPage() {
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation()
+                                    setExpandedUnit(expandedUnit === `${floor.number}-${unitIndex}` ? null : `${floor.number}-${unitIndex}`)
                                   }}
-                                  className="p-2 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 transition-all"
+                                  className="p-2 text-gray-600 rounded-lg hover:bg-gray-200/50 transition-all"
                                 >
                                   {expandedUnit === `${floor.number}-${unitIndex}` ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                                 </button>
@@ -1653,8 +1654,8 @@ export default function NewBuildingPage() {
                                 {/* الصف الأول - المعلومات الأساسية */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                   <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                      <Maximize className="w-4 h-4 text-blue-600" />
+                                    <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
+                                      <Maximize className="w-4 h-4 text-blue-500/70" />
                                       المساحة (م²)
                                     </label>
                                     <input
@@ -1663,14 +1664,14 @@ export default function NewBuildingPage() {
                                       step="0.1"
                                       value={unit.area}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { area: parseFloat(e.target.value) || 0 })}
-                                      className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition font-semibold text-lg"
+                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-semibold text-lg shadow-sm hover:shadow-md"
                                       placeholder="0.00"
                                     />
                                   </div>
 
                                   <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                      <DollarSign className="w-4 h-4 text-green-600" />
+                                    <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
+                                      <DollarSign className="w-4 h-4 text-green-500/70" />
                                       السعر (ر.س)
                                     </label>
                                     <input
@@ -1678,20 +1679,20 @@ export default function NewBuildingPage() {
                                       min="0"
                                       value={unit.price}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { price: parseInt(e.target.value) || 0 })}
-                                      className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 outline-none transition font-semibold text-lg"
+                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-semibold text-lg shadow-sm hover:shadow-md"
                                       placeholder="0"
                                     />
                                   </div>
 
                                   <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                      <Tag className="w-4 h-4 text-purple-600" />
+                                    <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
+                                      <Tag className="w-4 h-4 text-purple-500/70" />
                                       نوع الوحدة
                                     </label>
                                     <select
                                       value={unit.type}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { type: e.target.value as any })}
-                                      className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition font-medium"
+                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
                                     >
                                       <option value="apartment">شقة</option>
                                       <option value="studio">ملحق</option>
@@ -1704,8 +1705,8 @@ export default function NewBuildingPage() {
                                 {/* الصف الثاني - الغرف والحمامات */}
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                   <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                      <Bed className="w-4 h-4 text-red-500" />
+                                    <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
+                                      <Bed className="w-4 h-4 text-red-500/70" />
                                       عدد الغرف
                                     </label>
                                     <input
@@ -1713,13 +1714,13 @@ export default function NewBuildingPage() {
                                       min="0"
                                       value={unit.rooms}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { rooms: parseInt(e.target.value) || 0 })}
-                                      className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-red-500 focus:ring-4 focus:ring-red-100 outline-none transition font-semibold text-center text-lg"
+                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-semibold text-center text-lg shadow-sm hover:shadow-md"
                                     />
                                   </div>
 
                                   <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                      <Bath className="w-4 h-4 text-cyan-500" />
+                                    <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
+                                      <Bath className="w-4 h-4 text-cyan-500/70" />
                                       عدد الحمامات
                                     </label>
                                     <input
@@ -1727,13 +1728,13 @@ export default function NewBuildingPage() {
                                       min="0"
                                       value={unit.bathrooms}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { bathrooms: parseInt(e.target.value) || 0 })}
-                                      className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 outline-none transition font-semibold text-center text-lg"
+                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-semibold text-center text-lg shadow-sm hover:shadow-md"
                                     />
                                   </div>
 
                                   <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                      <Sofa className="w-4 h-4 text-amber-500" />
+                                    <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
+                                      <Sofa className="w-4 h-4 text-amber-500/70" />
                                       صالات
                                     </label>
                                     <input
@@ -1741,13 +1742,13 @@ export default function NewBuildingPage() {
                                       min="0"
                                       value={unit.livingRooms}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { livingRooms: parseInt(e.target.value) || 0 })}
-                                      className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-amber-500 focus:ring-4 focus:ring-amber-100 outline-none transition font-semibold text-center text-lg"
+                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-semibold text-center text-lg shadow-sm hover:shadow-md"
                                     />
                                   </div>
 
                                   <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                      <UtensilsCrossed className="w-4 h-4 text-orange-500" />
+                                    <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
+                                      <UtensilsCrossed className="w-4 h-4 text-orange-500/70" />
                                       مطابخ
                                     </label>
                                     <input
@@ -1755,22 +1756,36 @@ export default function NewBuildingPage() {
                                       min="0"
                                       value={unit.kitchens}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { kitchens: parseInt(e.target.value) || 0 })}
-                                      className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition font-semibold text-center text-lg"
+                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-semibold text-center text-lg shadow-sm hover:shadow-md"
                                     />
                                   </div>
                                 </div>
 
-                                {/* الصف الثالث - الغرف الإضافية والتكييف */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {/* الصف الثالث - الغرف الإضافية والتكييف والمداخل */}
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                   <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                      <User className="w-4 h-4 text-indigo-600" />
+                                    <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
+                                      <DoorOpen className="w-4 h-4 text-emerald-500/70" />
+                                      عدد المداخل
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      value={unit.entrances}
+                                      onChange={(e) => updateUnit(floor.number, unitIndex, { entrances: parseInt(e.target.value) || 1 })}
+                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-semibold text-center text-lg shadow-sm hover:shadow-md"
+                                    />
+                                  </div>
+                                  
+                                  <div className="space-y-2">
+                                    <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
+                                      <User className="w-4 h-4 text-indigo-500/70" />
                                       غرفة خادمة
                                     </label>
                                     <select
                                       value={unit.maidRoom ? 'yes' : 'no'}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { maidRoom: e.target.value === 'yes' })}
-                                      className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition font-medium"
+                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
                                     >
                                       <option value="no">لا يوجد</option>
                                       <option value="yes">يوجد</option>
@@ -1778,14 +1793,14 @@ export default function NewBuildingPage() {
                                   </div>
 
                                   <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                      <User className="w-4 h-4 text-pink-600" />
+                                    <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
+                                      <User className="w-4 h-4 text-pink-500/70" />
                                       غرفة سائق
                                     </label>
                                     <select
                                       value={unit.driverRoom ? 'yes' : 'no'}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { driverRoom: e.target.value === 'yes' })}
-                                      className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-pink-500 focus:ring-4 focus:ring-pink-100 outline-none transition font-medium"
+                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
                                     >
                                       <option value="no">لا يوجد</option>
                                       <option value="yes">يوجد</option>
@@ -1793,14 +1808,14 @@ export default function NewBuildingPage() {
                                   </div>
 
                                   <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                      <Wind className="w-4 h-4 text-sky-500" />
+                                    <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
+                                      <Wind className="w-4 h-4 text-sky-500/70" />
                                       التكييف
                                     </label>
                                     <select
                                       value={unit.acType}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { acType: e.target.value as any })}
-                                      className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-sky-500 focus:ring-4 focus:ring-sky-100 outline-none transition font-medium"
+                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
                                     >
                                       <option value="split">سبلت</option>
                                       <option value="window">شباك</option>
@@ -1814,14 +1829,14 @@ export default function NewBuildingPage() {
                                 {/* الصف الرابع - الحالة والوصف */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                      <BadgeCheck className="w-4 h-4 text-emerald-600" />
+                                    <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
+                                      <BadgeCheck className="w-4 h-4 text-emerald-500/70" />
                                       حالة الوحدة
                                     </label>
                                     <select
                                       value={unit.status}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { status: e.target.value as any })}
-                                      className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none transition font-medium"
+                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
                                     >
                                       <option value="available">متاح</option>
                                       <option value="reserved">محجوز</option>
@@ -1830,15 +1845,15 @@ export default function NewBuildingPage() {
                                   </div>
 
                                   <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                      <FileText className="w-4 h-4 text-slate-600" />
+                                    <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
+                                      <FileText className="w-4 h-4 text-slate-500/70" />
                                       الوصف
                                     </label>
                                     <input
                                       type="text"
                                       value={unit.description || ''}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { description: e.target.value })}
-                                      className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-slate-500 focus:ring-4 focus:ring-slate-100 outline-none transition font-medium"
+                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
                                       placeholder="وصف اختياري للوحدة..."
                                     />
                                   </div>
