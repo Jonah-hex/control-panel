@@ -708,7 +708,7 @@ export default function NewBuildingPage() {
                   </span>
                   إضافة عمارة جديدة
                 </h1>
-                <p className="text-xs text-gray-600 flex items-center gap-2 mt-1">
+                <p className="text-xs text-gray-600 flex items-center gap-2 mt-2">
                   <Sparkles className="w-3 h-3 text-indigo-400 animate-pulse" />
                   أدخل جميع تفاصيل العمارة والوحدات السكنية بطريقة سهلة وسريعة
                 </p>
