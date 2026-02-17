@@ -8,13 +8,20 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowUp,
+  BarChart3,
   Building2,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
   ChevronDown,
+  Download,
   DoorOpen,
   Edit2,
   Home,
+  Images,
+  Printer,
   Save,
+  Share2,
   Trash2,
   Wind,
   X
@@ -66,6 +73,7 @@ interface Building {
   owners_committee_email?: string | null
   owners_committee_chairman?: string | null
   owners_committee_meeting_schedule?: string | null
+  image_urls?: string[] | null
   created_at?: string
   updated_at?: string
 }
@@ -102,6 +110,9 @@ export default function BuildingDetailPage() {
   const [successMessage, setSuccessMessage] = useState('')
   const [formData, setFormData] = useState<Partial<Building>>({})
   const [openSection, setOpenSection] = useState('basic')
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  const [modalStep, setModalStep] = useState(1)
 
   const params = useParams()
   const buildingId = params.id as string
@@ -244,6 +255,52 @@ export default function BuildingDetailPage() {
     return '-'
   }, [building?.guard_shift])
 
+  const imageUrls = building?.image_urls || []
+
+  const handlePrint = () => {
+    window.print()
+  }
+
+  const handleExportJson = () => {
+    if (!building) return
+    const payload = {
+      building,
+      units,
+      exported_at: new Date().toISOString(),
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `building-${building.id}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleShare = async () => {
+    const shareUrl = window.location.href
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: building?.name || 'تفاصيل العمارة', url: shareUrl })
+        return
+      } catch {
+      }
+    }
+    await navigator.clipboard.writeText(shareUrl)
+    setSuccessMessage('تم نسخ رابط الصفحة')
+    setTimeout(() => setSuccessMessage(''), 3000)
+  }
+
+  const nextImage = () => {
+    if (imageUrls.length === 0) return
+    setCurrentImageIndex((prev) => (prev + 1) % imageUrls.length)
+  }
+
+  const previousImage = () => {
+    if (imageUrls.length === 0) return
+    setCurrentImageIndex((prev) => (prev - 1 + imageUrls.length) % imageUrls.length)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
@@ -344,6 +401,98 @@ export default function BuildingDetailPage() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="bg-white/80 backdrop-blur-lg rounded-2xl border border-white/30 shadow-lg p-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+              <button
+                onClick={() => setIsDetailsModalOpen(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-indigo-50 text-indigo-700 rounded-xl font-semibold hover:bg-indigo-100 transition"
+              >
+                <BarChart3 className="w-4 h-4" />
+                عرض إحصائيات الوحدات
+              </button>
+              <button
+                onClick={handlePrint}
+                className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-slate-50 text-slate-700 rounded-xl font-semibold hover:bg-slate-100 transition"
+              >
+                <Printer className="w-4 h-4" />
+                طباعة
+              </button>
+              <button
+                onClick={handleExportJson}
+                className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-emerald-50 text-emerald-700 rounded-xl font-semibold hover:bg-emerald-100 transition"
+              >
+                <Download className="w-4 h-4" />
+                تصدير JSON
+              </button>
+              <button
+                onClick={handleShare}
+                className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-amber-50 text-amber-700 rounded-xl font-semibold hover:bg-amber-100 transition"
+              >
+                <Share2 className="w-4 h-4" />
+                مشاركة الرابط
+              </button>
+              <button
+                onClick={() => {
+                  setModalStep(1)
+                  setIsDetailsModalOpen(true)
+                }}
+                className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-purple-50 text-purple-700 rounded-xl font-semibold hover:bg-purple-100 transition"
+              >
+                <Images className="w-4 h-4" />
+                كل التفاصيل
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl overflow-hidden border border-white/20 p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">معرض الصور</h2>
+              <span className="text-sm text-gray-500">
+                {imageUrls.length > 0 ? `${currentImageIndex + 1} / ${imageUrls.length}` : '0 / 0'}
+              </span>
+            </div>
+
+            {imageUrls.length > 0 ? (
+              <>
+                <div className="relative rounded-2xl overflow-hidden bg-slate-100 h-72 md:h-96 mb-4">
+                  <img
+                    src={imageUrls[currentImageIndex]}
+                    alt={`صورة ${currentImageIndex + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    onClick={previousImage}
+                    className="absolute top-1/2 -translate-y-1/2 right-3 w-10 h-10 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={nextImage}
+                    className="absolute top-1/2 -translate-y-1/2 left-3 w-10 h-10 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
+                  {imageUrls.map((url, index) => (
+                    <button
+                      key={url + index}
+                      onClick={() => setCurrentImageIndex(index)}
+                      className={`rounded-lg overflow-hidden border-2 ${index === currentImageIndex ? 'border-indigo-500' : 'border-transparent'}`}
+                    >
+                      <img src={url} alt={`صورة مصغرة ${index + 1}`} className="w-full h-16 object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="h-60 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 font-semibold">
+                لا توجد صور مضافة لهذه العمارة
+              </div>
+            )}
+          </div>
+
           <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatTile label="الأدوار" value={building.total_floors} icon={<ArrowUp className="w-5 h-5" />} />
             <StatTile label="الوحدات" value={building.total_units} icon={<Home className="w-5 h-5" />} />
@@ -740,6 +889,115 @@ export default function BuildingDetailPage() {
             )}
           </div>
         </div>
+
+        {isDetailsModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setIsDetailsModalOpen(false)}>
+            <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl border border-gray-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="p-5 border-b border-gray-200 flex items-center justify-between">
+                <h3 className="text-xl font-black text-gray-900">جميع التفاصيل</h3>
+                <button onClick={() => setIsDetailsModalOpen(false)} className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-4 border-b border-gray-100 overflow-x-auto">
+                <div className="flex items-center gap-2 min-w-max">
+                  {[
+                    { id: 1, label: 'المعلومات الأساسية' },
+                    { id: 2, label: 'معلومات البناء' },
+                    { id: 3, label: 'الوحدات السكنية' },
+                    { id: 4, label: 'الحارس والموقع' },
+                    { id: 5, label: 'اتحاد الملاك' },
+                  ].map((step) => (
+                    <button
+                      key={step.id}
+                      onClick={() => setModalStep(step.id)}
+                      className={`px-4 py-2 rounded-xl text-sm font-semibold transition ${
+                        modalStep === step.id ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {step.id}. {step.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-6 max-h-[65vh] overflow-auto">
+                {modalStep === 1 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <InfoItem label="اسم المبنى" value={formatValue(building.name)} />
+                    <InfoItem label="رقم القطعة" value={formatValue(building.plot_number)} />
+                    <InfoItem label="الحي" value={formatValue(building.neighborhood)} />
+                    <InfoItem label="رقم الهاتف" value={formatValue(building.phone)} />
+                    <InfoItem label="الوصف" value={formatValue(building.description)} />
+                  </div>
+                )}
+
+                {modalStep === 2 && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <InfoItem label="عدد الأدوار" value={formatValue(building.total_floors)} />
+                    <InfoItem label="إجمالي الوحدات" value={formatValue(building.total_units)} />
+                    <InfoItem label="عدد المداخل" value={formatValue(building.entrances)} />
+                    <InfoItem label="المصاعد" value={formatValue(building.elevators)} />
+                    <InfoItem label="مواقف السيارات" value={formatValue(building.parking_slots)} />
+                    <InfoItem label="غرف السائقين" value={formatValue(building.driver_rooms)} />
+                  </div>
+                )}
+
+                {modalStep === 3 && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-right py-3">رقم الوحدة</th>
+                          <th className="text-right py-3">الدور</th>
+                          <th className="text-right py-3">النوع</th>
+                          <th className="text-right py-3">المساحة</th>
+                          <th className="text-right py-3">الغرف</th>
+                          <th className="text-right py-3">الحالة</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {units.map((unit) => (
+                          <tr key={unit.id} className="border-b border-gray-100">
+                            <td className="py-3">{unit.unit_number}</td>
+                            <td className="py-3">{unit.floor}</td>
+                            <td className="py-3">{unit.type}</td>
+                            <td className="py-3">{unit.area} م²</td>
+                            <td className="py-3">{unit.rooms}</td>
+                            <td className="py-3">{unit.status === 'available' ? 'متاحة' : unit.status === 'reserved' ? 'محجوزة' : 'مباعة'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {modalStep === 4 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <InfoItem label="اسم الحارس" value={formatValue(building.guard_name)} />
+                    <InfoItem label="رقم الحارس" value={formatValue(building.guard_phone)} />
+                    <InfoItem label="رقم غرفة الحارس" value={formatValue(building.guard_room_number)} />
+                    <InfoItem label="فترة عمل الحارس" value={guardShiftLabel} />
+                    <InfoItem label="رابط Google Maps" value={formatValue(building.google_maps_link)} />
+                    <InfoItem label="الحي / القطعة" value={`${formatValue(building.neighborhood)} / ${formatValue(building.plot_number)}`} />
+                  </div>
+                )}
+
+                {modalStep === 5 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <InfoItem label="يوجد اتحاد" value={formatBool(building.owner_association?.hasAssociation)} />
+                    <InfoItem label="الرسوم الشهرية" value={formatCurrency(building.owner_association?.monthlyFee)} />
+                    <InfoItem label="اسم المسؤول" value={formatValue(building.owner_association?.managerName)} />
+                    <InfoItem label="رقم التواصل" value={formatValue(building.owner_association?.contactNumber)} />
+                    <InfoItem label="اسم اللجنة" value={formatValue(building.owners_committee_name)} />
+                    <InfoItem label="هاتف اللجنة" value={formatValue(building.owners_committee_phone)} />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

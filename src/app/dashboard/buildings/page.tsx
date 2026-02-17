@@ -3,17 +3,26 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Plus, ArrowLeft, Building2, MapPin, Users, DollarSign, Search, Edit, Trash2, Eye } from 'lucide-react'
+import { Plus, ArrowLeft, Building2, MapPin, Home, Search, Edit, Trash2, Eye } from 'lucide-react'
 
 interface Building {
   id: string
   name: string
   plot_number: string
   neighborhood?: string
+  address?: string | null
+  phone?: string | null
+  build_status?: 'ready' | 'under_construction' | 'old' | null
+  year_built?: number | null
   total_units: number
   total_floors: number
   owner_id: string
   created_at: string
+}
+
+interface UnitStatusRow {
+  building_id: string
+  status: 'available' | 'reserved' | 'sold'
 }
 
 export default function BuildingsPage() {
@@ -22,6 +31,7 @@ export default function BuildingsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [buildingToDelete, setBuildingToDelete] = useState<Building | null>(null)
+  const [unitStatsByBuilding, setUnitStatsByBuilding] = useState<Record<string, { available: number; reserved: number; sold: number }>>({})
   const supabase = createClient()
 
   useEffect(() => {
@@ -44,6 +54,32 @@ export default function BuildingsPage() {
       if (error) throw error
       
       setBuildings(data || [])
+
+      const buildingIds = (data || []).map((building) => building.id)
+      if (buildingIds.length > 0) {
+        const { data: unitRows, error: unitsError } = await supabase
+          .from('units')
+          .select('building_id,status')
+          .in('building_id', buildingIds)
+
+        if (unitsError) throw unitsError
+
+        const stats = (unitRows || []).reduce((acc: Record<string, { available: number; reserved: number; sold: number }>, row: UnitStatusRow) => {
+          if (!acc[row.building_id]) {
+            acc[row.building_id] = { available: 0, reserved: 0, sold: 0 }
+          }
+
+          if (row.status === 'available') acc[row.building_id].available += 1
+          else if (row.status === 'reserved') acc[row.building_id].reserved += 1
+          else if (row.status === 'sold') acc[row.building_id].sold += 1
+
+          return acc
+        }, {})
+
+        setUnitStatsByBuilding(stats)
+      } else {
+        setUnitStatsByBuilding({})
+      }
     } catch (error) {
       console.error('Error fetching buildings:', error)
     } finally {
@@ -85,8 +121,16 @@ export default function BuildingsPage() {
   const filteredBuildings = buildings.filter(building =>
     building.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     building.plot_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    building.neighborhood?.toLowerCase().includes(searchTerm.toLowerCase())
+    building.neighborhood?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    building.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    building.phone?.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  const getBuildStatusLabel = (status?: Building['build_status']) => {
+    if (status === 'under_construction') return { label: 'تحت الإنشاء', className: 'bg-amber-100 text-amber-700' }
+    if (status === 'old') return { label: 'قديم', className: 'bg-slate-200 text-slate-700' }
+    return { label: 'جاهز', className: 'bg-emerald-100 text-emerald-700' }
+  }
 
   // Sort by newest first (last added)
   const displayedBuildings = [...filteredBuildings].sort((a, b) =>
@@ -184,12 +228,13 @@ export default function BuildingsPage() {
               <table className="w-full text-sm">
                 <thead>
                     <tr className="bg-gradient-to-r from-slate-50 to-white text-slate-700 border-b border-gray-200">
-                      <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider w-[25%]">الاسم</th>
-                      <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider w-[15%]">رقم القطعة</th>
-                      <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider w-[20%]">الحي</th>
-                      <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider w-[8%]">الأدوار</th>
-                      <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider w-[8%]">الوحدات</th>
-                      <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider w-[24%]">الإجراءات</th>
+                      <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">الاسم</th>
+                      <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">الموقع</th>
+                      <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">حالة البناء</th>
+                      <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">الأدوار</th>
+                      <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">الوحدات</th>
+                      <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">حالات الوحدات</th>
+                      <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">الإجراءات</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -202,17 +247,27 @@ export default function BuildingsPage() {
                           </div>
                           <div className="text-right min-w-0 flex-1">
                             <div className="font-bold text-gray-900 truncate">{b.name}</div>
+                            <div className="text-xs text-gray-500 mt-1">{b.phone || 'بدون رقم هاتف'}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 text-gray-700">
+                        <div className="flex items-center gap-2 text-gray-700 mb-1">
                           <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                          <span className="truncate">{b.plot_number}</span>
+                          <span className="truncate">قطعة {b.plot_number}</span>
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          {b.neighborhood || '-'}
+                          {b.address ? ` • ${b.address}` : ''}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="text-gray-700 truncate">{b.neighborhood || '-'}</span>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${getBuildStatusLabel(b.build_status).className}`}>
+                          {getBuildStatusLabel(b.build_status).label}
+                        </span>
+                        {b.year_built && (
+                          <div className="text-[11px] text-gray-500 mt-1">{b.year_built}</div>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className="font-semibold text-gray-700">
@@ -224,6 +279,19 @@ export default function BuildingsPage() {
                           {b.total_units}
                         </span>
                       </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex flex-wrap items-center justify-center gap-1.5">
+                          <span className="px-2 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-700">
+                            متاحة: {unitStatsByBuilding[b.id]?.available || 0}
+                          </span>
+                          <span className="px-2 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700">
+                            محجوزة: {unitStatsByBuilding[b.id]?.reserved || 0}
+                          </span>
+                          <span className="px-2 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700">
+                            مباعة: {unitStatsByBuilding[b.id]?.sold || 0}
+                          </span>
+                        </div>
+                      </td>
                       
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-2">
@@ -233,6 +301,14 @@ export default function BuildingsPage() {
                             title="عرض التفاصيل"
                           >
                             <Eye className="w-4 h-4" />
+                          </Link>
+
+                          <Link
+                            href={`/dashboard/units?buildingId=${b.id}`}
+                            className="p-2 text-emerald-600 hover:text-emerald-700 rounded-full hover:bg-emerald-50 hover:scale-110 transform transition"
+                            title="وحدات العمارة"
+                          >
+                            <Home className="w-4 h-4" />
                           </Link>
 
                           <Link

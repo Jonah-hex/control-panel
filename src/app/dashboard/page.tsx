@@ -387,7 +387,7 @@ export default function DashboardPage() {
     { icon: Home, label: 'الوحدات', href: '/dashboard/units', color: 'purple', gradient: 'from-purple-500 to-pink-500' },
     { icon: FileText, label: 'التقارير', href: '/dashboard/reports', color: 'orange', gradient: 'from-orange-500 to-red-500' },
     { icon: BarChart3, label: 'الإحصائيات', href: '/dashboard/statistics', color: 'indigo', gradient: 'from-indigo-500 to-purple-500' },
-    { icon: Settings, label: 'الإعدادات', href: '#', color: 'gray', gradient: 'from-slate-500 to-gray-500' }
+    { icon: Settings, label: 'الإعدادات', href: '/dashboard/security', color: 'gray', gradient: 'from-slate-500 to-gray-500' }
   ]
 
   const recentBuildings = buildings.slice(0, 3)

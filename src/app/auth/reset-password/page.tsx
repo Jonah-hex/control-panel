@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Eye, EyeOff, Lock, AlertCircle, CheckCircle, Building2, ArrowRight } from 'lucide-react'
 
@@ -18,7 +18,6 @@ export default function ResetPasswordPage() {
   const [passwordStrength, setPasswordStrength] = useState(0)
   
   const router = useRouter()
-  const searchParams = useSearchParams()
   const supabase = createClient()
 
   // حساب قوة كلمة المرور

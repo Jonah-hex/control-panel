@@ -253,7 +253,7 @@ export default function SecurityDashboard() {
         {/* Additional Security Features */}
         <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6 animate-slideInUp" style={{animationDelay: '0.4s'}}>
           <Link
-            href="/dashboard/security/password"
+            href="/auth/reset-password"
             className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 hover:bg-slate-800 transition"
           >
             <h3 className="text-lg font-bold text-white mb-2">تغيير كلمة المرور</h3>
@@ -261,11 +261,11 @@ export default function SecurityDashboard() {
           </Link>
 
           <Link
-            href="/dashboard/security/two-factor"
+            href="/dashboard/security"
             className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 hover:bg-slate-800 transition"
           >
             <h3 className="text-lg font-bold text-white mb-2">المصادقة الثنائية</h3>
-            <p className="text-slate-400 text-sm">أضف طبقة أمان إضافية لحسابك</p>
+            <p className="text-slate-400 text-sm">قريباً: سيتم توفير إعدادات المصادقة الثنائية في هذه الصفحة</p>
           </Link>
         </div>
       </div>
