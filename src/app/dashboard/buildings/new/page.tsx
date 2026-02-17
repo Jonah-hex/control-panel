@@ -1773,12 +1773,19 @@ export default function NewBuildingPage() {
                             <Trash2 className="w-5 h-5 group-hover/btn:rotate-12 transition-transform" />
                             <span className="text-xs font-medium">حذف</span>
                           </button>
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            className="flex flex-col items-center gap-1 p-2 text-slate-800"
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setExpandedFloor(expandedFloor === floor.number ? null : floor.number)
+                            }}
+                            className="flex flex-col items-center gap-1 p-2 text-slate-800 rounded-2xl hover:bg-white/20 transition-all hover:scale-110 cursor-pointer"
                           >
-                            {expandedFloor === floor.number ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                          </div>
+                            {expandedFloor === floor.number ? 
+                              <ChevronUp className="w-5 h-5 transition-transform duration-300" /> : 
+                              <ChevronDown className="w-5 h-5 transition-transform duration-300" />
+                            }
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1786,7 +1793,24 @@ export default function NewBuildingPage() {
                     {/* وحدات الدور - طريقة عرض محسّنة */}
                     {expandedFloor === floor.number && (
                       <div className="p-6 space-y-5 bg-gray-50/50">
-                        {floor.units.map((unit, unitIndex) => (
+                        {floor.units.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-8 bg-white/50 rounded-2xl border-2 border-dashed border-emerald-200/50 backdrop-blur-sm">
+                            <Home className="w-12 h-12 text-gray-300 mb-3" />
+                            <p className="text-gray-500 font-medium mb-4">لا توجد وحدات في هذا الدور</p>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                addUnit(floor.number)
+                              }}
+                              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-400/80 to-emerald-400/80 text-white font-medium rounded-xl hover:shadow-lg transition-all hover:scale-105 backdrop-blur-sm border border-green-300/50"
+                            >
+                              <Plus className="w-5 h-5" />
+                              إضافة وحدة
+                            </button>
+                          </div>
+                        ) : (
+                          floor.units.map((unit, unitIndex) => (
                           <div key={unitIndex} className="bg-white/70 backdrop-blur-sm rounded-2xl border-2 border-emerald-200/30 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
                             {/* رأس الوحدة */}
                             <div className="bg-gradient-to-r from-emerald-50/60 to-teal-50/60 border-b-2 border-emerald-200/30 p-5 flex items-center justify-between backdrop-blur-sm">
@@ -2097,7 +2121,8 @@ export default function NewBuildingPage() {
                               </div>
                             )}
                           </div>
-                        ))}
+                        ))
+                        )}
                       </div>
                     )}
                   </div>
