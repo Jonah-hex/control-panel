@@ -340,9 +340,11 @@ export default function NewBuildingPage() {
     const unitsPerFloor = newFloorPlan === '4shuqq' ? 4 : newFloorPlan === '3shuqq' ? 3 : 2
     
     const newUnits: Unit[] = []
+    const totalExistingUnits = floors.reduce((sum, f) => sum + f.units.length, 0)
+    
     for (let i = 0; i < unitsPerFloor; i++) {
       newUnits.push({
-        unitNumber: `${floors.reduce((sum, f) => sum + f.units.length, 0) + i + 1}`,
+        unitNumber: `${totalExistingUnits + i + 1}`,
         floor: newFloorNumber,
         type: 'apartment',
         facing: 'front',
@@ -369,7 +371,7 @@ export default function NewBuildingPage() {
     setExpandedFloor(newFloorNumber)
     
     // تحديث إجمالي الوحدات
-    const total = floors.reduce((sum, floor) => sum + floor.units.length, 0) + newUnits.length
+    const total = totalExistingUnits + newUnits.length
     setFormData(prev => ({ ...prev, totalUnits: total }))
   }
 
@@ -382,24 +384,40 @@ export default function NewBuildingPage() {
     const floorToRemove = floors.find(f => f.number === floorNumber)
     const unitsCount = floorToRemove?.units.length || 0
     
-    setFloors(floors.filter(f => f.number !== floorNumber))
-    setFloors(prev => prev.map((f, index) => ({ ...f, number: index + 1 })))
+    // إزالة الدور
+    let updatedFloors = floors.filter(f => f.number !== floorNumber)
+    
+    // إعادة ترقيم الأدوار
+    updatedFloors = updatedFloors.map((f, index) => ({ ...f, number: index + 1 }))
+    
+    // إعادة ترقيم جميع الوحدات بشكل متسلسل
+    let sequentialNumber = 1
+    updatedFloors = updatedFloors.map(floor => ({
+      ...floor,
+      units: floor.units.map(unit => ({
+        ...unit,
+        unitNumber: String(sequentialNumber++),
+        floor: floor.number
+      }))
+    }))
+    
+    setFloors(updatedFloors)
     
     // تحديث إجمالي الوحدات
-    const total = floors.reduce((sum, floor) => sum + floor.units.length, 0) - unitsCount
+    const total = updatedFloors.reduce((sum, floor) => sum + floor.units.length, 0)
     setFormData(prev => ({ ...prev, totalUnits: total }))
   }
 
   const updateFloorPlan = (floorNumber: number, plan: '4shuqq' | '3shuqq' | '2shuqq') => {
     const unitsPerFloor = plan === '4shuqq' ? 4 : plan === '3shuqq' ? 3 : 2
     
-    setFloors(floors.map(floor => {
+    const updatedFloors = floors.map(floor => {
       if (floor.number === floorNumber) {
         // إنشاء وحدات جديدة بناءً على النظام الجديد
         const newUnits: Unit[] = []
         for (let i = 0; i < unitsPerFloor; i++) {
           newUnits.push({
-            unitNumber: `${floors.reduce((sum, f) => sum + f.units.length, 0) + i + 1}`,
+            unitNumber: '', // سيتم تعيينها بعد إعادة الترقيم
             floor: floorNumber,
             type: 'apartment',
             facing: 'front',
@@ -424,23 +442,30 @@ export default function NewBuildingPage() {
         }
       }
       return floor
+    })
+    
+    // إعادة ترقيم جميع الوحدات بشكل متسلسل
+    let sequentialNumber = 1
+    const finalFloors = updatedFloors.map(floor => ({
+      ...floor,
+      units: floor.units.map(unit => ({
+        ...unit,
+        unitNumber: String(sequentialNumber++)
+      }))
     }))
     
+    setFloors(finalFloors)
+    
     // تحديث إجمالي الوحدات
-    const total = floors.reduce((sum, floor) => {
-      if (floor.number === floorNumber) {
-        return sum + unitsPerFloor
-      }
-      return sum + floor.units.length
-    }, 0)
+    const total = finalFloors.reduce((sum, floor) => sum + floor.units.length, 0)
     setFormData(prev => ({ ...prev, totalUnits: total }))
   }
 
   const addUnit = (floorNumber: number) => {
-    setFloors(floors.map(floor => {
+    const updatedFloors = floors.map(floor => {
       if (floor.number === floorNumber) {
         const newUnit: Unit = {
-          unitNumber: `${floors.reduce((sum, f) => sum + f.units.length, 0) + 1}`,
+          unitNumber: '', // سيتم تعيينها بعد إعادة الترقيم
           floor: floorNumber,
           type: 'apartment',
           facing: 'front',
@@ -462,22 +487,46 @@ export default function NewBuildingPage() {
         }
       }
       return floor
+    })
+
+    // إعادة ترقيم جميع الوحدات بشكل متسلسل
+    let sequentialNumber = 1
+    const finalFloors = updatedFloors.map(floor => ({
+      ...floor,
+      units: floor.units.map(unit => ({
+        ...unit,
+        unitNumber: String(sequentialNumber++)
+      }))
     }))
 
-    const total = floors.reduce((sum, floor) => sum + floor.units.length, 0) + 1
+    setFloors(finalFloors)
+
+    const total = finalFloors.reduce((sum, floor) => sum + floor.units.length, 0)
     setFormData(prev => ({ ...prev, totalUnits: total }))
   }
 
   const removeUnit = (floorNumber: number, unitIndex: number) => {
-    setFloors(floors.map(floor => {
+    const updatedFloors = floors.map(floor => {
       if (floor.number === floorNumber) {
         const newUnits = floor.units.filter((_, i) => i !== unitIndex)
         return { ...floor, units: newUnits }
       }
       return floor
+    })
+
+    // إعادة ترقيم جميع الوحدات بشكل متسلسل
+    let sequentialNumber = 1
+    const finalFloors = updatedFloors.map(floor => ({
+      ...floor,
+      units: floor.units.map(unit => ({
+        ...unit,
+        unitNumber: String(sequentialNumber++)
+      }))
     }))
 
-    const total = floors.reduce((sum, floor) => sum + floor.units.length, 0) - 1
+    setFloors(finalFloors)
+
+    const total = finalFloors.reduce((sum, floor) => sum + floor.units.length, 0)
     setFormData(prev => ({ ...prev, totalUnits: total }))
   }
 
@@ -492,26 +541,6 @@ export default function NewBuildingPage() {
     }))
   }
 
-  const duplicateUnit = (floorNumber: number, unitIndex: number) => {
-    setFloors(floors.map(floor => {
-      if (floor.number === floorNumber) {
-        const unitToDuplicate = floor.units[unitIndex]
-        const newUnit = {
-          ...unitToDuplicate,
-          unitNumber: `${floorNumber}${String(floor.units.length + 1).padStart(2, '0')}`
-        }
-        return {
-          ...floor,
-          units: [...floor.units, newUnit]
-        }
-      }
-      return floor
-    }))
-
-    const total = floors.reduce((sum, floor) => sum + floor.units.length, 0) + 1
-    setFormData(prev => ({ ...prev, totalUnits: total }))
-  }
-
   // إضافة دالة نسخ الدور لجميع الأدوار - Quick Add
   const copyFloorToAll = (sourceFloorNumber: number) => {
     const sourceFloor = floors.find(f => f.number === sourceFloorNumber)
@@ -520,16 +549,16 @@ export default function NewBuildingPage() {
       return
     }
 
-    if (!confirm(`هل أنت متأكد من نسخ هذا الدور \u0625لى جميع الأدوار الأخرى؟ \n\nسيتم استبدال جميع الوحدات في الأدوار الأخرى.`)) {
+    if (!confirm(`هل أنت متأكد من نسخ هذا الدور إلى جميع الأدوار الأخرى؟ \n\nسيتم استبدال جميع الوحدات في الأدوار الأخرى.`)) {
       return
     }
 
-    setFloors(floors.map(floor => {
+    let updatedFloors = floors.map(floor => {
       if (floor.number === sourceFloorNumber) return floor
       
       const newUnits = sourceFloor.units.map((unit, index) => ({
         ...unit,
-        unitNumber: `${floors.reduce((sum, f) => sum + f.units.length, 0) + index + 1}`,
+        unitNumber: '', // سيتم تعيينها بعد إعادة الترقيم
         floor: floor.number
       }))
 
@@ -539,7 +568,23 @@ export default function NewBuildingPage() {
         floorPlan: sourceFloor.floorPlan,
         unitsPerFloor: sourceFloor.unitsPerFloor
       }
+    })
+
+    // إعادة ترقيم جميع الوحدات بشكل متسلسل
+    let sequentialNumber = 1
+    updatedFloors = updatedFloors.map(floor => ({
+      ...floor,
+      units: floor.units.map(unit => ({
+        ...unit,
+        unitNumber: String(sequentialNumber++)
+      }))
     }))
+
+    setFloors(updatedFloors)
+
+    // تحديث إجمالي الوحدات
+    const total = updatedFloors.reduce((sum, floor) => sum + floor.units.length, 0)
+    setFormData(prev => ({ ...prev, totalUnits: total }))
 
     setSuccess(`تم نسخ الدور ${sourceFloorNumber} إلى جميع الأدوار بنجاح!`)
     setTimeout(() => setSuccess(''), 3000)
@@ -598,6 +643,33 @@ export default function NewBuildingPage() {
       }
 
       const totalUnits = floors.reduce((sum, floor) => sum + floor.units.length, 0)
+      
+      // ==========================================
+      // تحقق من أرقام الوحدات المكررة أو الفارغة
+      // Check for Duplicate or Empty Unit Numbers
+      // ==========================================
+      const unitNumbers = new Set<string>()
+      const duplicateNumbers: string[] = []
+      
+      for (const floor of floors) {
+        for (const unit of floor.units) {
+          if (!unit.unitNumber || unit.unitNumber.trim() === '') {
+            throw new Error(`وجدت وحدة في الدور ${floor.number} بدون رقم. الرجاء التأكد من إدخال أرقام صحيحة`)
+          }
+          
+          if (unitNumbers.has(unit.unitNumber)) {
+            if (!duplicateNumbers.includes(unit.unitNumber)) {
+              duplicateNumbers.push(unit.unitNumber)
+            }
+          } else {
+            unitNumbers.add(unit.unitNumber)
+          }
+        }
+      }
+      
+      if (duplicateNumbers.length > 0) {
+        throw new Error(`❌ أرقام وحدات مكررة: ${duplicateNumbers.join(', ')}. الرجاء تحديث الأرقام لجعلها فريدة`)
+      }
       
       console.log('📊 بدء حفظ العمارة:', {
         name: formData.name,
@@ -815,7 +887,7 @@ export default function NewBuildingPage() {
       } else if (errorMessage.includes('row-level security')) {
         errorMessage += '\n\n💡 الحل: نفّذ fix_units_policies.sql في Supabase SQL Editor'
       } else if (errorMessage.includes('duplicate key')) {
-        errorMessage += '\n\n💡 الحل: رقم الوحدة مكرر. تأكد من عدم تكرار أرقام الوحدات'
+        errorMessage += '\n\n💡 الحل: تم تحديث كود توليد أرقام الوحدات ليكون تلقائياً (رقم_الدور-رقم_الوحدة). حاول إضافة إدارة حقول الوحدات من جديد أو تحديث أرقامها يدوياً لتكون فريدة تماماً'
       } else if (errorMessage.includes('violates not-null')) {
         errorMessage += '\n\n💡 الحل: حقل مطلوب فارغ. تأكد من ملء اسم العمارة ورقم القطعة'
       }
@@ -1769,12 +1841,12 @@ export default function NewBuildingPage() {
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    duplicateUnit(floor.number, unitIndex)
+                                    addUnit(floor.number)
                                   }}
-                                  className="p-2 text-blue-600 rounded-2xl hover:bg-blue-100/50 transition-all hover:scale-110"
-                                  title="نسخ الوحدة"
+                                  className="p-2 text-green-600 rounded-2xl hover:bg-green-100/50 transition-all hover:scale-110"
+                                  title="إضافة وحدة"
                                 >
-                                  <Copy className="w-4 h-4" />
+                                  <Plus className="w-4 h-4" />
                                 </button>
                                 <button
                                   type="button"
