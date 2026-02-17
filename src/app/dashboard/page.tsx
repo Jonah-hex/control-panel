@@ -439,6 +439,10 @@ export default function DashboardPage() {
                 <div>
                   <h1 className="text-xl font-bold text-gray-800">لوحة التحكم الرئيسية</h1>
                   <p className="text-xs text-gray-500">ادارة العماير</p>
+                  <div className="flex gap-2 mt-2">
+                    <a href="/dashboard/reservations" className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-200 transition">سجل الحجوزات</a>
+                    <a href="/dashboard/sales" className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-semibold hover:bg-green-200 transition">سجل المبيعات</a>
+                  </div>
                 </div>
               </div>
             </div>
