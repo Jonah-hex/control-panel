@@ -614,6 +614,31 @@ export default function NewBuildingPage() {
     }
   }
 
+  // ==========================================
+  // 🎯 سياسة الترقيم المتسلسل العالمي
+  // Sequential Global Numbering Policy
+  // ==========================================
+  // أرقام الوحدات تبدأ من 1 وتزيد بشكل متسلسل عبر جميع الأدوار
+  // Unit numbers start from 1 and increment sequentially across all floors
+  // لا توجد أرقام مكررة - No duplicate numbers
+  // تُطبق في جميع العمليات (إضافة/حذف/تعديل) - Applied to all operations (add/remove/edit)
+  // ==========================================
+  
+  const ensureSequentialNumbering = () => {
+    // التحقق والإصلاح التلقائي: ضمان أرقام متسلسلة صحيحة قبل الحفظ
+    // Verify and auto-fix: Ensure correct sequential numbering before saving
+    let sequentialNumber = 1
+    const correctedFloors = floors.map(floor => ({
+      ...floor,
+      units: floor.units.map(unit => ({
+        ...unit,
+        unitNumber: String(sequentialNumber++)
+      }))
+    }))
+    
+    return correctedFloors
+  }
+
   const confirmSaveBuilding = async () => {
     setShowConfirmModal(false)
 
@@ -622,6 +647,17 @@ export default function NewBuildingPage() {
     setSuccess('')
 
     try {
+      // ==========================================
+      // 0️⃣ تطبيق سياسة الترقيم المتسلسل العالمي
+      // Apply Sequential Numbering Policy
+      // ==========================================
+      const floorsWithSequentialNumbers = ensureSequentialNumbering()
+      console.log('🔢 تم تطبيق سياسة الترقيم المتسلسل:', {
+        totalUnits: floorsWithSequentialNumbers.reduce((sum, floor) => sum + floor.units.length, 0),
+        firstUnitNumber: floorsWithSequentialNumbers[0]?.units[0]?.unitNumber,
+        lastUnitNumber: floorsWithSequentialNumbers[floorsWithSequentialNumbers.length - 1]?.units[floorsWithSequentialNumbers[floorsWithSequentialNumbers.length - 1]?.units.length - 1]?.unitNumber
+      })
+
       // ==========================================
       // 1️⃣ التحقق من تسجيل الدخول
       // Verify User Authentication
@@ -642,7 +678,7 @@ export default function NewBuildingPage() {
         throw new Error('الرجاء إدخال اسم العمارة')
       }
 
-      const totalUnits = floors.reduce((sum, floor) => sum + floor.units.length, 0)
+      const totalUnits = floorsWithSequentialNumbers.reduce((sum, floor) => sum + floor.units.length, 0)
       
       // ==========================================
       // تحقق من أرقام الوحدات المكررة أو الفارغة
@@ -651,7 +687,7 @@ export default function NewBuildingPage() {
       const unitNumbers = new Set<string>()
       const duplicateNumbers: string[] = []
       
-      for (const floor of floors) {
+      for (const floor of floorsWithSequentialNumbers) {
         for (const unit of floor.units) {
           if (!unit.unitNumber || unit.unitNumber.trim() === '') {
             throw new Error(`وجدت وحدة في الدور ${floor.number} بدون رقم. الرجاء التأكد من إدخال أرقام صحيحة`)
@@ -703,7 +739,7 @@ export default function NewBuildingPage() {
             
             // 📋 الخطوة 2 - تفاصيل العمارة
             // Step 2 - Building Details
-            total_floors: floors.length,
+            total_floors: floorsWithSequentialNumbers.length,
             total_units: totalUnits,
             reserved_units: formData.reservedUnits || 0,
             parking_slots: formData.parkingSlots || 0,
@@ -731,8 +767,9 @@ export default function NewBuildingPage() {
             electricity_meter_number: formData.hasMainElectricityMeter ? (formData.electricityMeterNumber || null) : null,
             
             // 📋 الخطوة 3 - الوحدات (تُحفظ في جدول منفصل)
-            // Step 3 - Units (saved in separate table)
-            floors_data: floors,
+            // Step 3 - Units (saved in separate table with sequential numbering)
+            // الوحدات محفوظة برقم متسلسل ضماني
+            floors_data: floorsWithSequentialNumbers,
             
             // 📋 الخطوة 4 - معلومات إضافية
             // Step 4 - Additional Information
@@ -810,22 +847,26 @@ export default function NewBuildingPage() {
       }
 
       // ==========================================
-      // 5️⃣ حفظ الوحدات السكنية
-      // Save Units - All Fields (After running COMPLETE_SCHEMA_UPDATE.sql)
+      // 5️⃣ حفظ الوحدات السكنية برقم متسلسل مضمون
+      // Save Units with Guaranteed Sequential Numbering
+      // جميع الوحدات محفوظة برقم متسلسل من 1 إلى N
+      // All units saved with sequential numbers from 1 to N
       // ==========================================
       if (totalUnits > 0) {
-        console.log(`🏢 بدء حفظ ${totalUnits} وحدة سكنية...`)
+        console.log(`🏢 بدء حفظ ${totalUnits} وحدة سكنية برقم متسلسل مضمون...`)
         
         let savedUnitsCount = 0
         
-        for (const floor of floors) {
+        for (const floor of floorsWithSequentialNumbers) {
           for (const unit of floor.units) {
+            console.log(`  📝 حفظ وحدة رقم: ${unit.unitNumber} في الدور ${floor.number}`)
+            
             const { error: unitError } = await supabase
               .from('units')
               .insert([
                 {
                   building_id: building.id,
-                  unit_number: unit.unitNumber,
+                  unit_number: unit.unitNumber,                    // ✅ متسلسل: "1", "2", "3", ...
                   floor: floor.number,
                   type: unit.type || 'apartment',
                   facing: unit.facing || 'front',
@@ -856,10 +897,11 @@ export default function NewBuildingPage() {
             }
             
             savedUnitsCount++
+            console.log(`  ✅ تم حفظ الوحدة ${unit.unitNumber} بنجاح`)
           }
         }
         
-        console.log(`✅ تم حفظ ${savedUnitsCount} وحدة سكنية بنجاح`)
+        console.log(`🎯 ملخص الحفظ: تم حفظ ${savedUnitsCount} وحدة سكنية برقم متسلسل صحيح (1 إلى ${savedUnitsCount})`)
       } else {
         console.log('ℹ️ لا توجد وحدات لحفظها')
       }
@@ -867,8 +909,8 @@ export default function NewBuildingPage() {
       // ==========================================
       // 6️⃣ النجاح - Success
       // ==========================================
-      console.log('🎉 اكتمل حفظ البيانات بنجاح')
-      setSuccess('تم إضافة العمارة والوحدات بنجاح!')
+      console.log('🎉 اكتمل حفظ البيانات بنجاح مع تطبيق سياسة الترقيم المتسلسل')
+      setSuccess('تم إضافة العمارة والوحدات بنجاح برقم متسلسل مضمون!')
       
       setTimeout(() => {
         router.push('/dashboard/buildings')
