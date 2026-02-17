@@ -17,7 +17,10 @@ import {
   Trash2,
   Maximize2,
   Wind,
-  Users
+  Users,
+  ArrowUp,
+  DoorOpen,
+  ParkingCircle
 } from 'lucide-react'
 
 interface OwnerAssociation {
@@ -252,630 +255,520 @@ export default function BuildingDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50" dir="rtl">
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-white shadow-sm border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50" dir="rtl">
+      {/* الشريط العلوي - تصميم محسّن */}
+      <div className="bg-white/90 shadow-lg border-b-2 border-indigo-100 sticky top-0 z-20 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between py-4">
+            <div className="flex items-center gap-5">
+              {/* زر الرجوع */}
               <Link
                 href="/dashboard/buildings"
-                className="p-2 hover:bg-slate-100 rounded-lg transition text-slate-600 hover:text-slate-900"
+                className="inline-flex items-center justify-center p-2.5 rounded-2xl hover:bg-indigo-50 transition-all duration-300 group"
               >
-                <ArrowLeft className="w-5 h-5" />
+                <span className="w-11 h-11 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
+                  <ArrowLeft className="w-5 h-5 text-white" />
+                </span>
               </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900">{building.name}</h1>
-                <p className="text-sm text-slate-500">رقم القطعة: {building.plot_number}</p>
+
+              {/* اللوقو والنصوص */}
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-500/30">
+                  <Building2 className="w-7 h-7" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                    {building.name}
+                  </h1>
+                  <p className="text-xs text-gray-500">رقم القطعة: {building.plot_number}</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Messages */}
-      {successMessage && (
-        <div className="mx-4 mt-4 flex items-center gap-3 rounded-lg bg-green-50 border border-green-200 p-4 text-green-700">
-          <CheckCircle className="w-5 h-5 flex-shrink-0" />
-          <p>{successMessage}</p>
-        </div>
-      )}
-      {errorMessage && (
-        <div className="mx-4 mt-4 flex items-center gap-3 rounded-lg bg-red-50 border border-red-200 p-4 text-red-700">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <p>{errorMessage}</p>
-        </div>
-      )}
+      {/* Messages - Alerts */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-3">
+        {successMessage && (
+          <div className="p-4 bg-green-50/90 backdrop-blur-sm border-r-4 border-green-500 rounded-2xl flex items-start gap-3 animate-fadeIn">
+            <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 className="font-semibold text-green-800">نجح</h4>
+              <p className="text-green-600 text-sm">{successMessage}</p>
+            </div>
+          </div>
+        )}
+        {errorMessage && (
+          <div className="p-4 bg-red-50/90 backdrop-blur-sm border-r-4 border-red-500 rounded-2xl flex items-start gap-3 animate-fadeIn">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 className="font-semibold text-red-800">خطأ</h4>
+              <p className="text-red-600 text-sm">{errorMessage}</p>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Basic Information Cards Grid */}
         {isEditing ? (
-          <div className="space-y-6 mb-8">
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Edit2 className="w-5 h-5 text-blue-600" />
-              تعديل المعلومات الأساسية
-            </h2>
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-6">
+          <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl overflow-hidden border border-white/20 p-8 space-y-6 mb-8">
+          <div className="border-t-4 border-indigo-500 pt-6">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Edit2 className="w-6 h-6 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800">تعديل بيانات العمارة</h2>
+            </div>
+          </div>
+
+          <form onSubmit={(e) => {e.preventDefault(); handleSave()}} className="space-y-6">
+            {/* المعلومات الأساسية */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <span className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-indigo-600" />
+                </span>
+                المعلومات الأساسية
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">اسم المبنى*</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">اسم المبنى*</label>
                   <input
                     type="text"
                     value={formData.name || ''}
                     onChange={(e) => handleInputChange('name', e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">رقم القطعة*</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">رقم القطعة*</label>
                   <input
                     type="text"
                     value={formData.plot_number || ''}
                     onChange={(e) => handleInputChange('plot_number', e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">الحي</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">الحي</label>
                   <input
                     type="text"
                     value={formData.neighborhood || ''}
                     onChange={(e) => handleInputChange('neighborhood', e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">سنة البناء</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">سنة البناء</label>
                   <input
                     type="number"
                     value={formData.year_built || ''}
                     onChange={(e) => handleInputChange('year_built', parseInt(e.target.value))}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                   />
                 </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">الوصف</label>
+              <div className="mt-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">الوصف</label>
                 <textarea
                   value={formData.description || ''}
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   rows={4}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                 />
               </div>
+            </div>
 
+            {/* الهيكل الأساسي */}
+            <div className="pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <span className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
+                  <Grid3x3 className="w-5 h-5 text-amber-600" />
+                </span>
+                الهيكل الأساسي للعمارة
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">عدد الأدوار</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">عدد الأدوار</label>
                   <input
                     type="number"
                     value={formData.total_floors || ''}
                     onChange={(e) => handleInputChange('total_floors', parseInt(e.target.value))}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">عدد الوحدات</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">عدد الوحدات</label>
                   <input
                     type="number"
                     value={formData.total_units || ''}
                     onChange={(e) => handleInputChange('total_units', parseInt(e.target.value))}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">عدد المصاعد</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">عدد المصاعد</label>
                   <input
                     type="number"
                     value={formData.elevators || ''}
                     onChange={(e) => handleInputChange('elevators', parseInt(e.target.value))}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">عدد المداخل</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">عدد المداخل</label>
                   <input
                     type="number"
                     value={formData.entrances || ''}
                     onChange={(e) => handleInputChange('entrances', parseInt(e.target.value))}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">مواقف السيارات</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">مواقف السيارات</label>
                   <input
                     type="number"
                     value={formData.parking_slots || ''}
                     onChange={(e) => handleInputChange('parking_slots', parseInt(e.target.value))}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">غرف السائقين</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">غرف السائقين</label>
                   <input
                     type="number"
                     value={formData.driver_rooms || ''}
                     onChange={(e) => handleInputChange('driver_rooms', parseInt(e.target.value))}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                   />
                 </div>
               </div>
+            </div>
 
-              <div className="pt-6 border-t border-slate-200 flex gap-3">
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-400 transition"
-                >
-                  <Save className="w-4 h-4" />
-                  {isSaving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
-                </button>
-                <button
-                  onClick={() => {
-                    setFormData(building)
-                    setIsEditing(false)
-                  }}
-                  className="flex items-center gap-2 px-6 py-2 bg-slate-300 text-slate-700 rounded-lg hover:bg-slate-400 transition"
-                >
-                  <X className="w-4 h-4" />
-                  إلغاء
-                </button>
-              </div>
-
-              {/* Guard Information Edit Section */}
-              <div className="pt-6 border-t border-slate-200">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-amber-600" />
-                  معلومات الحارس
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">اسم الحارس</label>
-                    <input
-                      type="text"
-                      value={formData.guard_name || ''}
-                      onChange={(e) => handleInputChange('guard_name', e.target.value)}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">رقم الحارس</label>
-                    <input
-                      type="tel"
-                      value={formData.guard_phone || ''}
-                      onChange={(e) => handleInputChange('guard_phone', e.target.value)}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="05xxxxxxxx"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">رقم غرفة الحارس</label>
-                    <input
-                      type="text"
-                      value={formData.guard_room_number || ''}
-                      onChange={(e) => handleInputChange('guard_room_number', e.target.value)}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">فترة العمل</label>
-                    <select
-                      value={formData.guard_shift || ''}
-                      onChange={(e) => handleInputChange('guard_shift', e.target.value)}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">اختر الفترة</option>
-                      <option value="day">نهاري</option>
-                      <option value="night">ليلي</option>
-                      <option value="both">كلا الفترتين</option>
-                    </select>
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.guard_has_salary || false}
-                        onChange={(e) => handleInputChange('guard_has_salary', e.target.checked)}
-                        className="w-5 h-5 text-blue-600 rounded"
-                      />
-                      <span className="text-sm font-medium text-slate-700">صرف راتب للحارس</span>
-                    </label>
-                  </div>
-                  {formData.guard_has_salary && (
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">قيمة الراتب (ر.س)</label>
-                      <input
-                        type="number"
-                        value={formData.guard_salary_amount || ''}
-                        onChange={(e) => handleInputChange('guard_salary_amount', parseInt(e.target.value))}
-                        min="0"
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="0"
-                      />
-                    </div>
-                  )}
+            {/* معلومات الحارس */}
+            <div className="pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <span className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <Users className="w-5 h-5 text-orange-600" />
+                </span>
+                معلومات الحارس
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">اسم الحارس</label>
+                  <input
+                    type="text"
+                    value={formData.guard_name || ''}
+                    onChange={(e) => handleInputChange('guard_name', e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                  />
                 </div>
-              </div>
-
-              {/* Owner Association Section */}
-              <div className="pt-6 border-t border-slate-200">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-blue-600" />
-                  معلومات اتحاد الملاك
-                </h3>
-                <div className="mb-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">رقم الحارس</label>
+                  <input
+                    type="tel"
+                    value={formData.guard_phone || ''}
+                    onChange={(e) => handleInputChange('guard_phone', e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">رقم الغرفة</label>
+                  <input
+                    type="text"
+                    value={formData.guard_room_number || ''}
+                    onChange={(e) => handleInputChange('guard_room_number', e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">فترة العمل</label>
+                  <select
+                    value={formData.guard_shift || ''}
+                    onChange={(e) => handleInputChange('guard_shift', e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                  >
+                    <option value="">اختر الفترة</option>
+                    <option value="day">نهاري</option>
+                    <option value="night">ليلي</option>
+                    <option value="both">كلا الفترتين</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={formData.owner_association?.hasAssociation || false}
-                      onChange={(e) => handleInputChange('owner_association', {
-                        ...(formData.owner_association || {}),
-                        hasAssociation: e.target.checked
-                      })}
-                      className="w-5 h-5 text-blue-600 rounded"
+                      checked={formData.guard_has_salary || false}
+                      onChange={(e) => handleInputChange('guard_has_salary', e.target.checked)}
+                      className="w-5 h-5 text-indigo-600 rounded"
                     />
-                    <span className="text-sm font-medium text-slate-700">يوجد اتحاد ملاك للعمارة</span>
+                    <span className="text-sm font-semibold text-gray-700">صرف راتب للحارس</span>
                   </label>
                 </div>
-                {formData.owner_association?.hasAssociation && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">اسم مسؤول الاتحاد</label>
-                      <input
-                        type="text"
-                        value={formData.owner_association?.managerName || ''}
-                        onChange={(e) => handleInputChange('owner_association', {
-                          ...(formData.owner_association || {}),
-                          managerName: e.target.value
-                        })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">رقم سجل الاتحاد</label>
-                      <input
-                        type="text"
-                        value={formData.owner_association?.registrationNumber || ''}
-                        onChange={(e) => handleInputChange('owner_association', {
-                          ...(formData.owner_association || {}),
-                          registrationNumber: e.target.value
-                        })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">عدد الوحدات المسجلة</label>
-                      <input
-                        type="number"
-                        value={formData.owner_association?.registeredUnitsCount || ''}
-                        onChange={(e) => handleInputChange('owner_association', {
-                          ...(formData.owner_association || {}),
-                          registeredUnitsCount: parseInt(e.target.value) || 0
-                        })}
-                        min="0"
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">رقم التواصل</label>
-                      <input
-                        type="tel"
-                        value={formData.owner_association?.contactNumber || ''}
-                        onChange={(e) => handleInputChange('owner_association', {
-                          ...(formData.owner_association || {}),
-                          contactNumber: e.target.value
-                        })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="05xxxxxxxx"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">رقم الآيبان</label>
-                      <input
-                        type="text"
-                        value={formData.owner_association?.iban || ''}
-                        onChange={(e) => handleInputChange('owner_association', {
-                          ...(formData.owner_association || {}),
-                          iban: e.target.value
-                        })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="SA0000000000000000000000"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">رقم الحساب</label>
-                      <input
-                        type="text"
-                        value={formData.owner_association?.accountNumber || ''}
-                        onChange={(e) => handleInputChange('owner_association', {
-                          ...(formData.owner_association || {}),
-                          accountNumber: e.target.value
-                        })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">تاريخ البداية</label>
-                      <input
-                        type="date"
-                        value={formData.owner_association?.startDate || ''}
-                        onChange={(e) => handleInputChange('owner_association', {
-                          ...(formData.owner_association || {}),
-                          startDate: e.target.value
-                        })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">تاريخ النهاية</label>
-                      <input
-                        type="date"
-                        value={formData.owner_association?.endDate || ''}
-                        onChange={(e) => handleInputChange('owner_association', {
-                          ...(formData.owner_association || {}),
-                          endDate: e.target.value
-                        })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">الرسم الشهري (ر.س)</label>
-                      <input
-                        type="number"
-                        value={formData.owner_association?.monthlyFee || ''}
-                        onChange={(e) => handleInputChange('owner_association', {
-                          ...(formData.owner_association || {}),
-                          monthlyFee: parseInt(e.target.value) || 0
-                        })}
-                        min="0"
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-slate-700 mb-2">الرسوم تشمل</label>
-                      <div className="flex gap-4">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={formData.owner_association?.includesElectricity || false}
-                            onChange={(e) => handleInputChange('owner_association', {
-                              ...(formData.owner_association || {}),
-                              includesElectricity: e.target.checked
-                            })}
-                            className="w-5 h-5 text-blue-600 rounded"
-                          />
-                          <span className="text-sm font-medium text-slate-700">فواتير الكهرباء</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={formData.owner_association?.includesWater || false}
-                            onChange={(e) => handleInputChange('owner_association', {
-                              ...(formData.owner_association || {}),
-                              includesWater: e.target.checked
-                            })}
-                            className="w-5 h-5 text-blue-600 rounded"
-                          />
-                          <span className="text-sm font-medium text-slate-700">فواتير المياه</span>
-                        </label>
-                      </div>
-                    </div>
+                {formData.guard_has_salary && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">قيمة الراتب (ر.س)</label>
+                    <input
+                      type="number"
+                      value={formData.guard_salary_amount || ''}
+                      onChange={(e) => handleInputChange('guard_salary_amount', parseInt(e.target.value))}
+                      className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                    />
                   </div>
                 )}
               </div>
             </div>
+
+            {/* أزرار الحفظ */}
+            <div className="pt-6 border-t border-gray-200 flex gap-3">
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-50 transition-all duration-300 font-semibold"
+              >
+                <Save className="w-5 h-5" />
+                {isSaving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+              </button>
+              <button
+                onClick={() => {
+                  setFormData(building)
+                  setIsEditing(false)
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gray-200 text-gray-700 rounded-2xl hover:bg-gray-300 transition-all duration-300 font-semibold"
+              >
+                <X className="w-5 h-5" />
+                إلغاء
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : (
+        <>
+          {/* Basic Building Info Cards */}
+          <div className="relative overflow-hidden rounded-3xl shadow-2xl">
+              {/* Background Gradient */}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 pointer-events-none"></div>
+
+              {/* Content */}
+              <div className="relative bg-white/90 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 p-8 mb-8">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <Building2 className="w-6 h-6 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-800">المعلومات الأساسية</h2>
+                  </div>
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 font-semibold text-sm"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    تعديل
+                  </button>
+                </div>
+
+                {/* Cards in One Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Building Name Card */}
+                  <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-2xl p-4 border-l-4 border-indigo-600 hover:shadow-lg transition-all duration-300">
+                    <p className="text-xs font-semibold text-indigo-600 uppercase tracking-widest mb-2">اسم المبنى</p>
+                    <p className="text-lg font-bold text-gray-800">{building.name}</p>
+                  </div>
+
+                  {/* Plot Number Card */}
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-4 border-l-4 border-purple-600 hover:shadow-lg transition-all duration-300">
+                    <p className="text-xs font-semibold text-purple-600 uppercase tracking-widest mb-2">رقم القطعة</p>
+                    <p className="text-lg font-bold text-gray-800">{building.plot_number}</p>
+                  </div>
+
+                  {/* Neighborhood Card */}
+                  <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-2xl p-4 border-l-4 border-pink-600 hover:shadow-lg transition-all duration-300">
+                    <p className="text-xs font-semibold text-pink-600 uppercase tracking-widest mb-2">الحي</p>
+                    <p className="text-lg font-bold text-gray-800">{building.neighborhood || '-'}</p>
+                  </div>
+
+                  {/* Year Built Card */}
+                  <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl p-4 border-l-4 border-orange-600 hover:shadow-lg transition-all duration-300">
+                    <p className="text-xs font-semibold text-orange-600 uppercase tracking-widest mb-2">سنة البناء</p>
+                    <p className="text-lg font-bold text-gray-800">{building.year_built || '-'}</p>
+                  </div>
+                </div>
+
+                {/* Description Card - if exists */}
+                {building.description && (
+                  <div className="mt-4 bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-4 border-l-4 border-slate-600">
+                    <p className="text-xs font-semibold text-slate-600 uppercase tracking-widest mb-2">الوصف</p>
+                    <p className="text-gray-750 leading-relaxed">{building.description}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+          {/* الهيكل الأساسي - Building Structure */}
+          <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 p-8 mb-8">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-amber-600 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Grid3x3 className="w-6 h-6 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800">الهيكل الأساسي للعمارة</h2>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {[
+                { label: 'الأدوار', value: building.total_floors, icon: <Building2 className="w-5 h-5" />, gradient: 'from-blue-500 to-blue-600' },
+                { label: 'الوحدات', value: building.total_units, icon: <Home className="w-5 h-5" />, gradient: 'from-green-500 to-green-600' },
+                { label: 'المصاعد', value: building.elevators, icon: <ArrowUp className="w-5 h-5" />, gradient: 'from-purple-500 to-purple-600' },
+                { label: 'المداخل', value: building.entrances, icon: <DoorOpen className="w-5 h-5" />, gradient: 'from-orange-500 to-orange-600' },
+                { label: 'المواقف', value: building.parking_slots, icon: <ParkingCircle className="w-5 h-5" />, gradient: 'from-red-500 to-red-600' },
+                { label: 'غرف السائقين', value: building.driver_rooms, icon: <Users className="w-5 h-5" />, gradient: 'from-cyan-500 to-cyan-600' },
+              ].map((item, index) => (
+                <div
+                  key={index}
+                  className={`bg-gradient-to-br ${item.gradient} rounded-2xl p-4 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold uppercase tracking-wide">{item.label}</span>
+                    {item.icon}
+                  </div>
+                  <p className="text-3xl font-black">{item.value}</p>
+                </div>
+              ))}
+            </div>
           </div>
-        ) : (
-          <>
-            {/* Basic Building Info Cards */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-blue-600" />
-                  المعلومات الأساسية
-                </h2>
+
+          {/* معلومات الحارس - Guard Information */}
+          {building.guard_name && (
+            <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 p-8 mb-8">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-gradient-to-br from-orange-600 to-red-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <Users className="w-6 h-6 text-white" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-800">معلومات الحارس</h2>
+                </div>
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg font-medium transition text-sm"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 font-semibold text-sm"
                 >
                   <Edit2 className="w-4 h-4" />
-                  تعديل المعلومات
+                  تعديل
                 </button>
               </div>
 
-              {/* Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                {/* Name Card */}
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <Building2 className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-slate-600">اسم المبنى</h3>
-                  </div>
-                  <p className="text-lg font-bold text-slate-900">{building.name}</p>
-                </div>
-
-                {/* Plot Number Card */}
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 bg-amber-100 rounded-lg">
-                      <Grid3x3 className="w-5 h-5 text-amber-600" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-slate-600">رقم القطعة</h3>
-                  </div>
-                  <p className="text-lg font-bold text-slate-900">{building.plot_number}</p>
-                </div>
-
-                {/* Neighborhood Card */}
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <Home className="w-5 h-5 text-green-600" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-slate-600">الحي</h3>
-                  </div>
-                  <p className="text-lg font-bold text-slate-900">{building.neighborhood || '-'}</p>
-                </div>
-              </div>
-
-              {/* Year Built Card */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <ArrowLeft className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-slate-600">سنة البناء</h3>
-                  </div>
-                  <p className="text-lg font-bold text-slate-900">{building.year_built || '-'}</p>
-                </div>
-              </div>
-
-              {/* Description Card */}
-              {building.description && (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition mt-4">
-                  <h3 className="text-sm font-semibold text-slate-600 mb-3">الوصف</h3>
-                  <p className="text-slate-700 leading-relaxed">{building.description}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Structure Stats Cards */}
-            <div className="mb-8">
-              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Grid3x3 className="w-5 h-5 text-blue-600" />
-                الهيكل الأساسي للعمارة
-              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <StatCard label="الأدوار" value={building.total_floors} icon={Grid3x3} />
-                <StatCard label="الوحدات" value={building.total_units} icon={Home} />
-                <StatCard label="المصاعد" value={building.elevators} icon={Wind} />
-                <StatCard label="المداخل" value={building.entrances} icon={Maximize2} />
-                <StatCard label="مواقف السيارات" value={building.parking_slots} icon={Wind} />
-                <StatCard label="غرف السائقين" value={building.driver_rooms} icon={Users} />
+                <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl p-4 border-l-4 border-orange-600">
+                  <p className="text-xs font-semibold text-orange-600 uppercase tracking-widest mb-2">الاسم</p>
+                  <p className="text-lg font-bold text-gray-800">{building.guard_name}</p>
+                </div>
+                <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-4 border-l-4 border-red-600">
+                  <p className="text-xs font-semibold text-red-600 uppercase tracking-widest mb-2">الرقم</p>
+                  <p className="text-lg font-bold text-gray-800">{building.guard_phone || '-'}</p>
+                </div>
+                <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-2xl p-4 border-l-4 border-pink-600">
+                  <p className="text-xs font-semibold text-pink-600 uppercase tracking-widest mb-2">رقم الغرفة</p>
+                  <p className="text-lg font-bold text-gray-800">{building.guard_room_number || '-'}</p>
+                </div>
+                <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-2xl p-4 border-l-4 border-yellow-600">
+                  <p className="text-xs font-semibold text-yellow-600 uppercase tracking-widest mb-2">فترة العمل</p>
+                  <p className="text-lg font-bold text-gray-800">
+                    {building.guard_shift === 'day' ? 'نهاري' : building.guard_shift === 'night' ? 'ليلي' : 'كلا الفترتين'}
+                  </p>
+                </div>
+                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-4 border-l-4 border-green-600">
+                  <p className="text-xs font-semibold text-green-600 uppercase tracking-widest mb-2">صرف راتب</p>
+                  <p className="text-lg font-bold text-gray-800">{building.guard_has_salary ? 'نعم' : 'لا'}</p>
+                </div>
+                {building.guard_has_salary && building.guard_salary_amount && (
+                  <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-2xl p-4 border-l-4 border-cyan-600">
+                    <p className="text-xs font-semibold text-cyan-600 uppercase tracking-widest mb-2">قيمة الراتب</p>
+                    <p className="text-lg font-bold text-gray-800">{building.guard_salary_amount} ر.س</p>
+                  </div>
+                )}
               </div>
             </div>
+          )}
 
-            {/* Guard Information Card */}
-            {building.guard_name && (
-              <div className="mb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <Users className="w-5 h-5 text-amber-600" />
-                    معلومات الحارس
-                  </h2>
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg font-medium transition text-sm"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                    تعديل
-                  </button>
+          {/* Owner Association Card */}
+          {building.owner_association?.hasAssociation && (
+            <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 p-8 mb-8">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <Building2 className="w-6 h-6 text-white" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-800">معلومات اتحاد الملاك</h2>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
-                    <h3 className="text-sm font-semibold text-slate-600 mb-2">اسم الحارس</h3>
-                    <p className="text-lg font-bold text-slate-900">{building.guard_name}</p>
-                  </div>
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
-                    <h3 className="text-sm font-semibold text-slate-600 mb-2">رقم الحارس</h3>
-                    <p className="text-lg font-bold text-slate-900">{building.guard_phone || '-'}</p>
-                  </div>
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
-                    <h3 className="text-sm font-semibold text-slate-600 mb-2">رقم الغرفة</h3>
-                    <p className="text-lg font-bold text-slate-900">{building.guard_room_number || '-'}</p>
-                  </div>
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
-                    <h3 className="text-sm font-semibold text-slate-600 mb-2">فترة العمل</h3>
-                    <p className="text-lg font-bold text-slate-900">
-                      {building.guard_shift === 'day' ? 'نهاري' : building.guard_shift === 'night' ? 'ليلي' : building.guard_shift === 'both' ? 'كلا الفترتين' : '-'}
-                    </p>
-                  </div>
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
-                    <h3 className="text-sm font-semibold text-slate-600 mb-2">صرف راتب</h3>
-                    <p className="text-lg font-bold text-slate-900">{building.guard_has_salary ? 'نعم' : 'لا'}</p>
-                  </div>
-                  {building.guard_has_salary && building.guard_salary_amount && (
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
-                      <h3 className="text-sm font-semibold text-slate-600 mb-2">قيمة الراتب</h3>
-                      <p className="text-lg font-bold text-slate-900">{building.guard_salary_amount} ر.س</p>
-                    </div>
-                  )}
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 font-semibold text-sm"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  تعديل
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-2xl p-4 border-l-4 border-indigo-600">
+                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-widest mb-2">اسم المسؤول</p>
+                  <p className="text-lg font-bold text-gray-800">{building.owner_association.managerName || '-'}</p>
+                </div>
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-4 border-l-4 border-blue-600">
+                  <p className="text-xs font-semibold text-blue-600 uppercase tracking-widest mb-2">رقم السجل</p>
+                  <p className="text-lg font-bold text-gray-800">{building.owner_association.registrationNumber || '-'}</p>
+                </div>
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-4 border-l-4 border-purple-600">
+                  <p className="text-xs font-semibold text-purple-600 uppercase tracking-widest mb-2">عدد الوحدات</p>
+                  <p className="text-lg font-bold text-gray-800">{building.owner_association.registeredUnitsCount || '-'}</p>
+                </div>
+                <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-2xl p-4 border-l-4 border-pink-600">
+                  <p className="text-xs font-semibold text-pink-600 uppercase tracking-widest mb-2">رقم التواصل</p>
+                  <p className="text-lg font-bold text-gray-800">{building.owner_association.contactNumber || '-'}</p>
+                </div>
+                <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl p-4 border-l-4 border-orange-600">
+                  <p className="text-xs font-semibold text-orange-600 uppercase tracking-widest mb-2">الرسم الشهري</p>
+                  <p className="text-lg font-bold text-gray-800">{building.owner_association.monthlyFee ? `${building.owner_association.monthlyFee} ر.س` : '-'}</p>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Owner Association Card */}
-            {building.owner_association?.hasAssociation && (
-              <div className="mb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <Building2 className="w-5 h-5 text-blue-600" />
-                    معلومات اتحاد الملاك
-                  </h2>
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg font-medium transition text-sm"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                    تعديل
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
-                    <h3 className="text-sm font-semibold text-slate-600 mb-2">اسم المسؤول</h3>
-                    <p className="text-lg font-bold text-slate-900">{building.owner_association.managerName || '-'}</p>
-                  </div>
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
-                    <h3 className="text-sm font-semibold text-slate-600 mb-2">رقم السجل</h3>
-                    <p className="text-lg font-bold text-slate-900">{building.owner_association.registrationNumber || '-'}</p>
-                  </div>
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
-                    <h3 className="text-sm font-semibold text-slate-600 mb-2">عدد الوحدات</h3>
-                    <p className="text-lg font-bold text-slate-900">{building.owner_association.registeredUnitsCount || '-'}</p>
-                  </div>
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
-                    <h3 className="text-sm font-semibold text-slate-600 mb-2">رقم التواصل</h3>
-                    <p className="text-lg font-bold text-slate-900">{building.owner_association.contactNumber || '-'}</p>
-                  </div>
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
-                    <h3 className="text-sm font-semibold text-slate-600 mb-2">الرسم الشهري</h3>
-                    <p className="text-lg font-bold text-slate-900">{building.owner_association.monthlyFee ? `${building.owner_association.monthlyFee} ر.س` : '-'}</p>
-                  </div>
-                </div>
+          {/* Units Section */}
+          <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 p-8">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Home className="w-6 h-6 text-white" />
               </div>
-            )}
-          </>
-        )}
-
-        {/* Units Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <Home className="w-5 h-5 text-blue-600" />
-            الوحدات ({units.length})
-          </h2>
+              <h2 className="text-2xl font-bold text-gray-800">الوحدات ({units.length})</h2>
+            </div>
+            <button
+              onClick={() => setIsEditing(true)}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 font-semibold text-sm"
+            >
+              <Edit2 className="w-4 h-4" />
+              إدارة الوحدات
+            </button>
+          </div>
 
           {units.length === 0 ? (
-            <p className="text-slate-500 text-center py-8">لا توجد وحدات</p>
+            <p className="text-gray-500 text-center py-12">لا توجد وحدات</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">الوحدة</th>
-                    <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">الدور</th>
-                    <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">النوع</th>
-                    <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">الاتجاه</th>
-                    <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">المساحة</th>
-                    <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">الغرف</th>
-                    <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">الحمامات</th>
-                    <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">السعر</th>
-                    <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">الحالة</th>
-                    <th className="text-center px-4 py-3 text-sm font-semibold text-slate-700">الإجراءات</th>
+                  <tr className="border-b-2 border-gray-200">
+                    <th className="text-right px-4 py-4 text-sm font-bold text-gray-700 uppercase">الوحدة</th>
+                    <th className="text-right px-4 py-4 text-sm font-bold text-gray-700 uppercase">الدور</th>
+                    <th className="text-right px-4 py-4 text-sm font-bold text-gray-700 uppercase">النوع</th>
+                    <th className="text-right px-4 py-4 text-sm font-bold text-gray-700 uppercase">الاتجاه</th>
+                    <th className="text-right px-4 py-4 text-sm font-bold text-gray-700 uppercase">المساحة</th>
+                    <th className="text-right px-4 py-4 text-sm font-bold text-gray-700 uppercase">الغرف</th>
+                    <th className="text-right px-4 py-4 text-sm font-bold text-gray-700 uppercase">الحمامات</th>
+                    <th className="text-right px-4 py-4 text-sm font-bold text-gray-700 uppercase">السعر</th>
+                    <th className="text-right px-4 py-4 text-sm font-bold text-gray-700 uppercase">الحالة</th>
+                    <th className="text-center px-4 py-4 text-sm font-bold text-gray-700 uppercase">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -913,7 +806,9 @@ export default function BuildingDetailPage() {
               </table>
             </div>
           )}
-        </div>
+          </div>
+        </>
+      )}
       </div>
     </div>
   )
