@@ -1,0 +1,59 @@
+==============================================================
+        🎯 إصلاح فوري - Instant Fix
+==============================================================
+
+✅ تم إصلاح المشكلة في الكود
+✅ النظام الآن يعمل بدون الأعمدة المفقودة
+✅ يحفظ 20+ حقل بنجاح
+
+==============================================================
+⚡ خطوة واحدة فقط لإكمال التشغيل
+==============================================================
+
+افتح Supabase SQL Editor
+انسخ الكود من ملف: QUICK_FIX.sql
+اضغط RUN
+انتهى! ✅
+
+==============================================================
+📋 أو انسخ هذا مباشرة:
+==============================================================
+
+-- حذف جميع السياسات القديمة
+DROP POLICY IF EXISTS "Users view own units" ON units;
+DROP POLICY IF EXISTS "Users insert own units" ON units;
+DROP POLICY IF EXISTS "Users update own units" ON units;
+DROP POLICY IF EXISTS "Users delete own units" ON units;
+
+-- إنشاء السياسات الجديدة
+CREATE POLICY "Users view own units" ON units
+FOR SELECT USING (EXISTS(SELECT 1 FROM buildings WHERE id = units.building_id AND owner_id = auth.uid()));
+
+CREATE POLICY "Users insert own units" ON units
+FOR INSERT WITH CHECK (EXISTS(SELECT 1 FROM buildings WHERE id = units.building_id AND owner_id = auth.uid()));
+
+CREATE POLICY "Users update own units" ON units
+FOR UPDATE USING (EXISTS(SELECT 1 FROM buildings WHERE id = units.building_id AND owner_id = auth.uid()));
+
+CREATE POLICY "Users delete own units" ON units
+FOR DELETE USING (EXISTS(SELECT 1 FROM buildings WHERE id = units.building_id AND owner_id = auth.uid()));
+
+==============================================================
+✅ بعدها مباشرة:
+==============================================================
+
+1. اذهب إلى /dashboard/buildings/new
+2. أنشئ عمارة جديدة
+3. املأ البيانات
+4. اضغط "حفظ العمارة"
+5. سترى: "تم إضافة العمارة والوحدات بنجاح!" ✅
+
+==============================================================
+📁 للمزيد من المعلومات:
+==============================================================
+
+PROBLEM_SOLVED.txt → ملخص المشكلة والحل
+COLUMNS_FIX_GUIDE.md → شرح تفصيلي كامل
+add_all_missing_columns.sql → لإضافة 13 عمود إضافي (اختياري)
+
+==============================================================

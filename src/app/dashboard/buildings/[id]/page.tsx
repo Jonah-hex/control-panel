@@ -20,6 +20,21 @@ import {
   Users
 } from 'lucide-react'
 
+interface OwnerAssociation {
+  hasAssociation: boolean
+  startDate?: string
+  endDate?: string
+  monthlyFee?: number
+  contactNumber?: string
+  managerName?: string
+  registrationNumber?: string
+  registeredUnitsCount?: number
+  iban?: string
+  accountNumber?: string
+  includesElectricity?: boolean
+  includesWater?: boolean
+}
+
 interface Building {
   id: string
   name: string
@@ -36,10 +51,12 @@ interface Building {
   phone: string | null
   guard_name: string | null
   guard_phone: string | null
-  guard_id_number: string | null
+  guard_room_number: string | null
+  guard_id_photo: string | null
   guard_shift: string | null
-  latitude: number | null
-  longitude: number | null
+  guard_has_salary: boolean | null
+  guard_salary_amount: number | null
+  owner_association?: OwnerAssociation | null
   owner_id?: string
   google_maps_link?: string | null
   street_type?: string | null
@@ -59,9 +76,16 @@ interface Unit {
   floor: number
   unit_number: string
   type: string
+  facing: string
   area: number
   rooms: number
   bathrooms: number
+  living_rooms: number
+  kitchens: number
+  maid_room: boolean
+  driver_room: boolean
+  entrances: number
+  ac_type: string
   price: number | null
   status: 'available' | 'reserved' | 'sold'
   created_at: string
@@ -148,8 +172,12 @@ export default function BuildingDetailPage() {
           phone: formData.phone,
           guard_name: formData.guard_name,
           guard_phone: formData.guard_phone,
-          guard_id_number: formData.guard_id_number,
+          guard_room_number: formData.guard_room_number,
+          guard_id_photo: formData.guard_id_photo,
           guard_shift: formData.guard_shift,
+          guard_has_salary: formData.guard_has_salary,
+          guard_salary_amount: formData.guard_salary_amount,
+          owner_association: formData.owner_association,
           google_maps_link: formData.google_maps_link,
           street_type: formData.street_type,
           building_facing: formData.building_facing,
@@ -403,6 +431,249 @@ export default function BuildingDetailPage() {
                 </div>
               </div>
 
+              {/* Guard Information Section */}
+              <div className="pt-6 border-t border-slate-200">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-amber-600" />
+                  معلومات الحارس
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">اسم الحارس</label>
+                    <input
+                      type="text"
+                      value={formData.guard_name || ''}
+                      onChange={(e) => handleInputChange('guard_name', e.target.value)}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">رقم الحارس</label>
+                    <input
+                      type="tel"
+                      value={formData.guard_phone || ''}
+                      onChange={(e) => handleInputChange('guard_phone', e.target.value)}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="05xxxxxxxx"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">رقم غرفة الحارس</label>
+                    <input
+                      type="text"
+                      value={formData.guard_room_number || ''}
+                      onChange={(e) => handleInputChange('guard_room_number', e.target.value)}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">فترة العمل</label>
+                    <select
+                      value={formData.guard_shift || ''}
+                      onChange={(e) => handleInputChange('guard_shift', e.target.value)}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">اختر الفترة</option>
+                      <option value="day">نهاري</option>
+                      <option value="night">ليلي</option>
+                      <option value="both">كلا الفترتين</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.guard_has_salary || false}
+                        onChange={(e) => handleInputChange('guard_has_salary', e.target.checked)}
+                        className="w-5 h-5 text-blue-600 rounded"
+                      />
+                      <span className="text-sm font-medium text-slate-700">صرف راتب للحارس</span>
+                    </label>
+                  </div>
+                  {formData.guard_has_salary && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">قيمة الراتب (ر.س)</label>
+                      <input
+                        type="number"
+                        value={formData.guard_salary_amount || ''}
+                        onChange={(e) => handleInputChange('guard_salary_amount', parseInt(e.target.value))}
+                        min="0"
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="0"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Owner Association Section */}
+              <div className="pt-6 border-t border-slate-200">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-blue-600" />
+                  معلومات اتحاد الملاك
+                </h3>
+                <div className="mb-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.owner_association?.hasAssociation || false}
+                      onChange={(e) => handleInputChange('owner_association', {
+                        ...(formData.owner_association || {}),
+                        hasAssociation: e.target.checked
+                      })}
+                      className="w-5 h-5 text-blue-600 rounded"
+                    />
+                    <span className="text-sm font-medium text-slate-700">يوجد اتحاد ملاك للعمارة</span>
+                  </label>
+                </div>
+                {formData.owner_association?.hasAssociation && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">اسم مسؤول الاتحاد</label>
+                      <input
+                        type="text"
+                        value={formData.owner_association?.managerName || ''}
+                        onChange={(e) => handleInputChange('owner_association', {
+                          ...(formData.owner_association || {}),
+                          managerName: e.target.value
+                        })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">رقم سجل الاتحاد</label>
+                      <input
+                        type="text"
+                        value={formData.owner_association?.registrationNumber || ''}
+                        onChange={(e) => handleInputChange('owner_association', {
+                          ...(formData.owner_association || {}),
+                          registrationNumber: e.target.value
+                        })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">عدد الوحدات المسجلة</label>
+                      <input
+                        type="number"
+                        value={formData.owner_association?.registeredUnitsCount || ''}
+                        onChange={(e) => handleInputChange('owner_association', {
+                          ...(formData.owner_association || {}),
+                          registeredUnitsCount: parseInt(e.target.value) || 0
+                        })}
+                        min="0"
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">رقم التواصل</label>
+                      <input
+                        type="tel"
+                        value={formData.owner_association?.contactNumber || ''}
+                        onChange={(e) => handleInputChange('owner_association', {
+                          ...(formData.owner_association || {}),
+                          contactNumber: e.target.value
+                        })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="05xxxxxxxx"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">رقم الآيبان</label>
+                      <input
+                        type="text"
+                        value={formData.owner_association?.iban || ''}
+                        onChange={(e) => handleInputChange('owner_association', {
+                          ...(formData.owner_association || {}),
+                          iban: e.target.value
+                        })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="SA0000000000000000000000"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">رقم الحساب</label>
+                      <input
+                        type="text"
+                        value={formData.owner_association?.accountNumber || ''}
+                        onChange={(e) => handleInputChange('owner_association', {
+                          ...(formData.owner_association || {}),
+                          accountNumber: e.target.value
+                        })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">تاريخ البداية</label>
+                      <input
+                        type="date"
+                        value={formData.owner_association?.startDate || ''}
+                        onChange={(e) => handleInputChange('owner_association', {
+                          ...(formData.owner_association || {}),
+                          startDate: e.target.value
+                        })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">تاريخ النهاية</label>
+                      <input
+                        type="date"
+                        value={formData.owner_association?.endDate || ''}
+                        onChange={(e) => handleInputChange('owner_association', {
+                          ...(formData.owner_association || {}),
+                          endDate: e.target.value
+                        })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">الرسم الشهري (ر.س)</label>
+                      <input
+                        type="number"
+                        value={formData.owner_association?.monthlyFee || ''}
+                        onChange={(e) => handleInputChange('owner_association', {
+                          ...(formData.owner_association || {}),
+                          monthlyFee: parseInt(e.target.value) || 0
+                        })}
+                        min="0"
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-2">الرسوم تشمل</label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.owner_association?.includesElectricity || false}
+                            onChange={(e) => handleInputChange('owner_association', {
+                              ...(formData.owner_association || {}),
+                              includesElectricity: e.target.checked
+                            })}
+                            className="w-5 h-5 text-blue-600 rounded"
+                          />
+                          <span className="text-sm font-medium text-slate-700">فواتير الكهرباء</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.owner_association?.includesWater || false}
+                            onChange={(e) => handleInputChange('owner_association', {
+                              ...(formData.owner_association || {}),
+                              includesWater: e.target.checked
+                            })}
+                            className="w-5 h-5 text-blue-600 rounded"
+                          />
+                          <span className="text-sm font-medium text-slate-700">فواتير المياه</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="pt-6 border-t border-slate-200">
                 <button
                   onClick={handleSave}
@@ -440,6 +711,61 @@ export default function BuildingDetailPage() {
           )}
         </div>
 
+        {/* Guard Information Section */}
+        {!isEditing && building.guard_name && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+              <Users className="w-5 h-5 text-amber-600" />
+              معلومات الحارس
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <InfoRow label="اسم الحارس" value={building.guard_name || '-'} />
+              <InfoRow label="رقم الحارس" value={building.guard_phone || '-'} />
+              <InfoRow label="رقم غرفة الحارس" value={building.guard_room_number || '-'} />
+              <InfoRow label="فترة العمل" value={building.guard_shift === 'day' ? 'نهاري' : building.guard_shift === 'night' ? 'ليلي' : building.guard_shift === 'both' ? 'كلا الفترتين' : '-'} />
+              <InfoRow label="صرف راتب" value={building.guard_has_salary ? 'نعم' : 'لا'} />
+              {building.guard_has_salary && building.guard_salary_amount && (
+                <InfoRow label="قيمة الراتب" value={`${building.guard_salary_amount} ر.س`} />
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Owner Association Section */}
+        {!isEditing && building.owner_association?.hasAssociation && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-blue-600" />
+              معلومات اتحاد الملاك
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <InfoRow label="اسم مسؤول الاتحاد" value={building.owner_association.managerName || '-'} />
+              <InfoRow label="رقم سجل الاتحاد" value={building.owner_association.registrationNumber || '-'} />
+              <InfoRow label="عدد الوحدات المسجلة" value={building.owner_association.registeredUnitsCount?.toString() || '-'} />
+              <InfoRow label="رقم التواصل" value={building.owner_association.contactNumber || '-'} />
+              <InfoRow label="رقم الآيبان" value={building.owner_association.iban || '-'} />
+              <InfoRow label="رقم الحساب" value={building.owner_association.accountNumber || '-'} />
+              <InfoRow label="تاريخ البداية" value={building.owner_association.startDate || '-'} />
+              <InfoRow label="تاريخ النهاية" value={building.owner_association.endDate || '-'} />
+              <InfoRow label="الرسم الشهري" value={building.owner_association.monthlyFee ? `${building.owner_association.monthlyFee} ر.س` : '-'} />
+              <div className="md:col-span-2">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">الرسوم تشمل</p>
+                <div className="flex gap-4">
+                  {building.owner_association.includesElectricity && (
+                    <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">فواتير الكهرباء</span>
+                  )}
+                  {building.owner_association.includesWater && (
+                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">فواتير المياه</span>
+                  )}
+                  {!building.owner_association.includesElectricity && !building.owner_association.includesWater && (
+                    <span className="text-slate-500">لا توجد خدمات مشمولة</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Units Section */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
@@ -452,25 +778,31 @@ export default function BuildingDetailPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead>
+<thead>
                   <tr className="border-b border-slate-200">
                     <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">الوحدة</th>
                     <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">الدور</th>
                     <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">النوع</th>
+                    <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">الاتجاه</th>
                     <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">المساحة</th>
+                    <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">الغرف</th>
+                    <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">الحمامات</th>
                     <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">السعر</th>
                     <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">الحالة</th>
                     <th className="text-center px-4 py-3 text-sm font-semibold text-slate-700">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {units.map((unit) => (
+{units.map((unit) => (
                     <tr key={unit.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
-                      <td className="px-4 py-3 text-sm">{unit.unit_number}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-slate-900">{unit.unit_number}</td>
                       <td className="px-4 py-3 text-sm">{unit.floor}</td>
-                      <td className="px-4 py-3 text-sm">{unit.type}</td>
+                      <td className="px-4 py-3 text-sm">{unit.type === 'apartment' ? 'شقة' : unit.type === 'studio' ? 'ملحق' : unit.type === 'duplex' ? 'دوبلكس' : 'بنتهاوس'}</td>
+                      <td className="px-4 py-3 text-sm">{unit.facing === 'front' ? 'أمامية' : unit.facing === 'back' ? 'خلفية' : 'على شارعين'}</td>
                       <td className="px-4 py-3 text-sm">{unit.area} م²</td>
-                      <td className="px-4 py-3 text-sm">{unit.price ? `${unit.price} ر.س` : '-'}</td>
+                      <td className="px-4 py-3 text-sm text-center">{unit.rooms}</td>
+                      <td className="px-4 py-3 text-sm text-center">{unit.bathrooms}</td>
+                      <td className="px-4 py-3 text-sm">{unit.price ? `${unit.price}` : '-'}</td>
                       <td className="px-4 py-3 text-sm">
                         <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
                           unit.status === 'available' ? 'bg-green-100 text-green-700' :

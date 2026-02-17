@@ -13,6 +13,7 @@ import {
   Home,
   X,
   Check,
+  CheckCircle,
   AlertCircle,
   Upload,
   Layers,
@@ -131,6 +132,7 @@ interface Unit {
   unitNumber: string
   floor: number
   type: 'apartment' | 'studio' | 'duplex' | 'penthouse'
+  facing: 'front' | 'back' | 'corner'
   area: number
   rooms: number
   bathrooms: number
@@ -158,8 +160,13 @@ interface OwnerAssociation {
   endDate?: string
   monthlyFee?: number
   contactNumber?: string
-  associationName?: string
+  managerName?: string
   registrationNumber?: string
+  registeredUnitsCount?: number
+  iban?: string
+  accountNumber?: string
+  includesElectricity?: boolean
+  includesWater?: boolean
 }
 
 export default function NewBuildingPage() {
@@ -203,26 +210,49 @@ export default function NewBuildingPage() {
     // الحارس
     guardName: '',
     guardPhone: '',
-    guardIdNumber: '',
-    guardShift: 'day' as 'day' | 'night' | 'rotating',
+    guardRoomNumber: '',
+    guardIdPhoto: '',
+    guardShift: 'day' as 'day' | 'night' | 'permanent',
+    hasSalary: false,
+    salaryAmount: 0,
     
     // الصور
     imageUrls: [] as string[],
     
     // موقع العمارة
-    latitude: '',
-    longitude: '',
     googleMapsLink: '',
   })
 
-  const [floors, setFloors] = useState<Floor[]>([
-    { 
-      number: 1, 
-      units: [],
-      floorPlan: '4shuqq',
-      unitsPerFloor: 4
+  const [floors, setFloors] = useState<Floor[]>(() => {
+    const defaultUnits: Unit[] = []
+    for (let i = 0; i < 4; i++) {
+      defaultUnits.push({
+        unitNumber: `${i + 1}`,
+        floor: 1,
+        type: 'apartment',
+        facing: 'front',
+        area: 0,
+        rooms: 1,
+        bathrooms: 1,
+        livingRooms: 1,
+        kitchens: 1,
+        maidRoom: false,
+        driverRoom: false,
+        entrances: 1,
+        acType: 'split',
+        status: 'available',
+        price: 0
+      })
     }
-  ])
+    return [
+      { 
+        number: 1, 
+        units: defaultUnits,
+        floorPlan: '4shuqq',
+        unitsPerFloor: 4
+      }
+    ]
+  })
 
   const [images, setImages] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
@@ -233,6 +263,7 @@ export default function NewBuildingPage() {
   const [currentStep, setCurrentStep] = useState(1)
   const [expandedFloor, setExpandedFloor] = useState<number | null>(1)
   const [expandedUnit, setExpandedUnit] = useState<string | null>(null)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
   
   const [ownerAssociation, setOwnerAssociation] = useState<OwnerAssociation>({
     hasAssociation: false,
@@ -240,8 +271,13 @@ export default function NewBuildingPage() {
     endDate: '',
     monthlyFee: 0,
     contactNumber: '',
-    associationName: '',
-    registrationNumber: ''
+    managerName: '',
+    registrationNumber: '',
+    registeredUnitsCount: 0,
+    iban: '',
+    accountNumber: '',
+    includesElectricity: false,
+    includesWater: false
   })
   
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -306,9 +342,10 @@ export default function NewBuildingPage() {
     const newUnits: Unit[] = []
     for (let i = 0; i < unitsPerFloor; i++) {
       newUnits.push({
-        unitNumber: `${newFloorNumber}${String(i + 1).padStart(2, '0')}`,
+        unitNumber: `${floors.reduce((sum, f) => sum + f.units.length, 0) + i + 1}`,
         floor: newFloorNumber,
         type: 'apartment',
+        facing: 'front',
         area: 0,
         rooms: 1,
         bathrooms: 1,
@@ -362,9 +399,10 @@ export default function NewBuildingPage() {
         const newUnits: Unit[] = []
         for (let i = 0; i < unitsPerFloor; i++) {
           newUnits.push({
-            unitNumber: `${floorNumber}${String(i + 1).padStart(2, '0')}`,
+            unitNumber: `${floors.reduce((sum, f) => sum + f.units.length, 0) + i + 1}`,
             floor: floorNumber,
             type: 'apartment',
+            facing: 'front',
             area: 0,
             rooms: 1,
             bathrooms: 1,
@@ -402,9 +440,10 @@ export default function NewBuildingPage() {
     setFloors(floors.map(floor => {
       if (floor.number === floorNumber) {
         const newUnit: Unit = {
-          unitNumber: `${floorNumber}${String(floor.units.length + 1).padStart(2, '0')}`,
+          unitNumber: `${floors.reduce((sum, f) => sum + f.units.length, 0) + 1}`,
           floor: floorNumber,
           type: 'apartment',
+          facing: 'front',
           area: 0,
           rooms: 1,
           bathrooms: 1,
@@ -490,7 +529,7 @@ export default function NewBuildingPage() {
       
       const newUnits = sourceFloor.units.map((unit, index) => ({
         ...unit,
-        unitNumber: `${floor.number}${String(index + 1).padStart(2, '0')}`,
+        unitNumber: `${floors.reduce((sum, f) => sum + f.units.length, 0) + index + 1}`,
         floor: floor.number
       }))
 
@@ -524,115 +563,239 @@ export default function NewBuildingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
+    // Only move to next step, never save from form submission
     if (currentStep < steps.length) {
-      setError('يرجى إكمال جميع الخطوات ثم تأكيد الحفظ من الخطوة الأخيرة')
-      return
+      handleNextStep()
     }
+  }
+
+  const confirmSaveBuilding = async () => {
+    setShowConfirmModal(false)
 
     setLoading(true)
     setError('')
     setSuccess('')
 
     try {
+      // ==========================================
+      // 1️⃣ التحقق من تسجيل الدخول
+      // Verify User Authentication
+      // ==========================================
       const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) {
+        setError('يجب تسجيل الدخول أولاً')
         router.push('/login')
         return
       }
 
-      if (!formData.name || !formData.plotNumber) {
-        throw new Error('الرجاء إدخال اسم العمارة ورقم القطعة')
+      // ==========================================
+      // 2️⃣ التحقق من البيانات المطلوبة
+      // Validate Required Fields
+      // ==========================================
+      if (!formData.name) {
+        throw new Error('الرجاء إدخال اسم العمارة')
       }
 
       const totalUnits = floors.reduce((sum, floor) => sum + floor.units.length, 0)
+      
+      console.log('📊 بدء حفظ العمارة:', {
+        name: formData.name,
+        neighborhood: formData.neighborhood || 'غير محدد',
+        plot_number: formData.plotNumber || 'غير محدد',
+        total_floors: floors.length,
+        total_units: totalUnits,
+        has_association: ownerAssociation.hasAssociation,
+        images_count: images.length
+      })
+
+      // ==========================================
+      // 3️⃣ حفظ بيانات العمارة - جميع الحقول
+      // Save Building Data - ALL FIELDS from 5 Steps
+      // يتطلب تنفيذ: ADD_ALL_COLUMNS_COMPLETE.sql أولاً
+      // Requires running: ADD_ALL_COLUMNS_COMPLETE.sql first
+      // ==========================================
 
       const { data: building, error: buildingError } = await supabase
         .from('buildings')
         .insert([
           {
+            // 📋 الخطوة 1 - معلومات العمارة الأساسية
+            // Step 1 - Basic Building Information
             name: formData.name,
-            plot_number: formData.plotNumber,
-            neighborhood: formData.neighborhood,
-            address: `${formData.neighborhood || ''} - قطعة ${formData.plotNumber || ''}`.trim(),
+            plot_number: formData.plotNumber || null,
+            neighborhood: formData.neighborhood || null,
+            address: [formData.neighborhood, formData.plotNumber ? `قطعة ${formData.plotNumber}` : ''].filter(Boolean).join(' - ') || null,
             description: formData.description || null,
+            phone: formData.phone || null,
+            
+            // 📋 الخطوة 2 - تفاصيل العمارة
+            // Step 2 - Building Details
             total_floors: floors.length,
             total_units: totalUnits,
-            reserved_units: formData.reservedUnits,
-            parking_slots: formData.parkingSlots,
-            driver_rooms: formData.driverRooms,
-            elevators: formData.elevators,
-            street_type: formData.streetType,
-            building_facing: formData.buildingFacing,
-            phone: formData.phone || null,
-            year_built: formData.yearBuilt,
-            build_status: formData.buildStatus,
+            reserved_units: formData.reservedUnits || 0,
+            parking_slots: formData.parkingSlots || 0,
+            driver_rooms: formData.driverRooms || 0,
+            elevators: formData.elevators || 1,
+            entrances: 1,
+            street_type: formData.streetType || 'one',
+            building_facing: formData.buildingFacing || 'north',
+            year_built: formData.yearBuilt || null,
+            
+            // معلومات قانونية - Legal Information
+            build_status: formData.buildStatus || 'ready',
             deed_number: formData.deedNumber || null,
             land_area: formData.landArea || null,
             building_license_number: formData.buildingLicenseNumber || null,
-            insurance_available: formData.insuranceAvailable,
-            insurance_policy_number: formData.insuranceAvailable ? formData.insurancePolicyNumber : null,
-            has_main_water_meter: formData.hasMainWaterMeter,
-            water_meter_number: formData.hasMainWaterMeter ? formData.waterMeterNumber : null,
-            has_main_electricity_meter: formData.hasMainElectricityMeter,
-            electricity_meter_number: formData.hasMainElectricityMeter ? formData.electricityMeterNumber : null,
+            
+            // معلومات التأمين - Insurance Information
+            insurance_available: formData.insuranceAvailable || false,
+            insurance_policy_number: formData.insuranceAvailable ? (formData.insurancePolicyNumber || null) : null,
+            
+            // عدادات المرافق - Utility Meters
+            has_main_water_meter: formData.hasMainWaterMeter || false,
+            water_meter_number: formData.hasMainWaterMeter ? (formData.waterMeterNumber || null) : null,
+            has_main_electricity_meter: formData.hasMainElectricityMeter || false,
+            electricity_meter_number: formData.hasMainElectricityMeter ? (formData.electricityMeterNumber || null) : null,
+            
+            // 📋 الخطوة 3 - الوحدات (تُحفظ في جدول منفصل)
+            // Step 3 - Units (saved in separate table)
+            floors_data: floors,
+            
+            // 📋 الخطوة 4 - معلومات إضافية
+            // Step 4 - Additional Information
+            
+            // معلومات الحارس - Guard Information
             guard_name: formData.guardName || null,
             guard_phone: formData.guardPhone || null,
-            guard_id_number: formData.guardIdNumber || null,
+            guard_room_number: formData.guardRoomNumber || null,
+            guard_id_photo: formData.guardIdPhoto || null,
             guard_shift: formData.guardShift || null,
-            owner_association: ownerAssociation.hasAssociation ? ownerAssociation : null,
-            latitude: formData.latitude ? parseFloat(formData.latitude) : null,
-            longitude: formData.longitude ? parseFloat(formData.longitude) : null,
+            guard_has_salary: formData.hasSalary || false,
+            guard_salary_amount: formData.hasSalary ? (formData.salaryAmount || null) : null,
+            
+            // الموقع - Location
             google_maps_link: formData.googleMapsLink || null,
-            floors_data: floors,
+            // image_urls سيتم تحديثه بعد رفع الصور
+            
+            // 📋 الخطوة 5 - اتحاد الملاك
+            // Step 5 - Owner Association
+            owner_association: ownerAssociation.hasAssociation ? {
+              hasAssociation: ownerAssociation.hasAssociation,
+              managerName: ownerAssociation.managerName || null,
+              registrationNumber: ownerAssociation.registrationNumber || null,
+              registeredUnitsCount: ownerAssociation.registeredUnitsCount || null,
+              iban: ownerAssociation.iban || null,
+              accountNumber: ownerAssociation.accountNumber || null,
+              contactNumber: ownerAssociation.contactNumber || null,
+              startDate: ownerAssociation.startDate || null,
+              endDate: ownerAssociation.endDate || null,
+              monthlyFee: ownerAssociation.monthlyFee || null,
+              includesElectricity: ownerAssociation.includesElectricity || false,
+              includesWater: ownerAssociation.includesWater || false,
+            } : null,
+            
+            // معلومات المالك - Owner Info
             owner_id: user.id,
           }
         ])
         .select()
         .single()
 
-      if (buildingError) throw buildingError
-
-      if (images.length > 0) {
-        const imageUrls = await uploadImages(building.id)
-        
-        const { error: updateError } = await supabase
-          .from('buildings')
-          .update({ image_urls: imageUrls })
-          .eq('id', building.id)
-
-        if (updateError) throw updateError
+      if (buildingError) {
+        console.error('❌ خطأ في حفظ العمارة:', buildingError)
+        throw new Error(`فشل حفظ العمارة: ${buildingError.message}`)
       }
 
-      for (const floor of floors) {
-        for (const unit of floor.units) {
-          const { error: unitError } = await supabase
-            .from('units')
-            .insert([
-              {
-                building_id: building.id,
-                unit_number: unit.unitNumber,
-                floor: floor.number,
-                type: unit.type,
-                area: unit.area,
-                rooms: unit.rooms,
-                bathrooms: unit.bathrooms,
-                living_rooms: unit.livingRooms,
-                kitchens: unit.kitchens,
-                maid_room: unit.maidRoom,
-                driver_room: unit.driverRoom,
-                ac_type: unit.acType,
-                status: unit.status,
-                price: unit.price,
-                description: unit.description || null
-              }
-            ])
+      console.log('✅ تم حفظ العمارة بنجاح - ID:', building.id)
 
-          if (unitError) throw unitError
+      // ==========================================
+      // 4️⃣ رفع الصور (إن وجدت)
+      // Upload Images (if any)
+      // ==========================================
+      if (images.length > 0) {
+        console.log(`📸 بدء رفع ${images.length} صورة...`)
+        
+        try {
+          const imageUrls = await uploadImages(building.id)
+          
+          const { error: updateError } = await supabase
+            .from('buildings')
+            .update({ image_urls: imageUrls })
+            .eq('id', building.id)
+
+          if (updateError) {
+            console.error('⚠️ خطأ في تحديث روابط الصور:', updateError)
+            throw new Error(`فشل حفظ الصور: ${updateError.message}`)
+          }
+          
+          console.log(`✅ تم رفع ${imageUrls.length} صورة بنجاح`)
+        } catch (uploadError: any) {
+          console.error('❌ خطأ في رفع الصور:', uploadError)
+          // لا نوقف العملية، فقط ننبه
+          console.warn('⚠️ تم حفظ العمارة لكن فشل رفع الصور')
         }
       }
-      
+
+      // ==========================================
+      // 5️⃣ حفظ الوحدات السكنية
+      // Save Units - All Fields (After running COMPLETE_SCHEMA_UPDATE.sql)
+      // ==========================================
+      if (totalUnits > 0) {
+        console.log(`🏢 بدء حفظ ${totalUnits} وحدة سكنية...`)
+        
+        let savedUnitsCount = 0
+        
+        for (const floor of floors) {
+          for (const unit of floor.units) {
+            const { error: unitError } = await supabase
+              .from('units')
+              .insert([
+                {
+                  building_id: building.id,
+                  unit_number: unit.unitNumber,
+                  floor: floor.number,
+                  type: unit.type || 'apartment',
+                  facing: unit.facing || 'front',
+                  area: unit.area || 0,
+                  rooms: unit.rooms || 1,
+                  bathrooms: unit.bathrooms || 1,
+                  living_rooms: unit.livingRooms || 1,
+                  kitchens: unit.kitchens || 1,
+                  maid_room: unit.maidRoom || false,
+                  driver_room: unit.driverRoom || false,
+                  entrances: unit.entrances || 1,
+                  ac_type: unit.acType || 'split',
+                  status: unit.status || 'available',
+                  price: unit.price || null,
+                  description: unit.description || null
+                }
+              ])
+
+            if (unitError) {
+              console.error(`❌ خطأ في حفظ الوحدة ${unit.unitNumber}:`, unitError)
+              
+              // إذا كانت المشكلة في RLS policies
+              if (unitError.message.includes('row-level security')) {
+                throw new Error('خطأ: صلاحيات قاعدة البيانات غير مكتملة. يرجى تطبيق fix_units_policies.sql في Supabase')
+              }
+              
+              throw new Error(`فشل حفظ الوحدة ${unit.unitNumber}: ${unitError.message}`)
+            }
+            
+            savedUnitsCount++
+          }
+        }
+        
+        console.log(`✅ تم حفظ ${savedUnitsCount} وحدة سكنية بنجاح`)
+      } else {
+        console.log('ℹ️ لا توجد وحدات لحفظها')
+      }
+
+      // ==========================================
+      // 6️⃣ النجاح - Success
+      // ==========================================
+      console.log('🎉 اكتمل حفظ البيانات بنجاح')
       setSuccess('تم إضافة العمارة والوحدات بنجاح!')
       
       setTimeout(() => {
@@ -641,7 +804,23 @@ export default function NewBuildingPage() {
       }, 2000)
       
     } catch (error: any) {
-      setError(error.message)
+      console.error('❌ خطأ عام في حفظ البيانات:', error)
+      
+      // رسائل خطأ مفصلة
+      let errorMessage = error.message || 'حدث خطأ غير متوقع'
+      
+      // أخطاء شائعة مع حلول
+      if (errorMessage.includes('Could not find')) {
+        errorMessage += '\n\n💡 الحل: قد يكون العمود غير موجود في قاعدة البيانات. راجع COMPLETE_SAVE_GUIDE.md'
+      } else if (errorMessage.includes('row-level security')) {
+        errorMessage += '\n\n💡 الحل: نفّذ fix_units_policies.sql في Supabase SQL Editor'
+      } else if (errorMessage.includes('duplicate key')) {
+        errorMessage += '\n\n💡 الحل: رقم الوحدة مكرر. تأكد من عدم تكرار أرقام الوحدات'
+      } else if (errorMessage.includes('violates not-null')) {
+        errorMessage += '\n\n💡 الحل: حقل مطلوب فارغ. تأكد من ملء اسم العمارة ورقم القطعة'
+      }
+      
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -725,46 +904,47 @@ export default function NewBuildingPage() {
       {/* الشريط العلوي - تصميم محسّن */}
       <div className="bg-white/90 shadow-lg border-b-2 border-indigo-100 sticky top-0 z-20 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20">
-            <div className="flex items-center gap-4">
-              <Link href="/dashboard/buildings" className="inline-flex items-center p-2 rounded-2xl hover:bg-indigo-50 transition-all duration-300 group">
-                <span className="w-12 h-12 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/30 group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
-                  <ArrowLeft className="w-6 h-6 text-white" />
+          <div className="flex items-center justify-between py-4">
+            <div className="flex items-center gap-5">
+              {/* زر الرجوع */}
+              <Link href="/dashboard/buildings" className="inline-flex items-center justify-center p-2.5 rounded-2xl hover:bg-indigo-50 transition-all duration-300 group">
+                <span className="w-11 h-11 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
+                  <ArrowLeft className="w-5 h-5 text-white" />
                 </span>
               </Link>
 
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-3">
-                  <span className="w-12 h-12 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-500/30 animate-pulse">
-                    <Building2 className="w-6 h-6" />
-                  </span>
-                  إضافة عمارة جديدة
-                </h1>
-                <p className="text-xs text-gray-600 flex items-center gap-2 mt-2">
-                  <Sparkles className="w-3 h-3 text-indigo-400 animate-pulse" />
-                  أدخل جميع تفاصيل العمارة والوحدات السكنية بطريقة سهلة وسريعة
-                </p>
+              {/* اللوقو والنصوص */}
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-500/30 animate-pulse">
+                  <Building2 className="w-7 h-7" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                    إضافة عمارة جديدة
+                  </h1>
+                  <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                    <Sparkles className="w-3 h-3 text-indigo-400 animate-pulse" />
+                    أدخل جميع تفاصيل العمارة والوحدات السكنية بطريقة سهلة وسريعة
+                  </p>
+                </div>
               </div>
             </div>
 
+            {/* الأزرار */}
             <div className="flex items-center gap-3">
               <Link
                 href="/dashboard"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-white rounded-2xl border-2 border-gray-200 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-300 group"
+                className="inline-flex items-center gap-2.5 px-4 py-2.5 bg-white rounded-xl border-2 border-gray-200 hover:shadow-md transition-all duration-300 transform hover:-translate-y-0.5 hover:border-indigo-300 group"
               >
-                <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center group-hover:from-indigo-100 group-hover:to-purple-100 transition-all">
-                  <Home className="w-5 h-5 text-gray-700 group-hover:text-indigo-600 transition-colors" />
-                </span>
+                <Home className="w-5 h-5 text-gray-600 group-hover:text-indigo-600 transition-colors" />
                 <span className="text-sm font-bold text-gray-700 group-hover:text-indigo-600 transition-colors">الرئيسية</span>
               </Link>
 
               <Link
                 href="/dashboard/buildings"
-                className="inline-flex items-center gap-3 px-5 py-2.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-2xl shadow-xl shadow-indigo-500/30 hover:shadow-2xl transform transition-all duration-300 hover:-translate-y-1 hover:scale-105"
+                className="inline-flex items-center gap-2.5 px-4 py-2.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-xl transform transition-all duration-300 hover:-translate-y-0.5 hover:scale-105"
               >
-                <span className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                  <Building2 className="w-5 h-5 text-white" />
-                </span>
+                <Building2 className="w-5 h-5 text-white" />
                 <span className="text-sm font-bold">قائمة العماير</span>
               </Link>
             </div>
@@ -780,15 +960,15 @@ export default function NewBuildingPage() {
               <>
                 <div
                   className="h-2 rounded-full absolute top-6 bg-gradient-to-l from-emerald-100 via-emerald-50 to-emerald-200"
-                  style={{ left: `${trackLeftPx}px`, width: `${trackTotalPx}px` }}
+                  style={{ left: `${trackLeftPx + 20}px`, width: `${trackTotalPx - 45}px` }}
                 />
 
                 {/* fill measured */}
                 <div
-                  className="h-2 rounded-full absolute top-6 bg-gradient-to-l from-green-400 to-emerald-500 transition-all duration-300"
+                  className="h-2 rounded-full absolute top-6 bg-gradient-to-l from-green-400 to-emerald-500 transition-all duration-500 ease-in-out"
                   style={{
-                    left: `${isRTL ? trackLeftPx + (trackTotalPx - (progressPercent / 100) * trackTotalPx) : trackLeftPx}px`,
-                    width: `${(progressPercent / 100) * trackTotalPx}px`,
+                    left: `${isRTL ? trackLeftPx + 20 + ((trackTotalPx - 45) - (progressPercent / 100) * (trackTotalPx - 45)) : trackLeftPx + 20}px`,
+                    width: `${(progressPercent / 100) * (trackTotalPx - 45)}px`,
                   }}
                 />
               </>
@@ -796,13 +976,13 @@ export default function NewBuildingPage() {
               <>
                 <div
                   className="h-2 rounded-full absolute top-6 bg-gradient-to-l from-emerald-100 via-emerald-50 to-emerald-200"
-                  style={{ left: '20px', right: '20px' }}
+                  style={{ left: '20px', right: '25px' }}
                 />
 
                 {/* fill fallback (percentage of container) */}
                 <div
-                  className="h-2 rounded-full absolute top-6 bg-gradient-to-l from-green-400 to-emerald-500 transition-all duration-300"
-                  style={isRTL ? { right: '20px', width: `${progressPercent}%` } : { left: '20px', width: `${progressPercent}%` }}
+                  className="h-2 rounded-full absolute top-6 bg-gradient-to-l from-green-400 to-emerald-500 transition-all duration-500 ease-in-out"
+                  style={isRTL ? { right: '25px', width: `calc((100% - 45px) * ${progressPercent / 100})` } : { left: '20px', width: `calc((100% - 45px) * ${progressPercent / 100})` }}
                 />
               </>
             )}
@@ -828,7 +1008,6 @@ export default function NewBuildingPage() {
                   <span className={`text-sm font-bold ${currentStep === step.number ? 'text-gray-900' : 'text-gray-500'}`}>
                     {step.title}
                   </span>
-                  <span className="text-xs text-gray-400 mt-1">{step.description}</span>
                 </button>
               ))}
             </div>
@@ -893,7 +1072,7 @@ export default function NewBuildingPage() {
                         value={formData.name}
                         onChange={(e) => setFormData({...formData, name: e.target.value})}
                         required
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition text-lg"
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition text-lg"
                         placeholder="مثال: عمارة النخيل"
                       />
                     </div>
@@ -914,7 +1093,7 @@ export default function NewBuildingPage() {
                         onChange={(e) => setFormData({...formData, yearBuilt: parseInt(e.target.value) || new Date().getFullYear()})}
                         min="1900"
                         max={new Date().getFullYear()}
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                       />
                     </div>
                   </div>
@@ -933,7 +1112,7 @@ export default function NewBuildingPage() {
                           value={formData.plotNumber}
                           onChange={(e) => setFormData({...formData, plotNumber: e.target.value})}
                         required
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                           placeholder="مثال: قطعة 12/34 أو 12345"
                       />
                     </div>
@@ -953,7 +1132,7 @@ export default function NewBuildingPage() {
                         value={formData.neighborhood}
                         onChange={(e) => setFormData({...formData, neighborhood: e.target.value})}
                         required
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                         placeholder="مثال: حي النزهة"
                       />
                     </div>
@@ -975,7 +1154,7 @@ export default function NewBuildingPage() {
                         value={formData.buildStatus}
                         onChange={(e) => setFormData({...formData, buildStatus: e.target.value as any})}
                         required
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition appearance-none text-gray-700 cursor-pointer"
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition appearance-none text-gray-700 cursor-pointer"
                       >
                         <option value="ready">جاهز</option>
                         <option value="under_construction">تحت الإنشاء</option>
@@ -999,7 +1178,7 @@ export default function NewBuildingPage() {
                         value={formData.deedNumber}
                         onChange={(e) => setFormData({...formData, deedNumber: e.target.value})}
                         required
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                         placeholder="مثال: 123456789"
                       />
                     </div>
@@ -1018,7 +1197,7 @@ export default function NewBuildingPage() {
                         type="number"
                         value={formData.landArea || ''}
                         onChange={(e) => setFormData({...formData, landArea: parseInt(e.target.value) || 0})}
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                         placeholder="مثال: 500"
                       />
                     </div>
@@ -1038,7 +1217,7 @@ export default function NewBuildingPage() {
                         value={formData.buildingLicenseNumber}
                         onChange={(e) => setFormData({...formData, buildingLicenseNumber: e.target.value})}
                         required
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                         placeholder="مثال: 12345/2023"
                       />
                     </div>
@@ -1087,7 +1266,7 @@ export default function NewBuildingPage() {
                             value={formData.insurancePolicyNumber}
                             onChange={(e) => setFormData({...formData, insurancePolicyNumber: e.target.value})}
                             required={formData.insuranceAvailable}
-                            className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                            className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                             placeholder="مثال: POL-2023-12345"
                           />
                         </div>
@@ -1137,7 +1316,7 @@ export default function NewBuildingPage() {
                             type="text"
                             value={formData.waterMeterNumber}
                             onChange={(e) => setFormData({...formData, waterMeterNumber: e.target.value})}
-                            className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                            className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                             placeholder="مثال: W-12345678"
                           />
                         </div>
@@ -1187,7 +1366,7 @@ export default function NewBuildingPage() {
                             type="text"
                             value={formData.electricityMeterNumber}
                             onChange={(e) => setFormData({...formData, electricityMeterNumber: e.target.value})}
-                            className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                            className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                             placeholder="مثال: E-87654321"
                           />
                         </div>
@@ -1204,7 +1383,7 @@ export default function NewBuildingPage() {
                       value={formData.description}
                       onChange={(e) => setFormData({...formData, description: e.target.value})}
                       rows={4}
-                      className="w-full px-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition"
+                      className="w-full px-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                       placeholder="اكتب وصفاً للعمارة..."
                     />
                   </div>
@@ -1250,11 +1429,16 @@ export default function NewBuildingPage() {
                               const newFloorPlan = floors[0]?.floorPlan || '4shuqq'
                               const unitsPerFloor = newFloorPlan === '4shuqq' ? 4 : newFloorPlan === '3shuqq' ? 3 : 2
                               const newUnits: Unit[] = []
+                              let unitCounter = 1
+                              for (let k = 0; k < i - 1; k++) {
+                                unitCounter += unitsPerFloor
+                              }
                               for (let j = 0; j < unitsPerFloor; j++) {
                                 newUnits.push({
-                                  unitNumber: `${i}${String(j + 1).padStart(2, '0')}`,
+                                  unitNumber: `${unitCounter + j}`,
                                   floor: i,
                                   type: 'apartment',
+                                  facing: 'front',
                                   area: 0,
                                   rooms: 1,
                                   bathrooms: 1,
@@ -1281,7 +1465,7 @@ export default function NewBuildingPage() {
                           }
                         }}
                         min="1"
-                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition shadow-sm hover:shadow-md"
+                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition shadow-sm hover:shadow-md"
                       />
                     </div>
                   </div>
@@ -1302,7 +1486,7 @@ export default function NewBuildingPage() {
                             updateFloorPlan(floor.number, e.target.value as any)
                           })
                         }}
-                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition appearance-none text-gray-700 font-medium shadow-sm hover:shadow-md"
+                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition appearance-none text-gray-700 font-medium shadow-sm hover:shadow-md"
                       >
                         <option value="4shuqq">٤ شقق</option>
                         <option value="3shuqq">٣ شقق</option>
@@ -1325,7 +1509,7 @@ export default function NewBuildingPage() {
                         value={formData.parkingSlots}
                         onChange={(e) => setFormData({...formData, parkingSlots: parseInt(e.target.value) || 0})}
                         min="0"
-                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition shadow-sm hover:shadow-md"
+                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition shadow-sm hover:shadow-md"
                       />
                     </div>
                   </div>
@@ -1344,7 +1528,7 @@ export default function NewBuildingPage() {
                         value={formData.driverRooms}
                         onChange={(e) => setFormData({...formData, driverRooms: parseInt(e.target.value) || 0})}
                         min="0"
-                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition shadow-sm hover:shadow-md"
+                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition shadow-sm hover:shadow-md"
                       />
                     </div>
                   </div>
@@ -1363,7 +1547,7 @@ export default function NewBuildingPage() {
                         value={formData.elevators}
                         onChange={(e) => setFormData({...formData, elevators: parseInt(e.target.value) || 1})}
                         min="0"
-                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition shadow-sm hover:shadow-md"
+                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition shadow-sm hover:shadow-md"
                       />
                     </div>
                   </div>
@@ -1382,7 +1566,7 @@ export default function NewBuildingPage() {
                           key={option.value}
                           type="button"
                           onClick={() => setFormData({...formData, streetType: option.value as any})}
-                          className={`py-4 px-3 rounded-xl border-2 transition-all duration-300 flex items-center justify-center gap-2 backdrop-blur-md shadow-sm hover:shadow-md ${
+                          className={`py-4 px-3 rounded-2xl border-2 transition-all duration-300 flex items-center justify-center gap-2 backdrop-blur-md shadow-sm hover:shadow-md ${
                             formData.streetType === option.value
                               ? 'bg-emerald-100/60 border-emerald-400/60 text-emerald-700'
                               : 'bg-white/50 border-emerald-200/30 hover:border-emerald-300/50 text-gray-600'
@@ -1407,7 +1591,7 @@ export default function NewBuildingPage() {
                       <select
                         value={formData.buildingFacing}
                         onChange={(e) => setFormData({...formData, buildingFacing: e.target.value as any})}
-                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition appearance-none text-gray-700 font-medium shadow-sm hover:shadow-md"
+                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition appearance-none text-gray-700 font-medium shadow-sm hover:shadow-md"
                       >
                         <option value="north">شمال</option>
                         <option value="south">جنوب</option>
@@ -1449,12 +1633,12 @@ export default function NewBuildingPage() {
                     <button
                       type="button"
                       onClick={quickAddUnits}
-                      className="group relative inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-emerald-500/90 to-teal-500/90 text-white rounded-2xl shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:shadow-emerald-500/30 transition-all duration-300 hover:scale-105 overflow-hidden backdrop-blur-sm"
+                      className="group relative inline-flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500/90 to-teal-500/90 text-white rounded-2xl shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:shadow-emerald-500/30 transition-all duration-300 hover:scale-105 overflow-hidden backdrop-blur-sm"
                     >
                       <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                      <Zap className="w-5 h-5 relative z-10 group-hover:rotate-12 transition-transform" />
-                      <span className="relative z-10 font-bold">تطبيق الدور الأول على الكل</span>
-                      <Sparkles className="w-4 h-4 relative z-10" />
+                      <Zap className="w-4 h-4 relative z-10 group-hover:rotate-12 transition-transform" />
+                      <span className="relative z-10 font-semibold text-sm">تطبيق الدور الأول على الكل</span>
+                      <Sparkles className="w-3 h-3 relative z-10" />
                     </button>
                   </div>
                 </div>
@@ -1462,7 +1646,7 @@ export default function NewBuildingPage() {
                 <div className="bg-gradient-to-br from-emerald-50/50 via-teal-50/50 to-cyan-50/50 border-2 border-emerald-200/30 rounded-2xl p-6 mb-6 shadow-sm hover:shadow-md transition-shadow backdrop-blur-sm">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 text-emerald-900">
-                      <div className="w-12 h-12 bg-gradient-to-br from-emerald-400/80 to-teal-400/80 rounded-xl flex items-center justify-center shadow-md">
+                      <div className="w-12 h-12 bg-gradient-to-br from-emerald-400/80 to-teal-400/80 rounded-2xl flex items-center justify-center shadow-md">
                         <Info className="w-6 h-6 text-white" />
                       </div>
                       <div>
@@ -1473,13 +1657,6 @@ export default function NewBuildingPage() {
                         <p className="text-xs text-emerald-600/80 mt-1">موزعة على {floors.length} {floors.length === 1 ? 'دور' : 'أدوار'}</p>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      {floors.map((f, idx) => (
-                        <div key={idx} className="text-xs bg-white/70 backdrop-blur-sm text-emerald-700 px-3 py-2 rounded-xl shadow-sm font-bold border border-emerald-200/50 hover:bg-white/90 transition-colors">
-                          د{f.number}: {f.units.length}
-                        </div>
-                      ))}
-                    </div>
                   </div>
                 </div>
 
@@ -1487,21 +1664,21 @@ export default function NewBuildingPage() {
                   <div key={floor.number} className="border-2 border-emerald-200/30 rounded-3xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-500 backdrop-blur-sm">
                     {/* رأس الدور - تصميم محسّن */}
                     <div
-                      className="bg-gradient-to-r from-emerald-400/70 via-teal-400/70 to-cyan-400/70 text-white p-6 hover:from-emerald-400/80 hover:via-teal-400/80 hover:to-cyan-400/80 transition-all duration-300 relative overflow-hidden group backdrop-blur-md"
+                      className="bg-gradient-to-r from-green-100/30 via-emerald-100/30 to-teal-100/30 text-slate-800 p-6 hover:from-green-100/40 hover:via-emerald-100/40 hover:to-teal-100/40 transition-all duration-300 relative overflow-hidden group backdrop-blur-md"
                     >
                       {/* Animated Background */}
                       <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                       
                       <div className="flex items-center justify-between relative z-10">
                         <div className="flex items-center gap-4">
-                          <Layers className="w-7 h-7 text-white/90" />
+                          <Layers className="w-7 h-7 text-slate-800" />
                           <div>
                             <h3 className="font-bold text-xl">الدور {floor.number}</h3>
                             <div className="flex items-center gap-3 mt-2">
                               <span className="text-sm bg-white/20 backdrop-blur px-4 py-1.5 rounded-full font-medium shadow-sm">
                                 {floor.units.length} {floor.units.length === 1 ? 'وحدة' : 'وحدات'}
                               </span>
-                              <span className="text-sm text-white/90 font-medium">
+                              <span className="text-sm text-slate-800 font-medium">
                                 نظام: {
                                   floor.floorPlan === '4shuqq' ? '٤ شقق' :
                                   floor.floorPlan === '3shuqq' ? '٣ شقق' : 'شقتين'
@@ -1510,28 +1687,30 @@ export default function NewBuildingPage() {
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              copyFloorToAll(floor.number)
-                            }}
-                            className="group/btn p-2.5 text-white rounded-lg hover:bg-white/20 transition-all hover:scale-110"
-                            title="نسخ هذا الدور لجميع الأدوار"
-                          >
-                            <Copy className="w-4.5 h-4.5 group-hover/btn:rotate-12 transition-transform" />
-                          </button>
+                        <div className="flex items-center gap-3">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
                               addUnit(floor.number)
                             }}
-                            className="group/btn p-2.5 text-white rounded-lg hover:bg-white/20 transition-all hover:scale-110"
+                            className="group/btn flex flex-col items-center gap-1 p-2 text-slate-800 rounded-2xl hover:bg-white/20 transition-all hover:scale-110"
                             title="إضافة وحدة جديدة"
                           >
-                            <Plus className="w-4.5 h-4.5 group-hover/btn:rotate-90 transition-transform" />
+                            <Plus className="w-5 h-5 group-hover/btn:rotate-90 transition-transform" />
+                            <span className="text-xs font-medium">إضافة</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              copyFloorToAll(floor.number)
+                            }}
+                            className="group/btn flex flex-col items-center gap-1 p-2 text-slate-800 rounded-2xl hover:bg-white/20 transition-all hover:scale-110"
+                            title="نسخ هذا الدور لجميع الأدوار"
+                          >
+                            <Copy className="w-5 h-5 group-hover/btn:rotate-12 transition-transform" />
+                            <span className="text-xs font-medium">نسخ</span>
                           </button>
                           <button
                             type="button"
@@ -1539,10 +1718,11 @@ export default function NewBuildingPage() {
                               e.stopPropagation()
                               removeFloor(floor.number)
                             }}
-                            className="group/btn p-2.5 text-white rounded-lg hover:bg-white/20 transition-all hover:scale-110"
+                            className="group/btn flex flex-col items-center gap-1 p-2 text-slate-800 rounded-2xl hover:bg-white/20 transition-all hover:scale-110"
                             title="حذف الدور"
                           >
-                            <Trash2 className="w-4.5 h-4.5 group-hover/btn:rotate-12 transition-transform" />
+                            <Trash2 className="w-5 h-5 group-hover/btn:rotate-12 transition-transform" />
+                            <span className="text-xs font-medium">حذف</span>
                           </button>
                           <button
                             type="button"
@@ -1550,9 +1730,10 @@ export default function NewBuildingPage() {
                               e.stopPropagation()
                               setExpandedFloor(expandedFloor === floor.number ? null : floor.number)
                             }}
-                            className="p-2.5 text-white rounded-lg hover:bg-white/20 transition-all"
+                            className="flex flex-col items-center gap-1 p-2 text-slate-800 rounded-2xl hover:bg-white/20 transition-all"
                           >
                             {expandedFloor === floor.number ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                            <span className="text-xs font-medium">{expandedFloor === floor.number ? 'إخفاء' : 'عرض'}</span>
                           </button>
                         </div>
                       </div>
@@ -1571,7 +1752,7 @@ export default function NewBuildingPage() {
                                   <h4 className="font-bold text-gray-700 text-lg">الوحدة {unit.unitNumber}</h4>
                                   <div className="flex items-center gap-2 mt-1">
                                     <span className="text-xs bg-blue-100/70 backdrop-blur-sm text-blue-700 px-2 py-1 rounded-full font-medium">
-                                      {unit.type === 'apartment' ? 'شقة' : unit.type === 'studio' ? 'استوديو' : unit.type === 'duplex' ? 'دوبلكس' : 'بنتهاوس'}
+                                      {unit.type === 'apartment' ? 'شقة' : unit.type === 'studio' ? 'ملحق' : unit.type === 'duplex' ? 'دوبلكس' : 'بنتهاوس'}
                                     </span>
                                     <span className={`text-xs px-2 py-1 rounded-full font-medium backdrop-blur-sm ${
                                       unit.status === 'available' ? 'bg-green-100/70 text-green-700' :
@@ -1590,7 +1771,7 @@ export default function NewBuildingPage() {
                                     e.stopPropagation()
                                     duplicateUnit(floor.number, unitIndex)
                                   }}
-                                  className="p-2 text-blue-600 rounded-lg hover:bg-blue-100/50 transition-all hover:scale-110"
+                                  className="p-2 text-blue-600 rounded-2xl hover:bg-blue-100/50 transition-all hover:scale-110"
                                   title="نسخ الوحدة"
                                 >
                                   <Copy className="w-4 h-4" />
@@ -1601,7 +1782,7 @@ export default function NewBuildingPage() {
                                     e.stopPropagation()
                                     removeUnit(floor.number, unitIndex)
                                   }}
-                                  className="p-2 text-red-600 rounded-lg hover:bg-red-100/50 transition-all hover:scale-110"
+                                  className="p-2 text-red-600 rounded-2xl hover:bg-red-100/50 transition-all hover:scale-110"
                                   title="حذف الوحدة"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -1612,7 +1793,7 @@ export default function NewBuildingPage() {
                                     e.stopPropagation()
                                     setExpandedUnit(expandedUnit === `${floor.number}-${unitIndex}` ? null : `${floor.number}-${unitIndex}`)
                                   }}
-                                  className="p-2 text-gray-600 rounded-lg hover:bg-gray-200/50 transition-all"
+                                  className="p-2 text-gray-600 rounded-2xl hover:bg-gray-200/50 transition-all"
                                 >
                                   {expandedUnit === `${floor.number}-${unitIndex}` ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                                 </button>
@@ -1620,41 +1801,36 @@ export default function NewBuildingPage() {
                             </div>
 
                             {/* ملخص سريع - صف واحد */}
-                            <div className="p-4 bg-white grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 border-b border-gray-100">
-                              <div className="flex flex-col items-center p-2 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
-                                <span className="text-xs text-gray-500 font-medium">المساحة</span>
-                                <span className="text-sm font-bold text-blue-600">{unit.area || '—'} م²</span>
+                            <div className="p-4 bg-white grid grid-cols-2 md:grid-cols-4 gap-3 border-b border-gray-100">
+                              <div className="flex flex-col items-center p-2 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200">
+                                <Maximize className="w-4 h-4 text-gray-600 mb-1" />
+                                <span className="text-xs text-gray-600 font-medium">المساحة</span>
+                                <span className="text-sm font-bold text-gray-700">{unit.area || '—'} م²</span>
                               </div>
-                              <div className="flex flex-col items-center p-2 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
-                                <span className="text-xs text-gray-500 font-medium">السعر</span>
-                                <span className="text-sm font-bold text-green-600">{unit.price ? unit.price.toLocaleString() : '—'} ر.س</span>
+                              <div className="flex flex-col items-center p-2 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200">
+                                <DollarSign className="w-4 h-4 text-gray-600 mb-1" />
+                                <span className="text-xs text-gray-600 font-medium">السعر</span>
+                                <span className="text-sm font-bold text-gray-700">{unit.price ? unit.price.toLocaleString() : '—'} ر.س</span>
                               </div>
-                              <div className="flex flex-col items-center p-2 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors">
-                                <Bed className="w-3 h-3 text-gray-400 mb-1" />
-                                <span className="text-sm font-bold text-purple-600">{unit.rooms} غ</span>
+                              <div className="flex flex-col items-center p-2 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200">
+                                <Bed className="w-4 h-4 text-gray-600 mb-1" />
+                                <span className="text-xs text-gray-600 font-medium">الغرف</span>
+                                <span className="text-sm font-bold text-gray-700">{unit.rooms}</span>
                               </div>
-                              <div className="flex flex-col items-center p-2 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors">
-                                <Bath className="w-3 h-3 text-gray-400 mb-1" />
-                                <span className="text-sm font-bold text-orange-600">{unit.bathrooms} ح</span>
+                              <div className="flex flex-col items-center p-2 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200">
+                                <Bath className="w-4 h-4 text-gray-600 mb-1" />
+                                <span className="text-xs text-gray-600 font-medium">الحمامات</span>
+                                <span className="text-sm font-bold text-gray-700">{unit.bathrooms}</span>
                               </div>
-                              <div className="flex flex-col items-center p-2 bg-pink-50 rounded-lg hover:bg-pink-100 transition-colors">
-                                <Maximize className="w-3 h-3 text-gray-400 mb-1" />
-                                <span className="text-sm font-bold text-pink-600">{unit.livingRooms}</span>
-                              </div>
-                              {unit.maidRoom && (
-                                <div className="flex flex-col items-center p-2 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors">
-                                  <span className="text-xs font-bold text-yellow-600">خادمة</span>
-                                </div>
-                              )}
                             </div>
 
                             {/* التفاصيل المdéveloppées */}
                             {expandedUnit === `${floor.number}-${unitIndex}` && (
                               <div className="p-6 bg-gradient-to-b from-white to-gray-50 space-y-6 border-t-2 border-gray-200">
                                 {/* الصف الأول - المعلومات الأساسية */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                   <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
+                                    <label className="block text-xs font-semibold text-gray-600 flex items-center gap-1">
                                       <Maximize className="w-4 h-4 text-blue-500/70" />
                                       المساحة (م²)
                                     </label>
@@ -1664,13 +1840,13 @@ export default function NewBuildingPage() {
                                       step="0.1"
                                       value={unit.area}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { area: parseFloat(e.target.value) || 0 })}
-                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-semibold text-lg shadow-sm hover:shadow-md"
+                                      className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-semibold text-sm shadow-sm hover:shadow-md"
                                       placeholder="0.00"
                                     />
                                   </div>
 
                                   <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
+                                    <label className="block text-xs font-semibold text-gray-600 flex items-center gap-1">
                                       <DollarSign className="w-4 h-4 text-green-500/70" />
                                       السعر (ر.س)
                                     </label>
@@ -1679,25 +1855,41 @@ export default function NewBuildingPage() {
                                       min="0"
                                       value={unit.price}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { price: parseInt(e.target.value) || 0 })}
-                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-semibold text-lg shadow-sm hover:shadow-md"
+                                      className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-semibold text-sm shadow-sm hover:shadow-md"
                                       placeholder="0"
                                     />
                                   </div>
 
                                   <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
+                                    <label className="block text-xs font-semibold text-gray-600 flex items-center gap-1">
                                       <Tag className="w-4 h-4 text-purple-500/70" />
                                       نوع الوحدة
                                     </label>
                                     <select
                                       value={unit.type}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { type: e.target.value as any })}
-                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
+                                      className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-medium text-sm shadow-sm hover:shadow-md"
                                     >
                                       <option value="apartment">شقة</option>
                                       <option value="studio">ملحق</option>
                                       <option value="duplex">دوبلكس</option>
                                       <option value="penthouse">بنتهاوس</option>
+                                    </select>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <label className="block text-xs font-semibold text-gray-600 flex items-center gap-1">
+                                      <Compass className="w-4 h-4 text-blue-500/70" />
+                                      اتجاه الوحدة
+                                    </label>
+                                    <select
+                                      value={unit.facing}
+                                      onChange={(e) => updateUnit(floor.number, unitIndex, { facing: e.target.value as any })}
+                                      className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-medium text-sm shadow-sm hover:shadow-md"
+                                    >
+                                      <option value="front">أمامية</option>
+                                      <option value="back">خلفية</option>
+                                      <option value="corner">على شارعين</option>
                                     </select>
                                   </div>
                                 </div>
@@ -1714,7 +1906,7 @@ export default function NewBuildingPage() {
                                       min="0"
                                       value={unit.rooms}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { rooms: parseInt(e.target.value) || 0 })}
-                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-semibold text-center text-lg shadow-sm hover:shadow-md"
+                                      className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-semibold text-sm shadow-sm hover:shadow-md"
                                     />
                                   </div>
 
@@ -1728,7 +1920,7 @@ export default function NewBuildingPage() {
                                       min="0"
                                       value={unit.bathrooms}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { bathrooms: parseInt(e.target.value) || 0 })}
-                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-semibold text-center text-lg shadow-sm hover:shadow-md"
+                                      className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-semibold text-sm shadow-sm hover:shadow-md"
                                     />
                                   </div>
 
@@ -1742,7 +1934,7 @@ export default function NewBuildingPage() {
                                       min="0"
                                       value={unit.livingRooms}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { livingRooms: parseInt(e.target.value) || 0 })}
-                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-semibold text-center text-lg shadow-sm hover:shadow-md"
+                                      className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-semibold text-sm shadow-sm hover:shadow-md"
                                     />
                                   </div>
 
@@ -1756,7 +1948,7 @@ export default function NewBuildingPage() {
                                       min="0"
                                       value={unit.kitchens}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { kitchens: parseInt(e.target.value) || 0 })}
-                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-semibold text-center text-lg shadow-sm hover:shadow-md"
+                                      className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-semibold text-sm shadow-sm hover:shadow-md"
                                     />
                                   </div>
                                 </div>
@@ -1773,7 +1965,7 @@ export default function NewBuildingPage() {
                                       min="1"
                                       value={unit.entrances}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { entrances: parseInt(e.target.value) || 1 })}
-                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-semibold text-center text-lg shadow-sm hover:shadow-md"
+                                      className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-semibold text-sm shadow-sm hover:shadow-md"
                                     />
                                   </div>
                                   
@@ -1785,7 +1977,7 @@ export default function NewBuildingPage() {
                                     <select
                                       value={unit.maidRoom ? 'yes' : 'no'}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { maidRoom: e.target.value === 'yes' })}
-                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
+                                      className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
                                     >
                                       <option value="no">لا يوجد</option>
                                       <option value="yes">يوجد</option>
@@ -1800,7 +1992,7 @@ export default function NewBuildingPage() {
                                     <select
                                       value={unit.driverRoom ? 'yes' : 'no'}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { driverRoom: e.target.value === 'yes' })}
-                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
+                                      className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
                                     >
                                       <option value="no">لا يوجد</option>
                                       <option value="yes">يوجد</option>
@@ -1815,7 +2007,7 @@ export default function NewBuildingPage() {
                                     <select
                                       value={unit.acType}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { acType: e.target.value as any })}
-                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
+                                      className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
                                     >
                                       <option value="split">سبلت</option>
                                       <option value="window">شباك</option>
@@ -1836,7 +2028,7 @@ export default function NewBuildingPage() {
                                     <select
                                       value={unit.status}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { status: e.target.value as any })}
-                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
+                                      className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
                                     >
                                       <option value="available">متاح</option>
                                       <option value="reserved">محجوز</option>
@@ -1853,7 +2045,7 @@ export default function NewBuildingPage() {
                                       type="text"
                                       value={unit.description || ''}
                                       onChange={(e) => updateUnit(floor.number, unitIndex, { description: e.target.value })}
-                                      className="w-full px-4 py-3 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-xl focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
+                                      className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
                                       placeholder="وصف اختياري للوحدة..."
                                     />
                                   </div>
@@ -1874,11 +2066,11 @@ export default function NewBuildingPage() {
                   className="w-full py-8 border-3 border-dashed border-indigo-300 rounded-2xl hover:border-indigo-600 hover:bg-indigo-50 transition-all duration-300 group shadow-sm hover:shadow-md"
                 >
                   <div className="flex items-center justify-center gap-3">
-                    <div className="w-14 h-14 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-xl flex items-center justify-center group-hover:scale-125 group-hover:shadow-lg transition-transform">
+                    <div className="w-14 h-14 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-2xl flex items-center justify-center group-hover:scale-125 group-hover:shadow-lg transition-transform">
                       <Plus className="w-7 h-7 text-indigo-600 group-hover:text-indigo-700" />
                     </div>
                     <div className="text-right">
-                      <span className="font-bold text-lg text-gray-700 group-hover:text-indigo-700 block">إضافة دور جديد</span>
+                      <span className="font-bold text-sm text-gray-700 group-hover:text-indigo-700 block">إضافة دور جديد</span>
                       <span className="text-xs text-gray-500 group-hover:text-indigo-600">انقر لإضافة دور إضافي للعمارة</span>
                     </div>
                   </div>
@@ -1908,59 +2100,143 @@ export default function NewBuildingPage() {
                     <h3 className="text-xl font-semibold text-gray-800">معلومات الحارس</h3>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">اسم الحارس</label>
-                      <div className="relative group">
-                        <User className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <div className="space-y-4">
+                    {/* الصف الأول: البيانات الأساسية (3 أعمدة) */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* الخانة 1: اسم الحارس */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">اسم الحارس</label>
+                        <div className="relative group">
+                          <User className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                          <input
+                            type="text"
+                            value={formData.guardName}
+                            onChange={(e) => setFormData({...formData, guardName: e.target.value})}
+                            className="w-full pr-12 pl-4 py-2.5 bg-white border-2 border-gray-200 rounded-2xl focus:border-blue-500 outline-none"
+                            placeholder="اسم الحارس"
+                          />
+                        </div>
+                      </div>
+
+                      {/* الخانة 2: رقم جوال الحارس */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">رقم جوال الحارس</label>
+                        <div className="relative group">
+                          <Phone className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                          <input
+                            type="tel"
+                            value={formData.guardPhone}
+                            onChange={(e) => setFormData({...formData, guardPhone: e.target.value})}
+                            className="w-full pr-12 pl-4 py-2.5 bg-white border-2 border-gray-200 rounded-2xl focus:border-blue-500 outline-none"
+                            placeholder="05xxxxxxxx"
+                            dir="ltr"
+                          />
+                        </div>
+                      </div>
+
+                      {/* الخانة 3: رقم الغرفة */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">رقم الغرفة</label>
                         <input
                           type="text"
-                          value={formData.guardName}
-                          onChange={(e) => setFormData({...formData, guardName: e.target.value})}
-                          className="w-full pr-12 pl-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-blue-500 outline-none"
-                          placeholder="اسم الحارس"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">رقم جوال الحارس</label>
-                      <div className="relative group">
-                        <Phone className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                        <input
-                          type="tel"
-                          value={formData.guardPhone}
-                          onChange={(e) => setFormData({...formData, guardPhone: e.target.value})}
-                          className="w-full pr-12 pl-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-blue-500 outline-none"
-                          placeholder="05xxxxxxxx"
+                          value={formData.guardRoomNumber}
+                          onChange={(e) => setFormData({...formData, guardRoomNumber: e.target.value})}
+                          className="w-full px-4 py-2.5 bg-white border-2 border-gray-200 rounded-2xl focus:border-blue-500 outline-none"
+                          placeholder="رقم الغرفة"
                           dir="ltr"
                         />
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">رقم الهوية</label>
-                      <input
-                        type="text"
-                        value={formData.guardIdNumber}
-                        onChange={(e) => setFormData({...formData, guardIdNumber: e.target.value})}
-                        className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-blue-500 outline-none"
-                        placeholder="رقم الهوية"
-                        dir="ltr"
-                      />
-                    </div>
+                    {/* الصف الثاني: فترة العمل + الراتب (عمود واحد) + عرض صورة الهوية */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* العمود الأول: فترة العمل + الراتب */}
+                      <div className="space-y-3">
+                        {/* فترة العمل */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">فترة العمل</label>
+                          <select
+                            value={formData.guardShift}
+                            onChange={(e) => setFormData({...formData, guardShift: e.target.value as any})}
+                            className="w-full px-4 py-2.5 bg-white border-2 border-gray-200 rounded-2xl focus:border-blue-500 outline-none"
+                          >
+                            <option value="day">صباحي</option>
+                            <option value="night">مسائي</option>
+                            <option value="permanent">دائم</option>
+                          </select>
+                        </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">فترة العمل</label>
-                      <select
-                        value={formData.guardShift}
-                        onChange={(e) => setFormData({...formData, guardShift: e.target.value as any})}
-                        className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-blue-500 outline-none"
-                      >
-                        <option value="day">صباحي</option>
-                        <option value="night">مسائي</option>
-                        <option value="rotating">متناوب</option>
-                      </select>
+                        {/* خانة الراتب */}
+                        <label className="flex items-center justify-start gap-3 p-3 bg-white border-2 border-gray-200 rounded-2xl hover:border-blue-400 transition-colors cursor-pointer">
+                          <input
+                            type="checkbox"
+                            id="hasSalary"
+                            checked={formData.hasSalary}
+                            onChange={(e) => setFormData({...formData, hasSalary: e.target.checked, salaryAmount: e.target.checked ? formData.salaryAmount : 0})}
+                            className="w-5 h-5 text-blue-600 rounded cursor-pointer flex-shrink-0"
+                          />
+                          <span className="text-sm font-medium text-gray-700">يوجد راتب</span>
+                        </label>
+
+                        {/* مبلغ الراتب (يظهر عند التفعيل) */}
+                        {formData.hasSalary && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">مبلغ الراتب</label>
+                            <div className="relative group">
+                              <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-blue-500 font-semibold text-sm">ر.س</span>
+                              <input
+                                type="number"
+                                value={formData.salaryAmount}
+                                onChange={(e) => setFormData({...formData, salaryAmount: parseFloat(e.target.value) || 0})}
+                                className="w-full pr-12 pl-4 py-2.5 bg-white border-2 border-blue-300 rounded-2xl focus:border-blue-500 outline-none font-semibold text-gray-700"
+                                placeholder="0"
+                                dir="ltr"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* العمود الثاني: عرض صورة الهوية */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">صورة الهوية</label>
+                        <div className="flex items-center justify-center h-[12.5rem] bg-white border-2 border-gray-200 rounded-2xl overflow-hidden">
+                          {formData.guardIdPhoto ? (
+                            <img
+                              src={formData.guardIdPhoto}
+                              alt="صورة الهوية"
+                              className="w-full h-full object-cover"
+                              style={{ width: '324px', height: '204px' }}
+                            />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              <Camera className="w-8 h-8 text-gray-300" />
+                              <span className="text-xs text-gray-400">اختر صورة</span>
+                            </div>
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const reader = new FileReader()
+                              reader.onload = (event) => {
+                                setFormData({...formData, guardIdPhoto: event.target?.result as string})
+                              }
+                              reader.readAsDataURL(e.target.files[0])
+                            }
+                          }}
+                          className="hidden"
+                          id="guardIdPhotoInput"
+                        />
+                        <label
+                          htmlFor="guardIdPhotoInput"
+                          className="mt-2 block w-full py-2 px-4 text-center text-sm font-medium text-blue-600 bg-blue-50 border-2 border-blue-200 rounded-2xl hover:bg-blue-100 cursor-pointer transition-colors"
+                        >
+                          رفع الصورة
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1987,7 +2263,7 @@ export default function NewBuildingPage() {
                       className="w-full p-12 border-3 border-dashed border-gray-300 rounded-2xl hover:border-purple-500 hover:bg-purple-50 transition-all duration-300 group"
                     >
                       <Upload className="w-10 h-10 text-gray-400 mx-auto mb-4 group-hover:text-purple-500 transition-colors" />
-                      <p className="text-gray-600 text-lg group-hover:text-purple-600 transition-colors">
+                      <p className="text-gray-600 text-sm group-hover:text-purple-600 transition-colors">
                         اضغط لرفع الصور أو اسحب وأفلت
                       </p>
                       <p className="text-sm text-gray-400 mt-3">PNG, JPG, JPEG (الحد الأقصى 5MB لكل صورة)</p>
@@ -1997,7 +2273,7 @@ export default function NewBuildingPage() {
                   {imagePreviews.length > 0 && (
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                       {imagePreviews.map((preview, index) => (
-                        <div key={index} className="relative group rounded-xl overflow-hidden border-2 border-gray-200 hover:border-purple-500 transition-all">
+                        <div key={index} className="relative group rounded-2xl overflow-hidden border-2 border-gray-200 hover:border-purple-500 transition-all">
                           <img
                             src={preview}
                             alt={`Preview ${index + 1}`}
@@ -2006,7 +2282,7 @@ export default function NewBuildingPage() {
                           <button
                             type="button"
                             onClick={() => removeImage(index)}
-                            className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600 hover:scale-110"
+                            className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-2xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600 hover:scale-110"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -2029,37 +2305,13 @@ export default function NewBuildingPage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">خط العرض (Latitude)</label>
-                      <input
-                        type="text"
-                        value={formData.latitude}
-                        onChange={(e) => setFormData({...formData, latitude: e.target.value})}
-                        className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-emerald-500 outline-none"
-                        placeholder="مثال: 24.7136"
-                        dir="ltr"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">خط الطول (Longitude)</label>
-                      <input
-                        type="text"
-                        value={formData.longitude}
-                        onChange={(e) => setFormData({...formData, longitude: e.target.value})}
-                        className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-emerald-500 outline-none"
-                        placeholder="مثال: 46.6753"
-                        dir="ltr"
-                      />
-                    </div>
-
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-2">رابط خرائط Google</label>
                       <input
                         type="url"
                         value={formData.googleMapsLink}
                         onChange={(e) => setFormData({...formData, googleMapsLink: e.target.value})}
-                        className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-emerald-500 outline-none"
+                        className="w-full px-3 py-2.5 bg-white border-2 border-gray-200 rounded-2xl focus:border-emerald-500 outline-none"
                         placeholder="https://maps.google.com/..."
                         dir="ltr"
                       />
@@ -2100,7 +2352,9 @@ export default function NewBuildingPage() {
                         })}
                         className="sr-only peer"
                       />
-                      <div className="w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:right-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-amber-600"></div>
+                      <div className="relative w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-300 rounded-full peer peer-checked:bg-amber-600 transition-colors">
+                        <div className={`absolute top-0.5 right-0.5 bg-white border border-gray-300 rounded-full h-6 w-6 transition-transform ${ownerAssociation.hasAssociation ? 'translate-x-[-28px]' : 'translate-x-0'}`}></div>
+                      </div>
                       <span className="mr-4 text-sm font-medium text-gray-700">
                         {ownerAssociation.hasAssociation ? 'يوجد اتحاد ملاك' : 'لا يوجد اتحاد ملاك'}
                       </span>
@@ -2110,24 +2364,75 @@ export default function NewBuildingPage() {
                   {ownerAssociation.hasAssociation && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 animate-fadeIn">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">اسم الاتحاد</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">اسم مسؤول الاتحاد</label>
                         <input
                           type="text"
-                          value={ownerAssociation.associationName}
-                          onChange={(e) => setOwnerAssociation({ ...ownerAssociation, associationName: e.target.value })}
-                          className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-amber-500 outline-none"
-                          placeholder="اسم اتحاد الملاك"
+                          value={ownerAssociation.managerName}
+                          onChange={(e) => setOwnerAssociation({ ...ownerAssociation, managerName: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border-2 border-gray-200 rounded-2xl focus:border-amber-500 outline-none"
+                          placeholder="اسم مسؤول الاتحاد"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">رقم السجل</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">رقم سجل الاتحاد</label>
                         <input
                           type="text"
                           value={ownerAssociation.registrationNumber}
                           onChange={(e) => setOwnerAssociation({ ...ownerAssociation, registrationNumber: e.target.value })}
-                          className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-amber-500 outline-none"
-                          placeholder="رقم السجل"
+                          className="w-full px-4 py-2.5 bg-white border-2 border-gray-200 rounded-2xl focus:border-amber-500 outline-none"
+                          placeholder="رقم سجل الاتحاد"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">رقم الحساب</label>
+                        <input
+                          type="text"
+                          value={ownerAssociation.accountNumber}
+                          onChange={(e) => setOwnerAssociation({ ...ownerAssociation, accountNumber: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border-2 border-gray-200 rounded-2xl focus:border-amber-500 outline-none"
+                          placeholder="رقم الحساب البنكي"
+                          dir="ltr"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">رقم الآيبان (IBAN)</label>
+                        <input
+                          type="text"
+                          value={ownerAssociation.iban}
+                          onChange={(e) => setOwnerAssociation({ ...ownerAssociation, iban: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border-2 border-gray-200 rounded-2xl focus:border-amber-500 outline-none"
+                          placeholder="SA0000000000000000000000"
+                          dir="ltr"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">رقم التواصل</label>
+                        <div className="relative group">
+                          <Phone className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                          <input
+                            type="tel"
+                            value={ownerAssociation.contactNumber}
+                            onChange={(e) => setOwnerAssociation({ ...ownerAssociation, contactNumber: e.target.value })}
+                            className="w-full pr-12 pl-4 py-2.5 bg-white border-2 border-gray-200 rounded-2xl focus:border-amber-500 outline-none"
+                            placeholder="05xxxxxxxx"
+                            dir="ltr"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">عدد الوحدات المسجلة بالاتحاد</label>
+                        <input
+                          type="number"
+                          value={ownerAssociation.registeredUnitsCount}
+                          onChange={(e) => setOwnerAssociation({ ...ownerAssociation, registeredUnitsCount: parseInt(e.target.value) || 0 })}
+                          min="0"
+                          className="w-full px-4 py-2.5 bg-white border-2 border-gray-200 rounded-2xl focus:border-amber-500 outline-none"
+                          placeholder="عدد الوحدات"
                         />
                       </div>
 
@@ -2139,7 +2444,7 @@ export default function NewBuildingPage() {
                             type="date"
                             value={ownerAssociation.startDate}
                             onChange={(e) => setOwnerAssociation({ ...ownerAssociation, startDate: e.target.value })}
-                            className="w-full pr-12 pl-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-amber-500 outline-none"
+                            className="w-full pr-12 pl-4 py-3 bg-white border-2 border-gray-200 rounded-2xl focus:border-amber-500 outline-none"
                           />
                         </div>
                       </div>
@@ -2152,7 +2457,7 @@ export default function NewBuildingPage() {
                             type="date"
                             value={ownerAssociation.endDate}
                             onChange={(e) => setOwnerAssociation({ ...ownerAssociation, endDate: e.target.value })}
-                            className="w-full pr-12 pl-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-amber-500 outline-none"
+                            className="w-full pr-12 pl-4 py-3 bg-white border-2 border-gray-200 rounded-2xl focus:border-amber-500 outline-none"
                           />
                         </div>
                       </div>
@@ -2166,24 +2471,34 @@ export default function NewBuildingPage() {
                             value={ownerAssociation.monthlyFee}
                             onChange={(e) => setOwnerAssociation({ ...ownerAssociation, monthlyFee: parseInt(e.target.value) || 0 })}
                             min="0"
-                            className="w-full pr-12 pl-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-amber-500 outline-none"
+                            className="w-full pr-12 pl-4 py-3 bg-white border-2 border-gray-200 rounded-2xl focus:border-amber-500 outline-none"
                             placeholder="0"
                           />
                         </div>
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">رقم التواصل</label>
-                        <div className="relative group">
-                          <Phone className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                          <input
-                            type="tel"
-                            value={ownerAssociation.contactNumber}
-                            onChange={(e) => setOwnerAssociation({ ...ownerAssociation, contactNumber: e.target.value })}
-                            className="w-full pr-12 pl-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-amber-500 outline-none"
-                            placeholder="05xxxxxxxx"
-                            dir="ltr"
-                          />
+                        <label className="block text-sm font-medium text-gray-700 mb-2">الرسوم تشمل</label>
+                        <div className="flex flex-col gap-2">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={ownerAssociation.includesElectricity}
+                              onChange={(e) => setOwnerAssociation({ ...ownerAssociation, includesElectricity: e.target.checked })}
+                              className="w-4 h-4 text-amber-600 rounded cursor-pointer"
+                            />
+                            <span className="text-sm text-gray-700">فواتير الكهرباء</span>
+                          </label>
+
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={ownerAssociation.includesWater}
+                              onChange={(e) => setOwnerAssociation({ ...ownerAssociation, includesWater: e.target.checked })}
+                              className="w-4 h-4 text-amber-600 rounded cursor-pointer"
+                            />
+                            <span className="text-sm text-gray-700">فواتير الماء</span>
+                          </label>
                         </div>
                       </div>
                     </div>
@@ -2197,7 +2512,7 @@ export default function NewBuildingPage() {
               <div>
                 <Link
                   href="/dashboard/buildings"
-                  className="inline-flex items-center gap-2 px-4 py-3 bg-white border-2 border-red-300 text-red-600 rounded-full hover:bg-red-50 transition-all duration-300 font-semibold hover:scale-105 hover:shadow-lg"
+                  className="inline-flex items-center gap-2 px-3 py-2.5 bg-white border-2 border-red-300 text-red-600 rounded-full hover:bg-red-50 transition-all duration-300 font-semibold hover:scale-105 hover:shadow-lg"
                 >
                   إلغاء
                 </Link>
@@ -2208,7 +2523,7 @@ export default function NewBuildingPage() {
                   <button
                     type="button"
                     onClick={handlePreviousStep}
-                    className="inline-flex items-center gap-2 px-4 py-3 bg-white border-2 border-gray-200 text-gray-700 rounded-full hover:bg-gray-50 transition-all duration-300 font-semibold hover:scale-105 hover:shadow-lg"
+                    className="inline-flex items-center gap-2 px-3 py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-full hover:bg-gray-50 transition-all duration-300 font-semibold hover:scale-105 hover:shadow-lg"
                   >
                     <ChevronRight className="w-4 h-4" />
                     السابق
@@ -2226,11 +2541,12 @@ export default function NewBuildingPage() {
                   </button>
                 ) : (
                   <button
-                    type="submit"
+                    type="button"
+                    onClick={() => setShowConfirmModal(true)}
                     disabled={loading || uploading}
-                    className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-full hover:from-green-700 hover:to-emerald-700 transition-all duration-300 font-semibold shadow-lg shadow-green-500/25 hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-full hover:from-green-700 hover:to-emerald-700 transition-all duration-300 font-semibold shadow-lg shadow-green-500/25 hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed"
                   >
-                    <Save className="w-4 h-4" />
+                    <Save className="w-5 h-5" />
                     {loading ? 'جاري الحفظ...' : 'حفظ العمارة'}
                   </button>
                 )}
@@ -2239,6 +2555,88 @@ export default function NewBuildingPage() {
           </form>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all animate-scaleIn">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                  <Save className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">تأكيد حفظ العمارة</h3>
+                  <p className="text-green-100 text-sm mt-0.5">مراجعة البيانات قبل الحفظ</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 border border-blue-100">
+                <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-blue-600" />
+                  ملخص البيانات
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">اسم العمارة:</span>
+                    <span className="font-semibold text-gray-900">{formData.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">رقم القطعة:</span>
+                    <span className="font-semibold text-gray-900">{formData.plotNumber}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">عدد الأدوار:</span>
+                    <span className="font-semibold text-gray-900">{floors.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">عدد الوحدات:</span>
+                    <span className="font-semibold text-gray-900">{floors.reduce((sum, floor) => sum + floor.units.length, 0)}</span>
+                  </div>
+                  {ownerAssociation.hasAssociation && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">اتحاد الملاك:</span>
+                      <span className="font-semibold text-green-600">✓ موجود</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <p className="text-sm text-amber-800 flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <span>تأكد من صحة جميع البيانات قبل الحفظ. يمكنك التعديل لاحقاً من صفحة تفاصيل العمارة.</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-6 flex gap-3">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold flex items-center justify-center gap-2"
+              >
+                <X className="w-4 h-4" />
+                مراجعة البيانات
+              </button>
+              <button
+                onClick={confirmSaveBuilding}
+                disabled={loading}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all font-semibold shadow-lg shadow-green-500/25 flex items-center justify-center gap-2 disabled:opacity-70"
+              >
+                <CheckCircle className="w-4 h-4" />
+                {loading ? 'جاري الحفظ...' : 'تأكيد الحفظ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
+

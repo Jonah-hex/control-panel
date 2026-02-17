@@ -29,12 +29,13 @@ CREATE TABLE IF NOT EXISTS buildings (
   -- معلومات الحارس
   guard_name VARCHAR(255),
   guard_phone VARCHAR(20),
-  guard_id_number VARCHAR(20),
-  guard_shift VARCHAR(50), -- 'day', 'night', 'rotating'
+  guard_room_number VARCHAR(50),
+  guard_id_photo TEXT,
+  guard_shift VARCHAR(50),
+  guard_has_salary BOOLEAN DEFAULT FALSE,
+  guard_salary_amount DECIMAL(15, 2),
   
   -- الموقع الجغرافي
-  latitude DECIMAL(10, 8),
-  longitude DECIMAL(11, 8),
   google_maps_link TEXT,
   
   -- الصور
@@ -44,7 +45,7 @@ CREATE TABLE IF NOT EXISTS buildings (
   floors_data JSONB,
   
   -- جمعية الملاك
-  owner_association JSONB, -- يحتوي على hasAssociation, startDate, endDate, monthlyFee, contactNumber, associationName, registrationNumber
+  owner_association JSONB, -- يحتوي على hasAssociation, startDate, endDate, monthlyFee, contactNumber, managerName, registrationNumber, registeredUnitsCount, iban, accountNumber, includesElectricity, includesWater
   
   -- معلومات المالك والتتبع
   owner_id UUID NOT NULL,
@@ -66,6 +67,7 @@ CREATE TABLE IF NOT EXISTS units (
   unit_number VARCHAR(50) NOT NULL,
   floor INTEGER NOT NULL,
   type VARCHAR(50) NOT NULL DEFAULT 'apartment', -- 'apartment', 'studio', 'duplex', 'penthouse'
+  facing VARCHAR(50) DEFAULT 'front', -- front, back, corner
   
   -- المواصفات
   area DECIMAL(8, 2) NOT NULL DEFAULT 0,
@@ -77,6 +79,7 @@ CREATE TABLE IF NOT EXISTS units (
   -- غرف إضافية
   maid_room BOOLEAN DEFAULT FALSE,
   driver_room BOOLEAN DEFAULT FALSE,
+  entrances INTEGER DEFAULT 1,
   
   -- التكييف
   ac_type VARCHAR(50) DEFAULT 'split', -- 'split', 'window', 'splitWindow', 'central', 'none'

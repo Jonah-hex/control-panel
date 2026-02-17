@@ -41,18 +41,19 @@ CREATE TABLE buildings (
   -- معلومات الحارس
   guard_name VARCHAR(255),
   guard_phone VARCHAR(20),
-  guard_id_number VARCHAR(20),
+  guard_room_number VARCHAR(50),
+  guard_id_photo TEXT,
   guard_shift VARCHAR(50),
+  guard_has_salary BOOLEAN DEFAULT FALSE,
+  guard_salary_amount DECIMAL(15, 2),
   
   -- الموقع
-  latitude DECIMAL(10, 8),
-  longitude DECIMAL(11, 8),
   google_maps_link TEXT,
   
   -- بيانات إضافية
   image_urls TEXT[],
   floors_data JSONB,
-  owner_association JSONB,
+  owner_association JSONB, -- يحتوي على hasAssociation, startDate, endDate, monthlyFee, contactNumber, managerName, registrationNumber, registeredUnitsCount, iban, accountNumber, includesElectricity, includesWater
   
   owner_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -66,6 +67,7 @@ CREATE TABLE units (
   unit_number VARCHAR(50) NOT NULL,
   floor INTEGER NOT NULL,
   type VARCHAR(50) DEFAULT 'apartment',
+  facing VARCHAR(50) DEFAULT 'front', -- front, back, corner
   area DECIMAL(8, 2) DEFAULT 0,
   rooms INTEGER DEFAULT 1,
   bathrooms INTEGER DEFAULT 1,
@@ -73,6 +75,7 @@ CREATE TABLE units (
   kitchens INTEGER DEFAULT 1,
   maid_room BOOLEAN DEFAULT FALSE,
   driver_room BOOLEAN DEFAULT FALSE,
+  entrances INTEGER DEFAULT 1,
   ac_type VARCHAR(50) DEFAULT 'split',
   status VARCHAR(50) DEFAULT 'available',
   price DECIMAL(15, 2),

@@ -1,0 +1,69 @@
+🎯 تنفيذ سريع - Quick Implementation
+═══════════════════════════════════════════
+
+الخطوة 1️⃣: افتح Supabase SQL Editor
+
+الخطوة 2️⃣: نفّذ هذا السكريبت:
+
+═══════════════════════════════════════════
+
+-- إضافة جميع الأعمدة المطلوبة
+-- الخطوة 1: معلومات العمارة
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS plot_number VARCHAR(100);
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS neighborhood VARCHAR(255);
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
+
+-- الخطوة 2: تفاصيل العمارة
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS reserved_units INTEGER DEFAULT 0;
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS parking_slots INTEGER DEFAULT 0;
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS driver_rooms INTEGER DEFAULT 0;
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS elevators INTEGER DEFAULT 1;
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS entrances INTEGER DEFAULT 1;
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS street_type VARCHAR(50) DEFAULT 'one';
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS building_facing VARCHAR(50) DEFAULT 'north';
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS year_built INTEGER;
+
+-- معلومات قانونية
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS build_status VARCHAR(50) DEFAULT 'ready';
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS deed_number VARCHAR(100);
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS land_area DECIMAL(10, 2);
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS building_license_number VARCHAR(100);
+
+-- معلومات التأمين
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS insurance_available BOOLEAN DEFAULT FALSE;
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS insurance_policy_number VARCHAR(100);
+
+-- عدادات المرافق
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS has_main_water_meter BOOLEAN DEFAULT FALSE;
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS water_meter_number VARCHAR(100);
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS has_main_electricity_meter BOOLEAN DEFAULT FALSE;
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS electricity_meter_number VARCHAR(100);
+
+-- الخطوة 4: معلومات الحارس
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS guard_name VARCHAR(255);
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS guard_phone VARCHAR(20);
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS guard_room_number VARCHAR(50);
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS guard_id_photo TEXT;
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS guard_shift VARCHAR(50);
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS guard_has_salary BOOLEAN DEFAULT FALSE;
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS guard_salary_amount DECIMAL(15, 2);
+
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS google_maps_link TEXT;
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS image_urls TEXT[];
+
+═══════════════════════════════════════════
+
+الخطوة 3️⃣: اضغط RUN
+
+الخطوة 4️⃣: انتهى! جرب الحفظ الآن 🎉
+
+═══════════════════════════════════════════
+
+✅ بعد التنفيذ:
+   • 67+ حقل سيتم حفظهم
+   • جميع الخطوات الخمس مدعومة
+   • لا حاجة لتعديل الكود
+   • جاهز للاستخدام فوراً
+
+═══════════════════════════════════════════
