@@ -1736,7 +1736,8 @@ export default function NewBuildingPage() {
                   <div key={floor.number} className="border-2 border-emerald-200/30 rounded-3xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-500 backdrop-blur-sm">
                     {/* رأس الدور - تصميم محسّن */}
                     <div
-                      className="bg-gradient-to-r from-green-100/30 via-emerald-100/30 to-teal-100/30 text-slate-800 p-6 hover:from-green-100/40 hover:via-emerald-100/40 hover:to-teal-100/40 transition-all duration-300 relative overflow-hidden group backdrop-blur-md"
+                      onClick={() => setExpandedFloor(expandedFloor === floor.number ? null : floor.number)}
+                      className="bg-gradient-to-r from-green-100/30 via-emerald-100/30 to-teal-100/30 text-slate-800 p-6 hover:from-green-100/40 hover:via-emerald-100/40 hover:to-teal-100/40 transition-all duration-300 relative overflow-hidden group backdrop-blur-md cursor-pointer"
                     >
                       {/* Animated Background */}
                       <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
@@ -1764,18 +1765,6 @@ export default function NewBuildingPage() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
-                              copyFloorToAll(floor.number)
-                            }}
-                            className="group/btn flex flex-col items-center gap-1 p-2 text-slate-800 rounded-2xl hover:bg-white/20 transition-all hover:scale-110"
-                            title="نسخ هذا الدور لجميع الأدوار"
-                          >
-                            <Copy className="w-5 h-5 group-hover/btn:rotate-12 transition-transform" />
-                            <span className="text-xs font-medium">نسخ</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
                               removeFloor(floor.number)
                             }}
                             className="group/btn flex flex-col items-center gap-1 p-2 text-slate-800 rounded-2xl hover:bg-white/20 transition-all hover:scale-110"
@@ -1784,17 +1773,12 @@ export default function NewBuildingPage() {
                             <Trash2 className="w-5 h-5 group-hover/btn:rotate-12 transition-transform" />
                             <span className="text-xs font-medium">حذف</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setExpandedFloor(expandedFloor === floor.number ? null : floor.number)
-                            }}
-                            className="flex flex-col items-center gap-1 p-2 text-slate-800 rounded-2xl hover:bg-white/20 transition-all"
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex flex-col items-center gap-1 p-2 text-slate-800"
                           >
                             {expandedFloor === floor.number ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                            <span className="text-xs font-medium">{expandedFloor === floor.number ? 'إخفاء' : 'عرض'}</span>
-                          </button>
+                          </div>
                         </div>
                       </div>
                     </div>
