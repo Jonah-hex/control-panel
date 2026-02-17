@@ -316,7 +316,7 @@ export default function DashboardPage() {
       borderColor: 'border-emerald-200',
       iconBg: 'bg-emerald-100',
       chart: [30, 60, 45, 70, 55, 85, 65],
-      link: '/dashboard/buildings'
+      link: '/dashboard/units'
     },
     {
       title: 'الشقق المتاحة',
@@ -376,14 +376,17 @@ export default function DashboardPage() {
       textColor: 'text-indigo-600',
       borderColor: 'border-indigo-200',
       iconBg: 'bg-indigo-100',
-      chart: [45, 65, 55, 75, 65, 85, 75]
+      chart: [45, 65, 55, 75, 65, 85, 75],
+      link: '/dashboard/statistics'
     }
   ]
 
   const quickActions = [
     { icon: Plus, label: 'إضافة عمارة', href: '/dashboard/buildings/new', color: 'blue', gradient: 'from-blue-500 to-cyan-500' },
     { icon: Eye, label: 'عرض العماير', href: '/dashboard/buildings', color: 'green', gradient: 'from-emerald-500 to-green-500' },
-    { icon: FileText, label: 'تقارير', href: '#', color: 'purple', gradient: 'from-purple-500 to-pink-500' },
+    { icon: Home, label: 'الوحدات', href: '/dashboard/units', color: 'purple', gradient: 'from-purple-500 to-pink-500' },
+    { icon: FileText, label: 'التقارير', href: '/dashboard/reports', color: 'orange', gradient: 'from-orange-500 to-red-500' },
+    { icon: BarChart3, label: 'الإحصائيات', href: '/dashboard/statistics', color: 'indigo', gradient: 'from-indigo-500 to-purple-500' },
     { icon: Settings, label: 'الإعدادات', href: '#', color: 'gray', gradient: 'from-slate-500 to-gray-500' }
   ]
 
