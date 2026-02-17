@@ -1764,18 +1764,6 @@ export default function NewBuildingPage() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
-                              addUnit(floor.number)
-                            }}
-                            className="group/btn flex flex-col items-center gap-1 p-2 text-slate-800 rounded-2xl hover:bg-white/20 transition-all hover:scale-110"
-                            title="إضافة وحدة جديدة"
-                          >
-                            <Plus className="w-5 h-5 group-hover/btn:rotate-90 transition-transform" />
-                            <span className="text-xs font-medium">إضافة</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
                               copyFloorToAll(floor.number)
                             }}
                             className="group/btn flex flex-col items-center gap-1 p-2 text-slate-800 rounded-2xl hover:bg-white/20 transition-all hover:scale-110"
