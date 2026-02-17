@@ -20,6 +20,8 @@ export default function BuildingsPage() {
   const [buildings, setBuildings] = useState<Building[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [buildingToDelete, setBuildingToDelete] = useState<Building | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -50,8 +52,6 @@ export default function BuildingsPage() {
   }
 
   const deleteBuilding = async (buildingId: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذه العمارة؟')) return
-
     try {
       const { error } = await supabase
         .from('buildings')
@@ -64,6 +64,22 @@ export default function BuildingsPage() {
     } catch (error) {
       console.error('Error deleting building:', error)
     }
+  }
+
+  const openDeleteModal = (building: Building) => {
+    setBuildingToDelete(building)
+    setIsDeleteModalOpen(true)
+  }
+
+  const closeDeleteModal = () => {
+    setIsDeleteModalOpen(false)
+    setBuildingToDelete(null)
+  }
+
+  const confirmDelete = async () => {
+    if (!buildingToDelete) return
+    await deleteBuilding(buildingToDelete.id)
+    closeDeleteModal()
   }
 
   const filteredBuildings = buildings.filter(building =>
@@ -228,7 +244,7 @@ export default function BuildingsPage() {
                           </Link>
 
                           <button
-                            onClick={() => deleteBuilding(b.id)}
+                            onClick={() => openDeleteModal(b)}
                             className="p-2 text-red-600 hover:text-red-700 rounded-full hover:bg-red-50 hover:scale-110 transform transition"
                             title="حذف"
                           >
@@ -244,6 +260,45 @@ export default function BuildingsPage() {
           </div>
         )}
       </div>
+
+      {isDeleteModalOpen && buildingToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-gray-200">
+            <div className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center">
+                  <Trash2 className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">تأكيد حذف العمارة</h3>
+                  <p className="text-sm text-gray-600">هذا الإجراء نهائي ولا يمكن التراجع عنه</p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-red-100 bg-red-50/50 px-4 py-3 text-sm text-gray-700">
+                هل أنت متأكد من حذف <span className="font-bold text-gray-900">{buildingToDelete.name}</span>؟
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
+              <button
+                type="button"
+                onClick={closeDeleteModal}
+                className="px-4 py-2 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition"
+              >
+                لا
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700 transition"
+              >
+                نعم، حذف
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

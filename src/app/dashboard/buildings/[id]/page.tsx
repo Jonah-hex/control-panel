@@ -269,33 +269,6 @@ export default function BuildingDetailPage() {
                 <p className="text-sm text-slate-500">رقم القطعة: {building.plot_number}</p>
               </div>
             </div>
-            <button
-              onClick={() => {
-                if (isEditing) {
-                  setFormData(building)
-                  setIsEditing(false)
-                } else {
-                  setIsEditing(true)
-                }
-              }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${
-                isEditing
-                  ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                  : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-              }`}
-            >
-              {isEditing ? (
-                <>
-                  <X className="w-4 h-4" />
-                  إلغاء
-                </>
-              ) : (
-                <>
-                  <Edit2 className="w-4 h-4" />
-                  تعديل
-                </>
-              )}
-            </button>
           </div>
         </div>
       </div>
@@ -316,15 +289,14 @@ export default function BuildingDetailPage() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Main Information */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
-          <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-blue-600" />
-            المعلومات الأساسية
-          </h2>
-
-          {isEditing ? (
-            <div className="space-y-6">
+        {/* Basic Information Cards Grid */}
+        {isEditing ? (
+          <div className="space-y-6 mb-8">
+            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <Edit2 className="w-5 h-5 text-blue-600" />
+              تعديل المعلومات الأساسية
+            </h2>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">اسم المبنى*</label>
@@ -431,7 +403,28 @@ export default function BuildingDetailPage() {
                 </div>
               </div>
 
-              {/* Guard Information Section */}
+              <div className="pt-6 border-t border-slate-200 flex gap-3">
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-400 transition"
+                >
+                  <Save className="w-4 h-4" />
+                  {isSaving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+                </button>
+                <button
+                  onClick={() => {
+                    setFormData(building)
+                    setIsEditing(false)
+                  }}
+                  className="flex items-center gap-2 px-6 py-2 bg-slate-300 text-slate-700 rounded-lg hover:bg-slate-400 transition"
+                >
+                  <X className="w-4 h-4" />
+                  إلغاء
+                </button>
+              </div>
+
+              {/* Guard Information Edit Section */}
               <div className="pt-6 border-t border-slate-200">
                 <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                   <Users className="w-5 h-5 text-amber-600" />
@@ -673,97 +666,190 @@ export default function BuildingDetailPage() {
                   </div>
                 )}
               </div>
-
-              <div className="pt-6 border-t border-slate-200">
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Basic Building Info Cards */}
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-blue-600" />
+                  المعلومات الأساسية
+                </h2>
                 <button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-400 transition"
+                  onClick={() => setIsEditing(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg font-medium transition text-sm"
                 >
-                  <Save className="w-4 h-4" />
-                  {isSaving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+                  <Edit2 className="w-4 h-4" />
+                  تعديل المعلومات
                 </button>
               </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <InfoRow label="اسم المبنى" value={building.name} />
-                <InfoRow label="رقم القطعة" value={building.plot_number} />
-                <InfoRow label="الحي" value={building.neighborhood || '-'} />
-                <InfoRow label="سنة البناء" value={building.year_built?.toString() || '-'} />
+
+              {/* Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                {/* Name Card */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Building2 className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-600">اسم المبنى</h3>
+                  </div>
+                  <p className="text-lg font-bold text-slate-900">{building.name}</p>
+                </div>
+
+                {/* Plot Number Card */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-amber-100 rounded-lg">
+                      <Grid3x3 className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-600">رقم القطعة</h3>
+                  </div>
+                  <p className="text-lg font-bold text-slate-900">{building.plot_number}</p>
+                </div>
+
+                {/* Neighborhood Card */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <Home className="w-5 h-5 text-green-600" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-600">الحي</h3>
+                  </div>
+                  <p className="text-lg font-bold text-slate-900">{building.neighborhood || '-'}</p>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+
+              {/* Year Built Card */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <ArrowLeft className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-600">سنة البناء</h3>
+                  </div>
+                  <p className="text-lg font-bold text-slate-900">{building.year_built || '-'}</p>
+                </div>
+              </div>
+
+              {/* Description Card */}
+              {building.description && (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition mt-4">
+                  <h3 className="text-sm font-semibold text-slate-600 mb-3">الوصف</h3>
+                  <p className="text-slate-700 leading-relaxed">{building.description}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Structure Stats Cards */}
+            <div className="mb-8">
+              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <Grid3x3 className="w-5 h-5 text-blue-600" />
+                الهيكل الأساسي للعمارة
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <StatCard label="الأدوار" value={building.total_floors} icon={Grid3x3} />
                 <StatCard label="الوحدات" value={building.total_units} icon={Home} />
                 <StatCard label="المصاعد" value={building.elevators} icon={Wind} />
                 <StatCard label="المداخل" value={building.entrances} icon={Maximize2} />
-                <StatCard label="المواقف" value={building.parking_slots} icon={Wind} />
+                <StatCard label="مواقف السيارات" value={building.parking_slots} icon={Wind} />
                 <StatCard label="غرف السائقين" value={building.driver_rooms} icon={Users} />
               </div>
-              {building.description && (
-                <div className="md:col-span-2">
-                  <p className="text-sm font-medium text-slate-600 mb-2">الوصف:</p>
-                  <p className="text-slate-700">{building.description}</p>
+            </div>
+
+            {/* Guard Information Card */}
+            {building.guard_name && (
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <Users className="w-5 h-5 text-amber-600" />
+                    معلومات الحارس
+                  </h2>
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg font-medium transition text-sm"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    تعديل
+                  </button>
                 </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Guard Information Section */}
-        {!isEditing && building.guard_name && (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-              <Users className="w-5 h-5 text-amber-600" />
-              معلومات الحارس
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <InfoRow label="اسم الحارس" value={building.guard_name || '-'} />
-              <InfoRow label="رقم الحارس" value={building.guard_phone || '-'} />
-              <InfoRow label="رقم غرفة الحارس" value={building.guard_room_number || '-'} />
-              <InfoRow label="فترة العمل" value={building.guard_shift === 'day' ? 'نهاري' : building.guard_shift === 'night' ? 'ليلي' : building.guard_shift === 'both' ? 'كلا الفترتين' : '-'} />
-              <InfoRow label="صرف راتب" value={building.guard_has_salary ? 'نعم' : 'لا'} />
-              {building.guard_has_salary && building.guard_salary_amount && (
-                <InfoRow label="قيمة الراتب" value={`${building.guard_salary_amount} ر.س`} />
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Owner Association Section */}
-        {!isEditing && building.owner_association?.hasAssociation && (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-blue-600" />
-              معلومات اتحاد الملاك
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <InfoRow label="اسم مسؤول الاتحاد" value={building.owner_association.managerName || '-'} />
-              <InfoRow label="رقم سجل الاتحاد" value={building.owner_association.registrationNumber || '-'} />
-              <InfoRow label="عدد الوحدات المسجلة" value={building.owner_association.registeredUnitsCount?.toString() || '-'} />
-              <InfoRow label="رقم التواصل" value={building.owner_association.contactNumber || '-'} />
-              <InfoRow label="رقم الآيبان" value={building.owner_association.iban || '-'} />
-              <InfoRow label="رقم الحساب" value={building.owner_association.accountNumber || '-'} />
-              <InfoRow label="تاريخ البداية" value={building.owner_association.startDate || '-'} />
-              <InfoRow label="تاريخ النهاية" value={building.owner_association.endDate || '-'} />
-              <InfoRow label="الرسم الشهري" value={building.owner_association.monthlyFee ? `${building.owner_association.monthlyFee} ر.س` : '-'} />
-              <div className="md:col-span-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">الرسوم تشمل</p>
-                <div className="flex gap-4">
-                  {building.owner_association.includesElectricity && (
-                    <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">فواتير الكهرباء</span>
-                  )}
-                  {building.owner_association.includesWater && (
-                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">فواتير المياه</span>
-                  )}
-                  {!building.owner_association.includesElectricity && !building.owner_association.includesWater && (
-                    <span className="text-slate-500">لا توجد خدمات مشمولة</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
+                    <h3 className="text-sm font-semibold text-slate-600 mb-2">اسم الحارس</h3>
+                    <p className="text-lg font-bold text-slate-900">{building.guard_name}</p>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
+                    <h3 className="text-sm font-semibold text-slate-600 mb-2">رقم الحارس</h3>
+                    <p className="text-lg font-bold text-slate-900">{building.guard_phone || '-'}</p>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
+                    <h3 className="text-sm font-semibold text-slate-600 mb-2">رقم الغرفة</h3>
+                    <p className="text-lg font-bold text-slate-900">{building.guard_room_number || '-'}</p>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
+                    <h3 className="text-sm font-semibold text-slate-600 mb-2">فترة العمل</h3>
+                    <p className="text-lg font-bold text-slate-900">
+                      {building.guard_shift === 'day' ? 'نهاري' : building.guard_shift === 'night' ? 'ليلي' : building.guard_shift === 'both' ? 'كلا الفترتين' : '-'}
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
+                    <h3 className="text-sm font-semibold text-slate-600 mb-2">صرف راتب</h3>
+                    <p className="text-lg font-bold text-slate-900">{building.guard_has_salary ? 'نعم' : 'لا'}</p>
+                  </div>
+                  {building.guard_has_salary && building.guard_salary_amount && (
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
+                      <h3 className="text-sm font-semibold text-slate-600 mb-2">قيمة الراتب</h3>
+                      <p className="text-lg font-bold text-slate-900">{building.guard_salary_amount} ر.س</p>
+                    </div>
                   )}
                 </div>
               </div>
-            </div>
-          </div>
+            )}
+
+            {/* Owner Association Card */}
+            {building.owner_association?.hasAssociation && (
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <Building2 className="w-5 h-5 text-blue-600" />
+                    معلومات اتحاد الملاك
+                  </h2>
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg font-medium transition text-sm"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    تعديل
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
+                    <h3 className="text-sm font-semibold text-slate-600 mb-2">اسم المسؤول</h3>
+                    <p className="text-lg font-bold text-slate-900">{building.owner_association.managerName || '-'}</p>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
+                    <h3 className="text-sm font-semibold text-slate-600 mb-2">رقم السجل</h3>
+                    <p className="text-lg font-bold text-slate-900">{building.owner_association.registrationNumber || '-'}</p>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
+                    <h3 className="text-sm font-semibold text-slate-600 mb-2">عدد الوحدات</h3>
+                    <p className="text-lg font-bold text-slate-900">{building.owner_association.registeredUnitsCount || '-'}</p>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
+                    <h3 className="text-sm font-semibold text-slate-600 mb-2">رقم التواصل</h3>
+                    <p className="text-lg font-bold text-slate-900">{building.owner_association.contactNumber || '-'}</p>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition">
+                    <h3 className="text-sm font-semibold text-slate-600 mb-2">الرسم الشهري</h3>
+                    <p className="text-lg font-bold text-slate-900">{building.owner_association.monthlyFee ? `${building.owner_association.monthlyFee} ر.س` : '-'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Units Section */}
@@ -778,7 +864,7 @@ export default function BuildingDetailPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-<thead>
+                <thead>
                   <tr className="border-b border-slate-200">
                     <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">الوحدة</th>
                     <th className="text-right px-4 py-3 text-sm font-semibold text-slate-700">الدور</th>
