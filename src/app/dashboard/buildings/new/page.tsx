@@ -1005,14 +1005,6 @@ export default function NewBuildingPage() {
             {/* الأزرار */}
             <div className="flex items-center gap-3">
               <Link
-                href="/dashboard"
-                className="inline-flex items-center gap-2.5 px-4 py-2.5 bg-white rounded-xl border-2 border-gray-200 hover:shadow-md transition-all duration-300 transform hover:-translate-y-0.5 hover:border-indigo-300 group"
-              >
-                <Home className="w-5 h-5 text-gray-600 group-hover:text-indigo-600 transition-colors" />
-                <span className="text-sm font-bold text-gray-700 group-hover:text-indigo-600 transition-colors">الرئيسية</span>
-              </Link>
-
-              <Link
                 href="/dashboard/buildings"
                 className="inline-flex items-center gap-2.5 px-4 py-2.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-xl transform transition-all duration-300 hover:-translate-y-0.5 hover:scale-105"
               >
