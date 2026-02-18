@@ -1559,11 +1559,11 @@ export default function NewBuildingPage() {
                             newFloors.push({
                               number: i,
                               units: newUnits,
-                              floorPlan: unitsPerFloor === 4 ? '4shuqq' : unitsPerFloor === 3 ? '3shuqq' : '2shuqq',
+                              floorPlan: (unitsPerFloor === 4 ? '4shuqq' : unitsPerFloor === 3 ? '3shuqq' : '2shuqq') as '4shuqq' | '3shuqq' | '2shuqq' | 'custom',
                               unitsPerFloor
                             });
                           }
-                          setFloors(newFloors);
+                          setFloors(newFloors as Floor[]);
                         }}
                         min="1"
                         className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition shadow-sm hover:shadow-md"
@@ -1613,11 +1613,11 @@ export default function NewBuildingPage() {
                             newFloors.push({
                               number: i,
                               units: newUnits,
-                              floorPlan: plan,
+                              floorPlan: plan as '4shuqq' | '3shuqq' | '2shuqq' | 'custom',
                               unitsPerFloor: newUnitsPerFloor
                             });
                           }
-                          setFloors(newFloors);
+                          setFloors(newFloors as Floor[]);
                         }}
                         className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition appearance-none text-gray-700 font-medium shadow-sm hover:shadow-md"
                       >

@@ -761,86 +761,84 @@ export default function BuildingDetailPage() {
                   <InfoItem label="رقم عداد المياه" value={formatValue(building.water_meter_number)} />
                   <InfoItem label="عداد الكهرباء الرئيسي" value={formatBool(building.has_main_electricity_meter)} />
                   <InfoItem label="رقم عداد الكهرباء" value={formatValue(building.electricity_meter_number)} />
+
                 </div>
-              </div>
-
                 <AccordionSection
-                  title={`الوحدات (${units.length})`}
-                  isOpen={openSection === 'units'}
-                  onToggle={() => setOpenSection(openSection === 'units' ? '' : 'units')}
-                >
-                  {units.length === 0 ? (
-                    <p className="text-gray-500 font-semibold">لا توجد وحدات</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b-2 border-gray-200">
-                            <th className="text-right px-4 py-3 font-bold text-gray-700">الوحدة</th>
-                            <th className="text-right px-4 py-3 font-bold text-gray-700">الدور</th>
-                            <th className="text-right px-4 py-3 font-bold text-gray-700">النوع</th>
-                            <th className="text-right px-4 py-3 font-bold text-gray-700">الاتجاه</th>
-                            <th className="text-right px-4 py-3 font-bold text-gray-700">المساحة</th>
-                            <th className="text-right px-4 py-3 font-bold text-gray-700">الغرف</th>
-                            <th className="text-right px-4 py-3 font-bold text-gray-700">الحمامات</th>
-                            <th className="text-right px-4 py-3 font-bold text-gray-700">السعر</th>
-                            <th className="text-right px-4 py-3 font-bold text-gray-700">الحالة</th>
-                            <th className="text-center px-4 py-3 font-bold text-gray-700">الإجراءات</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {units.map((unit) => (
-                            <tr key={unit.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
-                              <td className="px-4 py-3 font-semibold text-gray-900">{unit.unit_number}</td>
-                              <td className="px-4 py-3">{unit.floor}</td>
-                              <td className="px-4 py-3">
-                                {unit.type === 'apartment'
-                                  ? 'شقة'
-                                  : unit.type === 'studio'
-                                    ? 'ملحق - سطح'
-                                    : unit.type === 'duplex'
-                                      ? 'دوبلكس'
-                                      : 'بنتهاوس'}
-                              </td>
-                              <td className="px-4 py-3">
-                                {unit.facing === 'front'
-                                  ? 'أمامية'
-                                  : unit.facing === 'back'
-                                    ? 'خلفية'
-                                    : 'على شارعين'}
-                              </td>
-                              <td className="px-4 py-3">{unit.area} م²</td>
-                              <td className="px-4 py-3 text-center">{unit.rooms}</td>
-                              <td className="px-4 py-3 text-center">{unit.bathrooms}</td>
-                              <td className="px-4 py-3">{unit.price ? `${unit.price}` : '-'}</td>
-                              <td className="px-4 py-3">
-                                <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
-                                  unit.status === 'available'
-                                    ? 'bg-green-100 text-green-700'
-                                    : unit.status === 'reserved'
-                                      ? 'bg-amber-100 text-amber-700'
-                                      : 'bg-rose-100 text-rose-700'
-                                }`}>
-                                  {unit.status === 'available' ? 'متاحة' : unit.status === 'reserved' ? 'محجوزة' : 'مباعة'}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                <button
-                                  onClick={() => handleDeleteUnit(unit.id)}
-                                  className="p-2 text-rose-600 hover:bg-rose-50 rounded-full transition"
-                                  title="حذف"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </AccordionSection>
-
+              title={`الوحدات (${units.length})`}
+              isOpen={openSection === 'units'}
+              onToggle={() => setOpenSection(openSection === 'units' ? '' : 'units')}
+            >
+              {units.length === 0 ? (
+                <p className="text-gray-500 font-semibold">لا توجد وحدات</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b-2 border-gray-200">
+                        <th className="text-right px-4 py-3 font-bold text-gray-700">الوحدة</th>
+                        <th className="text-right px-4 py-3 font-bold text-gray-700">الدور</th>
+                        <th className="text-right px-4 py-3 font-bold text-gray-700">النوع</th>
+                        <th className="text-right px-4 py-3 font-bold text-gray-700">الاتجاه</th>
+                        <th className="text-right px-4 py-3 font-bold text-gray-700">المساحة</th>
+                        <th className="text-right px-4 py-3 font-bold text-gray-700">الغرف</th>
+                        <th className="text-right px-4 py-3 font-bold text-gray-700">الحمامات</th>
+                        <th className="text-right px-4 py-3 font-bold text-gray-700">السعر</th>
+                        <th className="text-right px-4 py-3 font-bold text-gray-700">الحالة</th>
+                        <th className="text-center px-4 py-3 font-bold text-gray-700">الإجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {units.map((unit) => (
+                        <tr key={unit.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                          <td className="px-4 py-3 font-semibold text-gray-900">{unit.unit_number}</td>
+                          <td className="px-4 py-3">{unit.floor}</td>
+                          <td className="px-4 py-3">
+                            {unit.type === 'apartment'
+                              ? 'شقة'
+                              : unit.type === 'studio'
+                                ? 'ملحق - سطح'
+                                : unit.type === 'duplex'
+                                  ? 'دوبلكس'
+                                  : 'بنتهاوس'}
+                          </td>
+                          <td className="px-4 py-3">
+                            {unit.facing === 'front'
+                              ? 'أمامية'
+                              : unit.facing === 'back'
+                                ? 'خلفية'
+                                : 'على شارعين'}
+                          </td>
+                          <td className="px-4 py-3">{unit.area} م²</td>
+                          <td className="px-4 py-3 text-center">{unit.rooms}</td>
+                          <td className="px-4 py-3 text-center">{unit.bathrooms}</td>
+                          <td className="px-4 py-3">{unit.price ? `${unit.price}` : '-'}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
+                              unit.status === 'available'
+                                ? 'bg-green-100 text-green-700'
+                                : unit.status === 'reserved'
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : 'bg-rose-100 text-rose-700'
+                            }`}>
+                              {unit.status === 'available' ? 'متاحة' : unit.status === 'reserved' ? 'محجوزة' : 'مباعة'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => handleDeleteUnit(unit.id)}
+                              className="p-2 text-rose-600 hover:bg-rose-50 rounded-full transition"
+                              title="حذف"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </AccordionSection>
                 <AccordionSection
                   title="بيانات النظام"
                   isOpen={openSection === 'system'}
