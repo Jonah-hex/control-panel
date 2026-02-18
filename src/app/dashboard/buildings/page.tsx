@@ -229,7 +229,7 @@ export default function BuildingsPage() {
                 <thead>
                     <tr className="bg-gradient-to-r from-slate-50 to-white text-slate-700 border-b border-gray-200">
                       <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">الاسم</th>
-                      <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">الموقع</th>
+                      <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">الحي</th>
                       <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">حالة البناء</th>
                       <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">الأدوار</th>
                       <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">الوحدات</th>
@@ -247,27 +247,18 @@ export default function BuildingsPage() {
                           </div>
                           <div className="text-right min-w-0 flex-1">
                             <div className="font-bold text-gray-900 truncate">{b.name}</div>
-                            <div className="text-xs text-gray-500 mt-1">{b.phone || 'بدون رقم هاتف'}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 text-gray-700 mb-1">
-                          <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                          <span className="truncate">قطعة {b.plot_number}</span>
-                        </div>
                         <div className="text-xs text-gray-600">
                           {b.neighborhood || '-'}
-                          {b.address ? ` • ${b.address}` : ''}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${getBuildStatusLabel(b.build_status).className}`}>
                           {getBuildStatusLabel(b.build_status).label}
                         </span>
-                        {b.year_built && (
-                          <div className="text-[11px] text-gray-500 mt-1">{b.year_built}</div>
-                        )}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className="font-semibold text-gray-700">
@@ -311,13 +302,6 @@ export default function BuildingsPage() {
                             <Home className="w-4 h-4" />
                           </Link>
 
-                          <Link
-                            href={`/dashboard/buildings/edit/${b.id}`}
-                            className="p-2 text-indigo-600 hover:text-indigo-700 rounded-full hover:bg-indigo-50 hover:scale-110 transform transition"
-                            title="تعديل"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Link>
 
                           <button
                             onClick={() => openDeleteModal(b)}

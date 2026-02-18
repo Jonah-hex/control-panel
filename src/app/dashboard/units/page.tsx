@@ -14,7 +14,8 @@ import {
   Search,
   ShoppingCart,
   Filter,
-  RefreshCw
+  RefreshCw,
+  Edit
 } from 'lucide-react'
 
 interface Building {
@@ -45,9 +46,11 @@ export default function UnitsFilterPage() {
   const [buildings, setBuildings] = useState<Building[]>([])
   const [units, setUnits] = useState<Unit[]>([])
   const [loading, setLoading] = useState(true)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'reserved' | 'sold'>('all')
-  const [selectedBuildingId, setSelectedBuildingId] = useState<string>('all')
+  const [facingFilter, setFacingFilter] = useState<'all' | 'front' | 'back'>('all')
+  const [typeFilter, setTypeFilter] = useState<'all' | 'apartment' | 'studio'>('all')
   const [filtersInitialized, setFiltersInitialized] = useState(false)
   
   const supabase = createClient()
@@ -96,7 +99,8 @@ export default function UnitsFilterPage() {
   useEffect(() => {
     const search = new URLSearchParams(window.location.search)
     const status = search.get('status')
-    const buildingId = search.get('buildingId')
+    const facing = search.get('facing')
+    const type = search.get('type')
 
     if (status === 'available' || status === 'reserved' || status === 'sold') {
       setStatusFilter(status)
@@ -104,10 +108,16 @@ export default function UnitsFilterPage() {
       setStatusFilter('all')
     }
 
-    if (buildingId && buildingId.trim()) {
-      setSelectedBuildingId(buildingId)
+    if (facing === 'front' || facing === 'back') {
+      setFacingFilter(facing)
     } else {
-      setSelectedBuildingId('all')
+      setFacingFilter('all')
+    }
+
+    if (type === 'apartment' || type === 'studio') {
+      setTypeFilter(type)
+    } else {
+      setTypeFilter('all')
     }
 
     setFiltersInitialized(true)
@@ -118,18 +128,21 @@ export default function UnitsFilterPage() {
 
     const params = new URLSearchParams()
     if (statusFilter !== 'all') params.set('status', statusFilter)
-    if (selectedBuildingId !== 'all') params.set('buildingId', selectedBuildingId)
+    if (facingFilter !== 'all') params.set('facing', facingFilter)
+    if (typeFilter !== 'all') params.set('type', typeFilter)
 
     const queryString = params.toString()
     const query = queryString ? `/dashboard/units?${queryString}` : '/dashboard/units'
     router.replace(query)
-  }, [statusFilter, selectedBuildingId, router, filtersInitialized])
+  }, [statusFilter, facingFilter, typeFilter, router, filtersInitialized])
 
   const fetchData = async () => {
     try {
       setLoading(true)
+      setErrorMsg(null)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
+        setErrorMsg('يجب تسجيل الدخول للوصول إلى الوحدات. سيتم تحويلك لصفحة الدخول.')
         router.push('/login')
         return
       }
@@ -167,35 +180,28 @@ export default function UnitsFilterPage() {
       }
 
       setBuildings(buildingsData || [])
-    } catch (error) {
+    } catch (error: any) {
+      setErrorMsg('حدث خطأ غير متوقع أثناء تحميل البيانات. يمكنك إعادة المحاولة أو العودة للوحة التحكم.')
       console.error('Error fetching data:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const scopedUnits = selectedBuildingId === 'all'
-    ? units
-    : units.filter((unit) => unit.building_id === selectedBuildingId)
-
-  const filteredUnits = scopedUnits.filter((unit) => {
+  const filteredUnits = units.filter((unit) => {
     const statusMatches = statusFilter === 'all' || unit.status === statusFilter
+    const facingMatches = facingFilter === 'all' || unit.facing === facingFilter
+    const typeMatches = typeFilter === 'all' || unit.type === typeFilter
     const term = searchTerm.trim().toLowerCase()
     const searchMatches =
-      term.length === 0 ||
-      unit.unit_number?.toLowerCase().includes(term) ||
-      unit.building?.name?.toLowerCase().includes(term) ||
-      unit.building?.plot_number?.toLowerCase().includes(term) ||
-      unit.building?.neighborhood?.toLowerCase().includes(term)
-
-    return statusMatches && searchMatches
+      term.length === 0 || unit.unit_number?.toLowerCase().includes(term)
+    return statusMatches && facingMatches && typeMatches && searchMatches
   })
 
-  const totalUnits = scopedUnits.length
-  const availableUnits = scopedUnits.filter((unit) => unit.status === 'available').length
-  const reservedUnits = scopedUnits.filter((unit) => unit.status === 'reserved').length
-  const soldUnits = scopedUnits.filter((unit) => unit.status === 'sold').length
-  const selectedBuilding = buildings.find((building) => building.id === selectedBuildingId)
+  const totalUnits = units.length
+  const availableUnits = units.filter((unit) => unit.status === 'available').length
+  const reservedUnits = units.filter((unit) => unit.status === 'reserved').length
+  const soldUnits = units.filter((unit) => unit.status === 'sold').length
 
   const exportToCSV = () => {
     if (filteredUnits.length === 0) return
@@ -261,6 +267,34 @@ export default function UnitsFilterPage() {
     )
   }
 
+  if (errorMsg) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-lg p-8 text-center border border-gray-200 max-w-md mx-auto">
+          <div className="w-20 h-20 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Building2 className="w-10 h-10 text-rose-600" />
+          </div>
+          <h3 className="text-xl font-bold text-gray-800 mb-2">حدث خطأ غير متوقع</h3>
+          <p className="text-gray-600 mb-6">{errorMsg}</p>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:shadow-lg transition-all font-semibold"
+            >
+              إعادة المحاولة
+            </button>
+            <Link
+              href="/dashboard"
+              className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold"
+            >
+              العودة للوحة التحكم
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="bg-emerald-50 border-b border-emerald-200">
@@ -273,27 +307,19 @@ export default function UnitsFilterPage() {
               <div>
                 <h1 className="text-3xl font-black text-emerald-700">إدارة الوحدات</h1>
                 <p className="text-gray-600 text-sm mt-1">
-                  عرض شامل للوحدات مع الفلترة والتصدير
-                  {selectedBuilding ? ` • ${selectedBuilding.name}` : ''}
+                  عرض شامل للوحدات مع الفلترة
                 </p>
               </div>
             </div>
             
             <div className="flex items-center gap-3">
-              <button
-                onClick={fetchData}
-                className="flex items-center gap-2 px-4 py-3 bg-white text-gray-700 rounded-xl hover:shadow-lg transition-all border border-gray-200"
-              >
-                <RefreshCw className="w-4 h-4" />
-                تحديث
-              </button>
-              <button
-                onClick={exportToCSV}
-                className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:shadow-lg transition-all"
-              >
-                <Download className="w-4 h-4" />
-                تصدير CSV
-              </button>
+                <button
+                  onClick={() => window.location.href = '/dashboard/buildings'}
+                  className="flex items-center gap-2 px-4 py-3 bg-white text-gray-700 rounded-xl hover:shadow-lg transition-all border border-gray-200"
+                >
+                  <Building2 className="w-4 h-4" />
+                  قائمة العماير
+                </button>
               <button
                 onClick={() => router.push('/dashboard')}
                 className="flex items-center gap-2 px-6 py-3 bg-white text-emerald-700 rounded-xl hover:shadow-lg transition-all font-semibold border-2 border-emerald-200"
@@ -343,19 +369,35 @@ export default function UnitsFilterPage() {
             <Filter className="w-5 h-5 text-emerald-600" />
             <h2 className="text-lg font-bold text-gray-800">البحث والفلترة</h2>
           </div>
-          
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="relative">
               <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="ابحث برقم الوحدة / اسم العمارة / رقم القطعة / الحي"
+                placeholder="ابحث برقم الشقة"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pr-10 pl-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               />
             </div>
-
+            <select
+              value={facingFilter}
+              onChange={(e) => setFacingFilter(e.target.value as 'all' | 'front' | 'back')}
+              className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+            >
+              <option value="all">كل الاتجاهات</option>
+              <option value="front">أمامية</option>
+              <option value="back">خلفية</option>
+            </select>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as 'all' | 'apartment' | 'studio')}
+              className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+            >
+              <option value="all">كل الأنواع</option>
+              <option value="apartment">شقة</option>
+              <option value="studio">ملحق - سطح</option>
+            </select>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as 'all' | 'available' | 'reserved' | 'sold')}
@@ -366,30 +408,6 @@ export default function UnitsFilterPage() {
               <option value="reserved">محجوزة</option>
               <option value="sold">مباعة</option>
             </select>
-
-            <select
-              value={selectedBuildingId}
-              onChange={(e) => setSelectedBuildingId(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-            >
-              <option value="all">كل العمائر</option>
-              {buildings.map((building) => (
-                <option key={building.id} value={building.id}>
-                  {building.name} - قطعة {building.plot_number}
-                </option>
-              ))}
-            </select>
-
-            <button
-              onClick={() => {
-                setSearchTerm('')
-                setStatusFilter('all')
-                setSelectedBuildingId('all')
-              }}
-              className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:shadow-lg transition-all font-semibold"
-            >
-              إعادة تعيين الفلاتر
-            </button>
           </div>
         </div>
 
@@ -409,6 +427,7 @@ export default function UnitsFilterPage() {
                     <th className="text-right px-4 py-4 font-bold text-gray-700">الحمامات</th>
                     <th className="text-right px-4 py-4 font-bold text-gray-700">السعر</th>
                     <th className="text-right px-4 py-4 font-bold text-gray-700">الحالة</th>
+                    <th className="text-center px-4 py-4 font-bold text-gray-700">إجراءات التعديل</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -423,7 +442,7 @@ export default function UnitsFilterPage() {
                       </td>
                       <td className="px-4 py-4">{unit.building?.neighborhood || '-'}</td>
                       <td className="px-4 py-4">{unit.floor ?? '-'}</td>
-                      <td className="px-4 py-4">{unit.type || '-'}</td>
+                      <td className="px-4 py-4">{unit.type === 'apartment' ? 'شقة' : unit.type === 'studio' ? 'ملحق - سطح' : unit.type === 'duplex' ? 'دوبلكس' : unit.type === 'penthouse' ? 'بنتهاوس' : unit.type || '-'}</td>
                       <td className="px-4 py-4">{unit.area ? `${unit.area} م²` : '-'}</td>
                       <td className="px-4 py-4">{unit.rooms ?? '-'}</td>
                       <td className="px-4 py-4">{unit.bathrooms ?? '-'}</td>
@@ -434,6 +453,15 @@ export default function UnitsFilterPage() {
                         <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${statusBadge(unit.status)}`}>
                           {statusLabel(unit.status)}
                         </span>
+                      </td>
+                      <td className="px-4 py-4 text-center align-middle flex items-center justify-center">
+                        <Link
+                          href={`/dashboard/units/edit?unitId=${unit.id}`}
+                          className="flex items-center justify-center w-9 h-9 text-indigo-600 hover:text-white bg-white hover:bg-indigo-600 rounded-full shadow transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                          title="تعديل الوحدة"
+                        >
+                          <Edit className="w-5 h-5" />
+                        </Link>
                       </td>
                     </tr>
                   ))}
@@ -462,7 +490,7 @@ export default function UnitsFilterPage() {
                 href="/dashboard/buildings"
                 className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold"
               >
-                إدارة العماير
+                قائمة العماير
               </Link>
             </div>
           </div>

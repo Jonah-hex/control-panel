@@ -45,6 +45,7 @@ import {
   FileText,
   Edit,
   Trash2
+  , User2
 } from 'lucide-react'
 
 interface Building {
@@ -385,9 +386,7 @@ export default function DashboardPage() {
     { icon: Plus, label: 'إضافة عمارة', href: '/dashboard/buildings/new', color: 'blue', gradient: 'from-blue-500 to-cyan-500' },
     { icon: Eye, label: 'عرض العماير', href: '/dashboard/buildings', color: 'green', gradient: 'from-emerald-500 to-green-500' },
     { icon: Home, label: 'الوحدات', href: '/dashboard/units', color: 'purple', gradient: 'from-purple-500 to-pink-500' },
-    { icon: FileText, label: 'التقارير', href: '/dashboard/reports', color: 'orange', gradient: 'from-orange-500 to-red-500' },
-    { icon: BarChart3, label: 'الإحصائيات', href: '/dashboard/statistics', color: 'indigo', gradient: 'from-indigo-500 to-purple-500' },
-    { icon: Settings, label: 'الإعدادات', href: '/dashboard/security', color: 'gray', gradient: 'from-slate-500 to-gray-500' }
+    { icon: BarChart3, label: 'الإحصائيات', href: '/dashboard/statistics', color: 'indigo', gradient: 'from-indigo-500 to-purple-500' }
   ]
 
   const recentBuildings = buildings.slice(0, 3)
@@ -511,10 +510,14 @@ export default function DashboardPage() {
                     <p className="text-xs text-gray-500">مدير النظام</p>
                   </div>
                   <div className="p-2">
-                    <button className="w-full px-3 py-2 text-right text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
+                    <a href="/user" className="w-full px-3 py-2 text-right text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
+                      <User2 className="w-4 h-4" />
+                      ملف المستخدم
+                    </a>
+                    <a href="/user/settings" className="w-full px-3 py-2 text-right text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
                       <Settings className="w-4 h-4" />
-                      الإعدادات
-                    </button>
+                      إعدادات متقدمة
+                    </a>
                     <button 
                       onClick={handleLogout}
                       className="w-full px-3 py-2 text-right text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2"

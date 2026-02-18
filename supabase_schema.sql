@@ -44,8 +44,6 @@ CREATE TABLE IF NOT EXISTS buildings (
   -- بيانات الأدوار (JSON)
   floors_data JSONB,
   
-  -- جمعية الملاك
-  owner_association JSONB, -- يحتوي على hasAssociation, startDate, endDate, monthlyFee, contactNumber, managerName, registrationNumber, registeredUnitsCount, iban, accountNumber, includesElectricity, includesWater
   
   -- معلومات المالك والتتبع
   owner_id UUID NOT NULL,

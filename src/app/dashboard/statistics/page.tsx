@@ -158,7 +158,7 @@ export default function StatisticsPage() {
 
       const unitTypeStats = Array.from(typeMap.entries())
         .map(([type, count]) => ({
-          type,
+          type: type === 'apartment' ? 'شقة' : type === 'studio' ? 'ملحق - سطح' : type === 'duplex' ? 'دوبلكس' : type === 'penthouse' ? 'بنتهاوس' : type,
           count,
           percentage: totalUnits > 0 ? (count / totalUnits) * 100 : 0
         }))
@@ -199,7 +199,7 @@ export default function StatisticsPage() {
   const getTypeText = (type: string) => {
     switch (type) {
       case 'apartment': return 'شقة'
-      case 'studio': return 'ملحق'
+      case 'studio': return 'ملحق - سطح'
       case 'duplex': return 'دوبلكس'
       case 'penthouse': return 'بنتهاوس'
       default: return type

@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -50,7 +51,7 @@ interface Building {
   description: string | null
   total_floors: number
   total_units: number
-  entrances: number
+  // entrances: number (تم حذفه من قاعدة البيانات)
   parking_slots: number
   elevators: number
   driver_rooms: number
@@ -92,7 +93,7 @@ interface Unit {
   kitchens: number
   maid_room: boolean
   driver_room: boolean
-  entrances: number
+  // entrances: number (تم حذفه من قاعدة البيانات)
   ac_type: string
   price: number | null
   status: 'available' | 'reserved' | 'sold'
@@ -176,7 +177,7 @@ export default function BuildingDetailPage() {
           description: formData.description,
           total_floors: formData.total_floors,
           total_units: formData.total_units,
-          entrances: formData.entrances,
+          // entrances: formData.entrances, (تم حذفه من قاعدة البيانات)
           parking_slots: formData.parking_slots,
           elevators: formData.elevators,
           driver_rooms: formData.driver_rooms,
@@ -328,9 +329,8 @@ export default function BuildingDetailPage() {
           </Link>
         </div>
       </div>
-    )
+    );
   }
-
   return (
     <div
       className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 text-gray-900"
@@ -403,13 +403,7 @@ export default function BuildingDetailPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="bg-white/80 backdrop-blur-lg rounded-2xl border border-white/30 shadow-lg p-4 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-              <button
-                onClick={() => setIsDetailsModalOpen(true)}
-                className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-indigo-50 text-indigo-700 rounded-xl font-semibold hover:bg-indigo-100 transition"
-              >
-                <BarChart3 className="w-4 h-4" />
-                عرض إحصائيات الوحدات
-              </button>
+              {/* زر عرض إحصائيات الوحدات تم حذفه */}
               <button
                 onClick={handlePrint}
                 className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-slate-50 text-slate-700 rounded-xl font-semibold hover:bg-slate-100 transition"
@@ -417,13 +411,7 @@ export default function BuildingDetailPage() {
                 <Printer className="w-4 h-4" />
                 طباعة
               </button>
-              <button
-                onClick={handleExportJson}
-                className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-emerald-50 text-emerald-700 rounded-xl font-semibold hover:bg-emerald-100 transition"
-              >
-                <Download className="w-4 h-4" />
-                تصدير JSON
-              </button>
+              {/* زر تصدير JSON تم حذفه */}
               <button
                 onClick={handleShare}
                 className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-amber-50 text-amber-700 rounded-xl font-semibold hover:bg-amber-100 transition"
@@ -476,13 +464,17 @@ export default function BuildingDetailPage() {
 
                 <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
                   {imageUrls.map((url, index) => (
-                    <button
-                      key={url + index}
-                      onClick={() => setCurrentImageIndex(index)}
-                      className={`rounded-lg overflow-hidden border-2 ${index === currentImageIndex ? 'border-indigo-500' : 'border-transparent'}`}
-                    >
-                      <img src={url} alt={`صورة مصغرة ${index + 1}`} className="w-full h-16 object-cover" />
-                    </button>
+                    <div key={url + index} className="flex flex-col items-center">
+                      <button
+                        onClick={() => setCurrentImageIndex(index)}
+                        className={`rounded-lg overflow-hidden border-2 mb-1 ${index === currentImageIndex ? 'border-indigo-500' : 'border-transparent'}`}
+                      >
+                        <img src={url} alt={`صورة مصغرة ${index + 1}`} className="w-full h-16 object-cover" />
+                      </button>
+                      <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline break-all max-w-[90px] text-center">
+                        {url.split('/').pop()}
+                      </a>
+                    </div>
                   ))}
                 </div>
               </>
@@ -497,7 +489,7 @@ export default function BuildingDetailPage() {
             <StatTile label="الأدوار" value={building.total_floors} icon={<ArrowUp className="w-5 h-5" />} />
             <StatTile label="الوحدات" value={building.total_units} icon={<Home className="w-5 h-5" />} />
             <StatTile label="المصاعد" value={building.elevators} icon={<Wind className="w-5 h-5" />} />
-            <StatTile label="المداخل" value={building.entrances} icon={<DoorOpen className="w-5 h-5" />} />
+            {/* <StatTile label="المداخل" value={building.entrances} icon={<DoorOpen className="w-5 h-5" />} /> */}
           </div>
 
           <div className="mt-6 space-y-3">
@@ -602,9 +594,9 @@ export default function BuildingDetailPage() {
                       <Field label="عدد المداخل">
                         <input
                           type="number"
-                          value={formData.entrances || ''}
-                          onChange={(e) => handleInputChange('entrances', parseInt(e.target.value))}
-                          className={fieldInputClass}
+                          // value={formData.entrances || ''}
+                          // onChange={(e) => handleInputChange('entrances', parseInt(e.target.value))}
+                          // className={fieldInputClass}
                         />
                       </Field>
                       <Field label="مواقف السيارات">
@@ -712,90 +704,65 @@ export default function BuildingDetailPage() {
                 </form>
               </div>
             ) : (
-              <div className="space-y-4">
-                <AccordionSection
-                  title="المعلومات الأساسية"
-                  isOpen={openSection === 'basic'}
-                  onToggle={() => setOpenSection(openSection === 'basic' ? '' : 'basic')}
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <InfoItem label="اسم المبنى" value={formatValue(building.name)} />
-                    <InfoItem label="رقم القطعة" value={formatValue(building.plot_number)} />
-                    <InfoItem label="الحي" value={formatValue(building.neighborhood)} />
-                    <InfoItem label="سنة البناء" value={formatValue(building.year_built)} />
-                    <InfoItem label="رقم الهاتف" value={formatValue(building.phone)} />
-                    <InfoItem label="نوع الشارع" value={formatValue(building.street_type)} />
-                    <InfoItem label="واجهة المبنى" value={formatValue(building.building_facing)} />
-                    <InfoItem label="رابط خرائط Google" value={formatValue(building.google_maps_link)} />
-                    <InfoItem label="الوصف" value={formatValue(building.description)} />
-                  </div>
-                </AccordionSection>
 
-                <AccordionSection
-                  title="هيكل العمارة"
-                  isOpen={openSection === 'structure'}
-                  onToggle={() => setOpenSection(openSection === 'structure' ? '' : 'structure')}
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <InfoItem label="عدد الأدوار" value={formatValue(building.total_floors)} />
-                    <InfoItem label="عدد الوحدات" value={formatValue(building.total_units)} />
-                    <InfoItem label="عدد المداخل" value={formatValue(building.entrances)} />
-                    <InfoItem label="عدد المواقف" value={formatValue(building.parking_slots)} />
-                    <InfoItem label="عدد المصاعد" value={formatValue(building.elevators)} />
-                    <InfoItem label="غرف السائقين" value={formatValue(building.driver_rooms)} />
-                  </div>
-                </AccordionSection>
+              <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl overflow-hidden border border-white/20 p-8">
+                <h2 className="text-xl font-bold text-gray-900 mb-6">بطاقة بيانات العمارة</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* المعلومات الأساسية */}
+                  <InfoItem label="اسم المبنى" value={formatValue(building.name)} />
+                  <InfoItem label="رقم القطعة" value={formatValue(building.plot_number)} />
+                  <InfoItem label="الحي" value={formatValue(building.neighborhood)} />
+                  <InfoItem label="سنة البناء" value={formatValue(building.year_built)} />
+                  <InfoItem label="رقم الهاتف" value={formatValue(building.phone)} />
+                  <InfoItem label="نوع الشارع" value={formatValue(building.street_type)} />
+                  <InfoItem label="واجهة المبنى" value={formatValue(building.building_facing)} />
+                  <InfoItem label="رابط خرائط Google" value={formatValue(building.google_maps_link)} />
+                  <InfoItem label="الوصف" value={formatValue(building.description)} />
 
-                <AccordionSection
-                  title="بيانات الحارس"
-                  isOpen={openSection === 'guard'}
-                  onToggle={() => setOpenSection(openSection === 'guard' ? '' : 'guard')}
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <InfoItem label="اسم الحارس" value={formatValue(building.guard_name)} />
-                    <InfoItem label="رقم الحارس" value={formatValue(building.guard_phone)} />
-                    <InfoItem label="رقم غرفة الحارس" value={formatValue(building.guard_room_number)} />
-                    <InfoItem label="فترة العمل" value={guardShiftLabel} />
-                    <InfoItem label="صرف راتب" value={formatBool(building.guard_has_salary)} />
-                    <InfoItem label="قيمة الراتب" value={formatCurrency(building.guard_salary_amount)} />
-                    <InfoItem label="صورة الهوية" value={formatValue(building.guard_id_photo)} />
-                  </div>
-                </AccordionSection>
+                  {/* رقم الرخصة ورقم الصك والتأمين */}
+                  <InfoItem label="رقم رخصة البناء" value={formatValue(building.building_license_number)} />
+                  <InfoItem label="رقم الصك" value={formatValue(building.deed_number)} />
+                  <InfoItem label="التأمين متوفر" value={formatBool(building.insurance_available)} />
+                  <InfoItem label="رقم وثيقة التأمين" value={formatValue(building.insurance_policy_number)} />
 
-                <AccordionSection
-                  title="لجنة الملاك"
-                  isOpen={openSection === 'committee'}
-                  onToggle={() => setOpenSection(openSection === 'committee' ? '' : 'committee')}
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <InfoItem label="اسم اللجنة" value={formatValue(building.owners_committee_name)} />
-                    <InfoItem label="رئيس اللجنة" value={formatValue(building.owners_committee_chairman)} />
-                    <InfoItem label="هاتف اللجنة" value={formatValue(building.owners_committee_phone)} />
-                    <InfoItem label="بريد اللجنة" value={formatValue(building.owners_committee_email)} />
-                    <InfoItem label="جدول الاجتماعات" value={formatValue(building.owners_committee_meeting_schedule)} />
-                  </div>
-                </AccordionSection>
+                  {/* الهيكل */}
+                  <InfoItem label="عدد الأدوار" value={formatValue(building.total_floors)} />
+                  <InfoItem label="عدد الوحدات" value={formatValue(building.total_units)} />
+                  {/* <InfoItem label="عدد المداخل" value={formatValue(building.entrances)} /> */}
+                  <InfoItem label="عدد المواقف" value={formatValue(building.parking_slots)} />
+                  <InfoItem label="عدد المصاعد" value={formatValue(building.elevators)} />
+                  <InfoItem label="غرف السائقين" value={formatValue(building.driver_rooms)} />
 
-                <AccordionSection
-                  title="اتحاد الملاك"
-                  isOpen={openSection === 'association'}
-                  onToggle={() => setOpenSection(openSection === 'association' ? '' : 'association')}
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <InfoItem label="يوجد اتحاد" value={formatBool(building.owner_association?.hasAssociation)} />
-                    <InfoItem label="تاريخ البداية" value={formatValue(building.owner_association?.startDate)} />
-                    <InfoItem label="تاريخ النهاية" value={formatValue(building.owner_association?.endDate)} />
-                    <InfoItem label="الرسوم الشهرية" value={formatCurrency(building.owner_association?.monthlyFee)} />
-                    <InfoItem label="رقم التواصل" value={formatValue(building.owner_association?.contactNumber)} />
-                    <InfoItem label="اسم المسؤول" value={formatValue(building.owner_association?.managerName)} />
-                    <InfoItem label="رقم السجل" value={formatValue(building.owner_association?.registrationNumber)} />
-                    <InfoItem label="عدد الوحدات المسجلة" value={formatValue(building.owner_association?.registeredUnitsCount)} />
-                    <InfoItem label="IBAN" value={formatValue(building.owner_association?.iban)} />
-                    <InfoItem label="رقم الحساب" value={formatValue(building.owner_association?.accountNumber)} />
-                    <InfoItem label="يشمل الكهرباء" value={formatBool(building.owner_association?.includesElectricity)} />
-                    <InfoItem label="يشمل الماء" value={formatBool(building.owner_association?.includesWater)} />
-                  </div>
-                </AccordionSection>
+                  {/* بيانات الحارس */}
+                  <InfoItem label="اسم الحارس" value={formatValue(building.guard_name)} />
+                  <InfoItem label="رقم الحارس" value={formatValue(building.guard_phone)} />
+                  <InfoItem label="رقم غرفة الحارس" value={formatValue(building.guard_room_number)} />
+                  <InfoItem label="فترة العمل" value={guardShiftLabel} />
+                  <InfoItem label="صرف راتب" value={formatBool(building.guard_has_salary)} />
+                  <InfoItem label="قيمة الراتب" value={formatCurrency(building.guard_salary_amount)} />
+                  <InfoItem label="صورة الهوية" value={formatValue(building.guard_id_photo)} />
+
+                  {/* اتحاد الملاك */}
+                  <InfoItem label="يوجد اتحاد" value={formatBool(building.owner_association?.hasAssociation)} />
+                  <InfoItem label="تاريخ البداية" value={formatValue(building.owner_association?.startDate)} />
+                  <InfoItem label="تاريخ النهاية" value={formatValue(building.owner_association?.endDate)} />
+                  <InfoItem label="الرسوم الشهرية" value={formatCurrency(building.owner_association?.monthlyFee)} />
+                  <InfoItem label="رقم التواصل" value={formatValue(building.owner_association?.contactNumber)} />
+                  <InfoItem label="اسم المسؤول" value={formatValue(building.owner_association?.managerName)} />
+                  <InfoItem label="رقم السجل" value={formatValue(building.owner_association?.registrationNumber)} />
+                  <InfoItem label="عدد الوحدات المسجلة" value={formatValue(building.owner_association?.registeredUnitsCount)} />
+                  <InfoItem label="IBAN" value={formatValue(building.owner_association?.iban)} />
+                  <InfoItem label="رقم الحساب" value={formatValue(building.owner_association?.accountNumber)} />
+                  <InfoItem label="يشمل الكهرباء" value={formatBool(building.owner_association?.includesElectricity)} />
+                  <InfoItem label="يشمل الماء" value={formatBool(building.owner_association?.includesWater)} />
+
+                  {/* العدادات */}
+                  <InfoItem label="عداد المياه الرئيسي" value={formatBool(building.has_main_water_meter)} />
+                  <InfoItem label="رقم عداد المياه" value={formatValue(building.water_meter_number)} />
+                  <InfoItem label="عداد الكهرباء الرئيسي" value={formatBool(building.has_main_electricity_meter)} />
+                  <InfoItem label="رقم عداد الكهرباء" value={formatValue(building.electricity_meter_number)} />
+                </div>
+              </div>
 
                 <AccordionSection
                   title={`الوحدات (${units.length})`}
@@ -830,7 +797,7 @@ export default function BuildingDetailPage() {
                                 {unit.type === 'apartment'
                                   ? 'شقة'
                                   : unit.type === 'studio'
-                                    ? 'ملحق'
+                                    ? 'ملحق - سطح'
                                     : unit.type === 'duplex'
                                       ? 'دوبلكس'
                                       : 'بنتهاوس'}
@@ -937,7 +904,7 @@ export default function BuildingDetailPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <InfoItem label="عدد الأدوار" value={formatValue(building.total_floors)} />
                     <InfoItem label="إجمالي الوحدات" value={formatValue(building.total_units)} />
-                    <InfoItem label="عدد المداخل" value={formatValue(building.entrances)} />
+                    {/* <InfoItem label="عدد المداخل" value={formatValue(building.entrances)} /> */}
                     <InfoItem label="المصاعد" value={formatValue(building.elevators)} />
                     <InfoItem label="مواقف السيارات" value={formatValue(building.parking_slots)} />
                     <InfoItem label="غرف السائقين" value={formatValue(building.driver_rooms)} />
@@ -1003,6 +970,7 @@ export default function BuildingDetailPage() {
   )
 }
 
+// --- الدوال المساعدة بعد إغلاق الدالة الرئيسية ---
 function StatTile({ label, value, icon }: { label: string; value: number; icon: React.ReactNode }) {
   return (
     <div className="bg-white/80 backdrop-blur-lg border border-white/30 rounded-2xl p-4 shadow-lg">
@@ -1072,5 +1040,7 @@ function Field({ label, children, className = '' }: { label: string; children: R
 }
 
 const fieldInputClass =
-  'w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition text-gray-700'
+  'w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition text-gray-700';
+
+// نهاية الملف: تأكد من عدم وجود أي return أو قوس زائد بعد هذا السطر
 

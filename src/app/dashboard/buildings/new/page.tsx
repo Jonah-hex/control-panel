@@ -140,7 +140,7 @@ interface Unit {
   kitchens: number
   maidRoom: boolean
   driverRoom: boolean
-  entrances: number
+  // entrances: number (تم حذفه من قاعدة البيانات)
   acType: 'split' | 'window' | 'splitWindow' | 'central' | 'none'
   status: 'available' | 'sold' | 'reserved'
   price: number
@@ -170,6 +170,10 @@ interface OwnerAssociation {
 }
 
 export default function NewBuildingPage() {
+
+  // متغير مستقل لعدد الشقق في الدور
+  const [unitsPerFloor, setUnitsPerFloor] = useState(4);
+
   const [formData, setFormData] = useState({
     // معلومات أساسية
     name: '',
@@ -238,7 +242,7 @@ export default function NewBuildingPage() {
         kitchens: 1,
         maidRoom: false,
         driverRoom: false,
-        entrances: 1,
+        // entrances: 1, (تم حذفه من قاعدة البيانات)
         acType: 'split',
         status: 'available',
         price: 0
@@ -355,7 +359,7 @@ export default function NewBuildingPage() {
         kitchens: 1,
         maidRoom: false,
         driverRoom: false,
-        entrances: 1,
+        // entrances: 1, (تم حذفه من قاعدة البيانات)
         acType: 'split',
         status: 'available',
         price: 0
@@ -428,7 +432,7 @@ export default function NewBuildingPage() {
             kitchens: 1,
             maidRoom: false,
             driverRoom: false,
-            entrances: 1,
+            // entrances: 1, (تم حذفه من قاعدة البيانات)
             acType: 'split',
             status: 'available',
             price: 0
@@ -476,7 +480,7 @@ export default function NewBuildingPage() {
           kitchens: 1,
           maidRoom: false,
           driverRoom: false,
-          entrances: 1,
+          // entrances: 1, (تم حذفه من قاعدة البيانات)
           acType: 'split',
           status: 'available',
           price: 0
@@ -741,11 +745,11 @@ export default function NewBuildingPage() {
             // Step 2 - Building Details
             total_floors: floorsWithSequentialNumbers.length,
             total_units: totalUnits,
-            reserved_units: formData.reservedUnits || 0,
+            // reserved_units: formData.reservedUnits || 0, (تم حذفه من قاعدة البيانات)
             parking_slots: formData.parkingSlots || 0,
             driver_rooms: formData.driverRooms || 0,
             elevators: formData.elevators || 1,
-            entrances: 1,
+            // entrances: 1, (تم حذفه من قاعدة البيانات)
             street_type: formData.streetType || 'one',
             building_facing: formData.buildingFacing || 'north',
             year_built: formData.yearBuilt || null,
@@ -769,7 +773,7 @@ export default function NewBuildingPage() {
             // 📋 الخطوة 3 - الوحدات (تُحفظ في جدول منفصل)
             // Step 3 - Units (saved in separate table with sequential numbering)
             // الوحدات محفوظة برقم متسلسل ضماني
-            floors_data: floorsWithSequentialNumbers,
+            // floors_data: floorsWithSequentialNumbers, (تم حذفه من قاعدة البيانات)
             
             // 📋 الخطوة 4 - معلومات إضافية
             // Step 4 - Additional Information
@@ -877,7 +881,7 @@ export default function NewBuildingPage() {
                   kitchens: unit.kitchens || 1,
                   maid_room: unit.maidRoom || false,
                   driver_room: unit.driverRoom || false,
-                  entrances: unit.entrances || 1,
+                  // entrances: unit.entrances || 1, (تم حذفه من قاعدة البيانات)
                   ac_type: unit.acType || 'split',
                   status: unit.status || 'available',
                   price: unit.price || null,
@@ -1526,49 +1530,40 @@ export default function NewBuildingPage() {
                         type="number"
                         value={formData.totalFloors}
                         onChange={(e) => {
-                          const newTotal = parseInt(e.target.value) || 1
-                          setFormData({...formData, totalFloors: newTotal})
-                          // تعديل عدد الأدوار في قائمة floors
-                          if (newTotal > floors.length) {
-                            // إضافة أدوار جديدة
-                            for (let i = floors.length + 1; i <= newTotal; i++) {
-                              const newFloorPlan = floors[0]?.floorPlan || '4shuqq'
-                              const unitsPerFloor = newFloorPlan === '4shuqq' ? 4 : newFloorPlan === '3shuqq' ? 3 : 2
-                              const newUnits: Unit[] = []
-                              let unitCounter = 1
-                              for (let k = 0; k < i - 1; k++) {
-                                unitCounter += unitsPerFloor
-                              }
-                              for (let j = 0; j < unitsPerFloor; j++) {
-                                newUnits.push({
-                                  unitNumber: `${unitCounter + j}`,
-                                  floor: i,
-                                  type: 'apartment',
-                                  facing: 'front',
-                                  area: 0,
-                                  rooms: 1,
-                                  bathrooms: 1,
-                                  livingRooms: 1,
-                                  kitchens: 1,
-                                  maidRoom: false,
-                                  driverRoom: false,
-                                  entrances: 1,
-                                  acType: 'split',
-                                  status: 'available',
-                                  price: 0
-                                })
-                              }
-                              setFloors(prev => [...prev, { 
-                                number: i, 
-                                units: newUnits,
-                                floorPlan: newFloorPlan as any,
-                                unitsPerFloor
-                              }])
+                          const newTotal = parseInt(e.target.value) || 1;
+                          setFormData({...formData, totalFloors: newTotal});
+                          // إعادة بناء الأدوار بناءً على القيمتين الجديدتين
+                          const newFloors = [];
+                          let unitCounter = 1;
+                          for (let i = 1; i <= newTotal; i++) {
+                            const newUnits: Unit[] = [];
+                            for (let j = 0; j < unitsPerFloor; j++) {
+                              newUnits.push({
+                                unitNumber: `${unitCounter++}`,
+                                floor: i,
+                                type: 'apartment',
+                                facing: 'front',
+                                area: 0,
+                                rooms: 1,
+                                bathrooms: 1,
+                                livingRooms: 1,
+                                kitchens: 1,
+                                maidRoom: false,
+                                driverRoom: false,
+                                // entrances: 1, (تم حذفه من قاعدة البيانات)
+                                acType: 'split',
+                                status: 'available',
+                                price: 0
+                              });
                             }
-                          } else if (newTotal < floors.length) {
-                            // حذف أدوار زائدة
-                            setFloors(prev => prev.slice(0, newTotal))
+                            newFloors.push({
+                              number: i,
+                              units: newUnits,
+                              floorPlan: unitsPerFloor === 4 ? '4shuqq' : unitsPerFloor === 3 ? '3shuqq' : '2shuqq',
+                              unitsPerFloor
+                            });
                           }
+                          setFloors(newFloors);
                         }}
                         min="1"
                         className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition shadow-sm hover:shadow-md"
@@ -1586,11 +1581,43 @@ export default function NewBuildingPage() {
                         <Grid className="w-5 h-5" />
                       </div>
                       <select
-                        value={floors[0]?.floorPlan || '4shuqq'}
+                        value={unitsPerFloor === 4 ? '4shuqq' : unitsPerFloor === 3 ? '3shuqq' : '2shuqq'}
                         onChange={(e) => {
-                          floors.forEach(floor => {
-                            updateFloorPlan(floor.number, e.target.value as any)
-                          })
+                          const plan = e.target.value;
+                          const newUnitsPerFloor = plan === '4shuqq' ? 4 : plan === '3shuqq' ? 3 : 2;
+                          setUnitsPerFloor(newUnitsPerFloor);
+                          // إعادة بناء الأدوار بناءً على القيمتين الجديدتين
+                          const newFloors = [];
+                          let unitCounter = 1;
+                          for (let i = 1; i <= formData.totalFloors; i++) {
+                            const newUnits: Unit[] = [];
+                            for (let j = 0; j < newUnitsPerFloor; j++) {
+                              newUnits.push({
+                                unitNumber: `${unitCounter++}`,
+                                floor: i,
+                                type: 'apartment',
+                                facing: 'front',
+                                area: 0,
+                                rooms: 1,
+                                bathrooms: 1,
+                                livingRooms: 1,
+                                kitchens: 1,
+                                maidRoom: false,
+                                driverRoom: false,
+                                // entrances: 1, (تم حذفه من قاعدة البيانات)
+                                acType: 'split',
+                                status: 'available',
+                                price: 0
+                              });
+                            }
+                            newFloors.push({
+                              number: i,
+                              units: newUnits,
+                              floorPlan: plan,
+                              unitsPerFloor: newUnitsPerFloor
+                            });
+                          }
+                          setFloors(newFloors);
                         }}
                         className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition appearance-none text-gray-700 font-medium shadow-sm hover:shadow-md"
                       >
@@ -1854,7 +1881,7 @@ export default function NewBuildingPage() {
                                   <h4 className="font-bold text-gray-700 text-lg">الوحدة {unit.unitNumber}</h4>
                                   <div className="flex items-center gap-2 mt-1">
                                     <span className="text-xs bg-blue-100/70 backdrop-blur-sm text-blue-700 px-2 py-1 rounded-full font-medium">
-                                      {unit.type === 'apartment' ? 'شقة' : unit.type === 'studio' ? 'ملحق' : unit.type === 'duplex' ? 'دوبلكس' : 'بنتهاوس'}
+                                      {unit.type === 'apartment' ? 'شقة' : unit.type === 'studio' ? 'ملحق - سطح' : unit.type === 'duplex' ? 'دوبلكس' : 'بنتهاوس'}
                                     </span>
                                     <span className={`text-xs px-2 py-1 rounded-full font-medium backdrop-blur-sm ${
                                       unit.status === 'available' ? 'bg-green-100/70 text-green-700' :
@@ -1973,7 +2000,7 @@ export default function NewBuildingPage() {
                                       className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-medium text-sm shadow-sm hover:shadow-md"
                                     >
                                       <option value="apartment">شقة</option>
-                                      <option value="studio">ملحق</option>
+                                      <option value="studio">ملحق - سطح</option>
                                       <option value="duplex">دوبلكس</option>
                                       <option value="penthouse">بنتهاوس</option>
                                     </select>
@@ -2065,9 +2092,9 @@ export default function NewBuildingPage() {
                                     <input
                                       type="number"
                                       min="1"
-                                      value={unit.entrances}
-                                      onChange={(e) => updateUnit(floor.number, unitIndex, { entrances: parseInt(e.target.value) || 1 })}
-                                      className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-semibold text-sm shadow-sm hover:shadow-md"
+                                      // value={unit.entrances}
+                                      // onChange={(e) => updateUnit(floor.number, unitIndex, { entrances: parseInt(e.target.value) || 1 })}
+                                      // className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-semibold text-sm shadow-sm hover:shadow-md"
                                     />
                                   </div>
                                   
