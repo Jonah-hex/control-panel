@@ -1,10 +1,10 @@
 "use client";
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Building2, ArrowRight } from 'lucide-react';
 
-export default function EditUnitPage() {
+function EditUnitPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const unitId = searchParams.get('unitId');
@@ -66,7 +66,7 @@ export default function EditUnitPage() {
       });
   }, [unitId]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
@@ -76,7 +76,7 @@ export default function EditUnitPage() {
     setError('');
     const supabase = createClient();
     // استبعاد الحقول غير القابلة للتعديل
-    const updateData = { ...form, updated_at: new Date().toISOString() };
+    const updateData: any = { ...form, updated_at: new Date().toISOString() };
     delete updateData.unit_number;
     delete updateData.floor;
     delete updateData.building_id;
@@ -171,5 +171,13 @@ export default function EditUnitPage() {
         رجوع لقائمة الوحدات
       </button>
     </div>
+  );
+}
+
+export default function EditUnitPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <EditUnitPageContent />
+    </Suspense>
   );
 }

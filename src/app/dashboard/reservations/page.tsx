@@ -1,9 +1,27 @@
 "use client";
 import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
+
+interface Reservation {
+  id: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  reservation_date: string;
+  expiry_date: string;
+  status: string;
+  notes: string;
+  deposit_amount: number;
+  deposit_paid: boolean;
+  deposit_paid_date: string;
+  created_at: string;
+  updated_at: string;
+  unit_id: string;
+  building_id: string;
+}
 
 export default function ReservationsPage() {
-  const [reservations, setReservations] = useState([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
