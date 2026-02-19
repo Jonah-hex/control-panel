@@ -1,9 +1,29 @@
 "use client";
 import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
+
+interface Sale {
+  id: string;
+  buyer_name: string;
+  buyer_email: string;
+  buyer_phone: string;
+  buyer_id_number: string;
+  sale_date: string;
+  sale_price: number;
+  payment_method: string;
+  down_payment: number;
+  remaining_payment: number;
+  payment_status: string;
+  contract_url: string;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+  unit_id: string;
+  building_id: string;
+}
 
 export default function SalesPage() {
-  const [sales, setSales] = useState([]);
+  const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 

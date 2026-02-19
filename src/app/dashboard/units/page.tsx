@@ -33,6 +33,7 @@ interface Unit {
   floor: number
   status: 'available' | 'reserved' | 'sold'
   type: string
+  facing?: 'front' | 'back'
   price?: number
   area?: number
   rooms?: number
