@@ -15,8 +15,7 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import BuildingCard from "./BuildingCard";
 import {
-  Building2, Grid3x3, Home, BarChart3, Phone, ArrowUp, MapPin, Info, ParkingCircle, Wind, Users, User, DoorOpen, Clock, Calendar, FileText, CreditCard, Zap, Droplet, Shield, Image, UserCheck,
-  Pencil, Trash2, Share2, Printer, ArrowRight, Eye
+  Building2, Grid3x3, Home, BarChart3, Shield, Image, UserCheck, Users, Pencil, Trash2, Share2, Printer, ArrowRight
 } from 'lucide-react';
 const step1 = [
   { key: "name", label: "اسم المبنى" },
@@ -216,7 +215,7 @@ export default function BuildingPage() {
 
       {/* كروت بيانات رأسية مستطيلة */}
       <div style={{maxWidth:'900px',margin:'0 auto'}}>
-        <div ref={el => cardRefs.current[0] = el}>
+        <div ref={el => { cardRefs.current[0] = el; }}>
           <BuildingCard
             title="معلومات أساسية"
             open={openCard===1}
@@ -236,7 +235,7 @@ export default function BuildingPage() {
             </div>
           </BuildingCard>
         </div>
-        <div ref={el => cardRefs.current[1] = el}>
+        <div ref={el => { cardRefs.current[1] = el; }}>
           <BuildingCard
             title="تفاصيل العمارة"
             open={openCard===2}
@@ -256,7 +255,7 @@ export default function BuildingPage() {
             </div>
           </BuildingCard>
         </div>
-        <div ref={el => cardRefs.current[2] = el}>
+        <div ref={el => { cardRefs.current[2] = el; }}>
           <BuildingCard
             title="المرافق والتأمين"
             open={openCard===3}

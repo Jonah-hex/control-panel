@@ -287,7 +287,7 @@ export default function BuildingsPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-2">
                           <Link
-                            href={`/dashboard/buildings/${b.id}`}
+                            href={`/dashboard/buildings/details?buildingId=${b.id}`}
                             className="p-2 text-blue-600 hover:text-blue-700 rounded-full hover:bg-blue-50 hover:scale-110 transform transition"
                             title="عرض التفاصيل"
                           >
@@ -300,6 +300,15 @@ export default function BuildingsPage() {
                             title="وحدات العمارة"
                           >
                             <Home className="w-4 h-4" />
+                          </Link>
+
+
+                          <Link
+                            href={`/dashboard/buildings/edit/${b.id}?id=${b.id}`}
+                            className="p-2 text-blue-600 hover:text-blue-700 rounded-full hover:bg-blue-50 hover:scale-110 transform transition"
+                            title="تعديل المبنى"
+                          >
+                            <Edit className="w-4 h-4" />
                           </Link>
 
 
