@@ -7,6 +7,7 @@ interface EditableFieldProps {
   type?: string;
   icon?: React.ReactNode;
   disabled?: boolean;
+  inputClassName?: string;
 }
 
 const EditableField: React.FC<EditableFieldProps> = ({ label, value, onChange, type = "text", icon, disabled }) => {
@@ -17,7 +18,7 @@ const EditableField: React.FC<EditableFieldProps> = ({ label, value, onChange, t
         {label}
       </label>
       <input
-        className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition text-sm"
+        className={`rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition text-sm ${disabled ? '' : (typeof inputClassName === 'string' ? inputClassName : '')}`}
         type={type}
         value={value}
         onChange={e => onChange(e.target.value)}

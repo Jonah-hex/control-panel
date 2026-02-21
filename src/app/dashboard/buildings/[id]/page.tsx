@@ -13,7 +13,7 @@ const cardOptions = [
 ];
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import BuildingCard from "./BuildingCard";
+import BuildingCard from "@/components/BuildingCard";
 import {
   Building2, Grid3x3, Home, BarChart3, Shield, Image, UserCheck, Users, Pencil, Trash2, Share2, Printer, ArrowRight
 } from 'lucide-react';
@@ -221,7 +221,7 @@ export default function BuildingPage() {
             open={openCard===1}
             onToggle={()=>setOpenCard(openCard===1?0:1)}
             effect="js"
-            icon={Building2}
+            icon={<Building2 />}
             gradient="from-blue-500 to-cyan-500"
             iconColor="text-white"
           >
@@ -241,7 +241,7 @@ export default function BuildingPage() {
             open={openCard===2}
             onToggle={()=>setOpenCard(openCard===2?0:2)}
             effect="js"
-            icon={Grid3x3}
+            icon={<Grid3x3 />}
             gradient="from-purple-500 to-pink-500"
             iconColor="text-white"
           >
@@ -261,7 +261,7 @@ export default function BuildingPage() {
             open={openCard===3}
             onToggle={()=>setOpenCard(openCard===3?0:3)}
             effect="gsap"
-            icon={Shield}
+            icon={<Shield />}
             gradient="from-green-500 to-emerald-500"
             iconColor="text-white"
           >
@@ -324,7 +324,7 @@ export default function BuildingPage() {
             open={openCard===4}
             onToggle={()=>setOpenCard(openCard===4?0:4)}
             effect="js"
-            icon={UserCheck}
+            icon={<UserCheck />}
             gradient="from-yellow-400 to-orange-400"
             iconColor="text-white"
           >

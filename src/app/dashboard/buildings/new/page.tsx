@@ -171,8 +171,6 @@ interface OwnerAssociation {
 
 export default function NewBuildingPage() {
 
-  // متغير مستقل لعدد الشقق في الدور
-  const [unitsPerFloor, setUnitsPerFloor] = useState(4);
 
   const [formData, setFormData] = useState({
     // معلومات أساسية
@@ -227,36 +225,71 @@ export default function NewBuildingPage() {
     googleMapsLink: '',
   })
 
-  const [floors, setFloors] = useState<Floor[]>(() => {
-    const defaultUnits: Unit[] = []
-    for (let i = 0; i < 4; i++) {
-      defaultUnits.push({
-        unitNumber: `${i + 1}`,
-        floor: 1,
-        type: 'apartment',
-        facing: 'front',
-        area: 0,
-        rooms: 1,
-        bathrooms: 1,
-        livingRooms: 1,
-        kitchens: 1,
-        maidRoom: false,
-        driverRoom: false,
-        // entrances: 1, (تم حذفه من قاعدة البيانات)
-        acType: 'split',
-        status: 'available',
-        price: 0
-      })
-    }
-    return [
-      { 
-        number: 1, 
-        units: defaultUnits,
-        floorPlan: '4shuqq',
-        unitsPerFloor: 4
+  const [floors, setFloors] = useState<Floor[]>([]);
+
+  useEffect(() => {
+    setFloors(prevFloors => {
+      const newFloors = [...prevFloors];
+      // إضافة أدوار جديدة إذا زاد العدد
+      while (newFloors.length < formData.totalFloors) {
+        newFloors.push({
+          number: newFloors.length + 1,
+          units: Array(formData.unitsPerFloor).fill(null).map((_, idx) => ({
+            unitNumber: `${idx + 1}`,
+            floor: newFloors.length + 1,
+            type: 'apartment',
+            facing: 'front',
+            area: 0,
+            rooms: 1,
+            bathrooms: 1,
+            livingRooms: 1,
+            kitchens: 1,
+            maidRoom: false,
+            driverRoom: false,
+            acType: 'split',
+            status: 'available',
+            price: 0
+          })),
+          floorPlan: (formData.unitsPerFloor === 4 ? '4shuqq' : formData.unitsPerFloor === 3 ? '3shuqq' : '2shuqq'),
+          unitsPerFloor: formData.unitsPerFloor
+        });
       }
-    ]
-  })
+      // حذف أدوار إذا نقص العدد
+      while (newFloors.length > formData.totalFloors) {
+        newFloors.pop();
+      }
+      // تحديث عدد الوحدات في كل دور حسب unitsPerFloor
+      for (let i = 0; i < newFloors.length; i++) {
+        const units = newFloors[i].units;
+        if (units.length < formData.unitsPerFloor) {
+          // أضف وحدات جديدة
+          for (let j = units.length; j < formData.unitsPerFloor; j++) {
+            units.push({
+              unitNumber: `${j + 1}`,
+              floor: i + 1,
+              type: 'apartment',
+              facing: 'front',
+              area: 0,
+              rooms: 1,
+              bathrooms: 1,
+              livingRooms: 1,
+              kitchens: 1,
+              maidRoom: false,
+              driverRoom: false,
+              acType: 'split',
+              status: 'available',
+              price: 0
+            });
+          }
+        } else if (units.length > formData.unitsPerFloor) {
+          // احذف الوحدات الزائدة
+          units.length = formData.unitsPerFloor;
+        }
+        newFloors[i].unitsPerFloor = formData.unitsPerFloor;
+      }
+      return newFloors;
+    });
+  }, [formData.totalFloors, formData.unitsPerFloor]);
 
   const [images, setImages] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
@@ -341,7 +374,7 @@ export default function NewBuildingPage() {
   const addFloor = () => {
     const newFloorNumber = floors.length + 1
     const newFloorPlan = floors[0]?.floorPlan || '4shuqq'
-    const unitsPerFloor = newFloorPlan === '4shuqq' ? 4 : newFloorPlan === '3shuqq' ? 3 : 2
+    const unitsPerFloor = formData.unitsPerFloor
     
     const newUnits: Unit[] = []
     const totalExistingUnits = floors.reduce((sum, f) => sum + f.units.length, 0)
@@ -413,7 +446,7 @@ export default function NewBuildingPage() {
   }
 
   const updateFloorPlan = (floorNumber: number, plan: '4shuqq' | '3shuqq' | '2shuqq') => {
-    const unitsPerFloor = plan === '4shuqq' ? 4 : plan === '3shuqq' ? 3 : 2
+    const unitsPerFloor = formData.unitsPerFloor
     
     const updatedFloors = floors.map(floor => {
       if (floor.number === floorNumber) {
@@ -745,6 +778,7 @@ export default function NewBuildingPage() {
             // Step 2 - Building Details
             total_floors: floorsWithSequentialNumbers.length,
             total_units: totalUnits,
+            unitsperfloor: formData.unitsPerFloor || null,
             // reserved_units: formData.reservedUnits || 0, (تم حذفه من قاعدة البيانات)
             parking_slots: formData.parkingSlots || 0,
             driver_rooms: formData.driverRooms || 0,
@@ -1537,7 +1571,7 @@ export default function NewBuildingPage() {
                           let unitCounter = 1;
                           for (let i = 1; i <= newTotal; i++) {
                             const newUnits: Unit[] = [];
-                            for (let j = 0; j < unitsPerFloor; j++) {
+                            for (let j = 0; j < formData.unitsPerFloor; j++) {
                               newUnits.push({
                                 unitNumber: `${unitCounter++}`,
                                 floor: i,
@@ -1559,8 +1593,8 @@ export default function NewBuildingPage() {
                             newFloors.push({
                               number: i,
                               units: newUnits,
-                              floorPlan: (unitsPerFloor === 4 ? '4shuqq' : unitsPerFloor === 3 ? '3shuqq' : '2shuqq') as '4shuqq' | '3shuqq' | '2shuqq' | 'custom',
-                              unitsPerFloor
+                              floorPlan: (formData.unitsPerFloor === 4 ? '4shuqq' : formData.unitsPerFloor === 3 ? '3shuqq' : '2shuqq') as '4shuqq' | '3shuqq' | '2shuqq' | 'custom',
+                              unitsPerFloor: formData.unitsPerFloor
                             });
                           }
                           setFloors(newFloors as Floor[]);
@@ -1580,51 +1614,16 @@ export default function NewBuildingPage() {
                       <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-emerald-400/60 group-focus-within:text-emerald-500 transition pointer-events-none">
                         <Grid className="w-5 h-5" />
                       </div>
-                      <select
-                        value={unitsPerFloor === 4 ? '4shuqq' : unitsPerFloor === 3 ? '3shuqq' : '2shuqq'}
-                        onChange={(e) => {
-                          const plan = e.target.value;
-                          const newUnitsPerFloor = plan === '4shuqq' ? 4 : plan === '3shuqq' ? 3 : 2;
-                          setUnitsPerFloor(newUnitsPerFloor);
-                          // إعادة بناء الأدوار بناءً على القيمتين الجديدتين
-                          const newFloors = [];
-                          let unitCounter = 1;
-                          for (let i = 1; i <= formData.totalFloors; i++) {
-                            const newUnits: Unit[] = [];
-                            for (let j = 0; j < newUnitsPerFloor; j++) {
-                              newUnits.push({
-                                unitNumber: `${unitCounter++}`,
-                                floor: i,
-                                type: 'apartment',
-                                facing: 'front',
-                                area: 0,
-                                rooms: 1,
-                                bathrooms: 1,
-                                livingRooms: 1,
-                                kitchens: 1,
-                                maidRoom: false,
-                                driverRoom: false,
-                                // entrances: 1, (تم حذفه من قاعدة البيانات)
-                                acType: 'split',
-                                status: 'available',
-                                price: 0
-                              });
-                            }
-                            newFloors.push({
-                              number: i,
-                              units: newUnits,
-                              floorPlan: plan as '4shuqq' | '3shuqq' | '2shuqq' | 'custom',
-                              unitsPerFloor: newUnitsPerFloor
-                            });
-                          }
-                          setFloors(newFloors as Floor[]);
+                      <input
+                        type="number"
+                        min={1}
+                        value={formData.unitsPerFloor || ''}
+                        onChange={e => {
+                          const val = parseInt(e.target.value) || 1;
+                          setFormData(prev => ({ ...prev, unitsPerFloor: val }));
                         }}
-                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition appearance-none text-gray-700 font-medium shadow-sm hover:shadow-md"
-                      >
-                        <option value="4shuqq">٤ شقق</option>
-                        <option value="3shuqq">٣ شقق</option>
-                        <option value="2shuqq">٢ شقق</option>
-                      </select>
+                        className="w-full pr-14 pl-4 py-4 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition shadow-sm hover:shadow-md"
+                      />
                     </div>
                   </div>
 
