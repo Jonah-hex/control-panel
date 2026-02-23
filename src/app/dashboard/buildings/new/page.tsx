@@ -767,7 +767,6 @@ export default function NewBuildingPage() {
       // Verify User Authentication
       // ==========================================
       const { data: { user } } = await supabase.auth.getUser()
-      }
       
       if (!user) {
         setError('يجب تسجيل الدخول أولاً')
@@ -1403,25 +1402,6 @@ export default function NewBuildingPage() {
                   {/* مساحة الأرض */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  {/* مساحة الأرض */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      مساحة الأرض (م²)
-                    </label>
-                    <div className="relative group">
-                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
-                        <Ruler className="w-5 h-5" />
-                      </div>
-                      <input
-                        type="number"
-                        value={formData.landArea || ''}
-                        onChange={(e) => setFormData({...formData, landArea: parseInt(e.target.value) || 0})}
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                        placeholder="مثال: 500"
-                      />
-                    </div>
-                  </div>
-
                       مساحة الأرض (م²)
                     </label>
                     <div className="relative group">
@@ -1475,25 +1455,6 @@ export default function NewBuildingPage() {
                           required
                           className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                           placeholder="مثال: 12345/2023"
-                  {/* مساحة الأرض */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      مساحة الأرض (م²)
-                    </label>
-                    <div className="relative group">
-                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
-                        <Ruler className="w-5 h-5" />
-                      </div>
-                      <input
-                        type="number"
-                        value={formData.landArea || ''}
-                        onChange={(e) => setFormData({...formData, landArea: parseInt(e.target.value) || 0})}
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                        placeholder="مثال: 500"
-                      />
-                    </div>
-                  </div>
-
                         />
                       </div>
                     </div>
@@ -1528,19 +1489,6 @@ export default function NewBuildingPage() {
                           </label>
                         </div>
                         {formData.insuranceAvailable && (
-                  {/* الوصف */}
-                  <div className="col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      وصف العمارة
-                    </label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData({...formData, description: e.target.value})}
-                      rows={4}
-                      className="w-full px-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                      placeholder="اكتب وصفاً للعمارة..."
-                    />
-                  </div>
                           <div className="flex-1 min-w-[180px] animate-fadeIn">
                             <div className="relative group">
                               <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"><Shield className="w-4 h-4" /></div>

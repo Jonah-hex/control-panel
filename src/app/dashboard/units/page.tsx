@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -62,7 +62,7 @@ interface Unit {
   entrances?: number
 }
 
-export default function UnitsFilterPage() {
+function UnitsFilterContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const buildingIdFromUrl = searchParams.get('buildingId')
@@ -736,5 +736,13 @@ export default function UnitsFilterPage() {
         </>
       )}
     </div>
+  )
+}
+
+export default function UnitsFilterPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="animate-spin w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full" /></div>}>
+      <UnitsFilterContent />
+    </Suspense>
   )
 }
