@@ -2,7 +2,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import ImagesGallery from "../images-gallery";
 import { createClient } from "@/lib/supabase/client";
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 
 const typeTitles: Record<string, string> = {
   front: "الشقة الأمامية",
@@ -11,7 +11,7 @@ const typeTitles: Record<string, string> = {
   building: "العمارة"
 };
 
-export default function GalleryPage() {
+function GalleryContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const type = searchParams.get("type") || "building";
@@ -96,5 +96,17 @@ export default function GalleryPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function GalleryPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex justify-center items-center py-24">
+        <div className="animate-spin w-10 h-10 border-2 border-teal-500 border-t-transparent rounded-full" />
+      </div>
+    }>
+      <GalleryContent />
+    </Suspense>
   );
 }

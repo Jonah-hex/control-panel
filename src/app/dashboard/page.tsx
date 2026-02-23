@@ -1,7 +1,7 @@
 // src/app/dashboard/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -65,54 +65,52 @@ interface Unit {
   unit_number: string
   floor: number
   status: 'available' | 'reserved' | 'sold'
+  electricity_meter_number?: string | null
+  owner_name?: string | null
   created_at: string
+  updated_at?: string
 }
 
 interface Activity {
   id: string
-  type: 'add' | 'edit' | 'delete' | 'booking'
+  type: 'add' | 'edit' | 'delete' | 'booking' | 'sold' | 'reserved' | 'association_end'
   building_name: string
+  building_id?: string
   user_name: string
   timestamp: string
   details: string
+  /** لتنسيق العرض في تنبيهات اتحاد الملاك (تاريخ نهاية المدة) */
+  endDate?: string
+}
+
+interface BuildingAssocRow {
+  id: string
+  name: string
+  owner_association?: string | Record<string, unknown> | null
 }
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
   const [buildings, setBuildings] = useState<Building[]>([])
+  const [buildingsForAssoc, setBuildingsForAssoc] = useState<BuildingAssocRow[]>([])
   const [units, setUnits] = useState<Unit[]>([])
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [notifications, setNotifications] = useState(3)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set()
+    try {
+      const raw = localStorage.getItem('dashboard-read-notifications')
+      if (!raw) return new Set()
+      const arr = JSON.parse(raw) as string[]
+      return new Set(Array.isArray(arr) ? arr : [])
+    } catch {
+      return new Set()
+    }
+  })
   const [currentTime, setCurrentTime] = useState(new Date())
   const [greeting, setGreeting] = useState('')
   const [animateStats, setAnimateStats] = useState(false)
-  const [activities, setActivities] = useState<Activity[]>([
-    {
-      id: '1',
-      type: 'add',
-      building_name: 'عمارة النخيل',
-      user_name: 'أحمد محمد',
-      timestamp: new Date().toISOString(),
-      details: 'تم إضافة عمارة جديدة'
-    },
-    {
-      id: '2',
-      type: 'edit',
-      building_name: 'عمارة الزهور',
-      user_name: 'سارة أحمد',
-      timestamp: new Date(Date.now() - 3600000).toISOString(),
-      details: 'تم تحديث معلومات العمارة'
-    },
-    {
-      id: '3',
-      type: 'booking',
-      building_name: 'عمارة الأندلس',
-      user_name: 'محمد علي',
-      timestamp: new Date(Date.now() - 7200000).toISOString(),
-      details: 'تم بيع وحدة جديدة'
-    }
-  ])
 
   const router = useRouter()
   const supabase = createClient()
@@ -128,6 +126,14 @@ export default function DashboardPage() {
       }
     }
     getUser()
+
+    // تحديث البيانات عند العودة إلى تبويب لوحة التحكم (بعد نقل ملكية أو تغيير حالة وحدة)
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchBuildings()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
 
     // تحديث الوقت والتحية
     const updateTime = () => {
@@ -146,7 +152,10 @@ export default function DashboardPage() {
     // Animate stats after load
     setTimeout(() => setAnimateStats(true), 300)
     
-    return () => clearInterval(timer)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      clearInterval(timer)
+    }
   }, [])
 
   // مراقبة التحديثات الفورية للوحدات
@@ -192,17 +201,7 @@ export default function DashboardPage() {
             // فقط نشاطات المالك الحالي
             if (newBuilding.owner_id && newBuilding.owner_id !== user.id) return
 
-            const activity = {
-              id: String(Date.now()),
-              type: 'add' as const,
-              building_name: newBuilding.name || 'عمارة جديدة',
-              user_name: user.email || 'المستخدم',
-              timestamp: new Date().toISOString(),
-              details: 'تم إضافة عمارة جديدة'
-            }
-
-            setActivities(prev => [activity, ...prev].slice(0, 10))
-            // إعادة جلب العماير لعرض أحدثها في البطاقات
+            // إعادة جلب العماير لعرض أحدثها في البطاقات والنشاطات
             fetchBuildings()
           } catch (e) {
             console.error('Error processing building insert payload', e)
@@ -234,6 +233,13 @@ export default function DashboardPage() {
 
       if (error) throw error
       setBuildings(data || [])
+
+      // جلب جميع العماير (بدون حد) لاستخراج تنبيهات انتهاء مدة اتحاد الملاك
+      const { data: assocData } = await supabase
+        .from('buildings')
+        .select('id, name, owner_association')
+        .eq('owner_id', user.id)
+      setBuildingsForAssoc(assocData || [])
 
       // جلب جميع الوحدات لعماير هذا المستخدم فقط
       if ((data || []).length > 0) {
@@ -283,6 +289,146 @@ export default function DashboardPage() {
   const reservedUnits = units.filter(u => u.status === 'reserved').length
   const soldUnits = units.filter(u => u.status === 'sold').length
 
+  // تنبيهات فواتير الكهرباء — وحدات لها عداد مسجل (فواتير شركة الكهرباء السعودية تصدر 26 من كل شهر)
+  const electricityReminders = units
+    .filter(u => u.electricity_meter_number && String(u.electricity_meter_number).trim())
+    .map(u => ({
+      unit: u,
+      buildingName: buildings.find(b => b.id === u.building_id)?.name || '—'
+    }))
+
+  // تنبيهات الحجز — وحدات محجوزة منذ 3 أيام فأكثر (تذكير بمتابعة حالة الحجز)
+  const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000
+  const reservationReminders = units
+    .filter(u => u.status === 'reserved')
+    .map(u => ({
+      unit: u,
+      buildingName: buildings.find(b => b.id === u.building_id)?.name || '—',
+      reservedAt: u.updated_at || u.created_at
+    }))
+    .filter(({ reservedAt }) => reservedAt && (Date.now() - new Date(reservedAt).getTime() >= THREE_DAYS_MS))
+
+  // تنبيهات انتهاء مدة اتحاد الملاك — قبل 10، 5، 3 أيام وعند الانتهاء
+  const ASSOC_ALERT_DAYS = [10, 5, 3, 0]
+  const associationEndReminders = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const out: { buildingId: string; buildingName: string; endDate: string; daysLeft: number }[] = []
+    for (const b of buildingsForAssoc) {
+      let oa: Record<string, unknown> = {}
+      try {
+        const raw = b.owner_association
+        if (!raw) continue
+        oa = typeof raw === 'string' ? JSON.parse(raw) : raw
+      } catch {
+        continue
+      }
+      const hasAssoc = !!(oa.hasAssociation ?? oa.isAssociationActive)
+      if (!hasAssoc) continue
+      const endDateStr = (oa.endDate ?? oa.end_date) as string | undefined
+      if (!endDateStr || typeof endDateStr !== 'string') continue
+      const endDate = new Date(endDateStr)
+      endDate.setHours(0, 0, 0, 0)
+      const daysLeft = Math.ceil((endDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000))
+      if (ASSOC_ALERT_DAYS.includes(daysLeft)) {
+        out.push({
+          buildingId: b.id,
+          buildingName: b.name || 'عمارة',
+          endDate: endDateStr,
+          daysLeft
+        })
+      }
+    }
+    return out
+  }, [buildingsForAssoc])
+
+  const notificationsCount = electricityReminders.length + reservationReminders.length + associationEndReminders.length
+
+  // قائمة معرفات الإشعارات الحالية (لحساب غير المقروءة)
+  const currentNotificationIds = useMemo(() => {
+    const ids: string[] = []
+    associationEndReminders.forEach(({ buildingId, daysLeft }) => ids.push(`assoc-${buildingId}-${daysLeft}`))
+    reservationReminders.forEach(({ unit }) => ids.push(`res-${unit.id}`))
+    electricityReminders.forEach(({ unit }) => ids.push(`elec-${unit.id}`))
+    return ids
+  }, [associationEndReminders, reservationReminders, electricityReminders])
+
+  const unreadCount = useMemo(() => {
+    return currentNotificationIds.filter((id) => !readNotificationIds.has(id)).length
+  }, [currentNotificationIds, readNotificationIds])
+
+  const markAllNotificationsRead = () => {
+    setReadNotificationIds((prev) => {
+      const next = new Set(prev)
+      currentNotificationIds.forEach((id) => next.add(id))
+      try {
+        localStorage.setItem('dashboard-read-notifications', JSON.stringify([...next]))
+      } catch {}
+      return next
+    })
+  }
+
+  // اشتقاق آخر النشاطات من البيانات الفعلية (بيع، حجز، إضافة عمارة، تنبيهات اتحاد الملاك)
+  const activities = useMemo(() => {
+    const fromUnits: Activity[] = []
+    for (const u of units) {
+      const bName = buildings.find(b => b.id === u.building_id)?.name || '—'
+      if (u.status === 'sold') {
+        fromUnits.push({
+          id: u.id + '-sold',
+          type: 'sold',
+          building_name: bName,
+          building_id: u.building_id,
+          user_name: (u as Unit & { owner_name?: string }).owner_name || 'مشتري',
+          timestamp: u.updated_at || u.created_at,
+          details: `تم بيع الوحدة ${u.unit_number} (الدور ${u.floor})`
+        })
+      } else if (u.status === 'reserved') {
+        fromUnits.push({
+          id: u.id + '-reserved',
+          type: 'reserved',
+          building_name: bName,
+          building_id: u.building_id,
+          user_name: (u as Unit & { owner_name?: string }).owner_name || '—',
+          timestamp: u.updated_at || u.created_at,
+          details: `تم حجز الوحدة ${u.unit_number} (الدور ${u.floor})`
+        })
+      }
+    }
+    const fromBuildings: Activity[] = buildings.map(b => ({
+      id: b.id + '-add',
+      type: 'add',
+      building_name: b.name || 'عمارة جديدة',
+      building_id: b.id,
+      user_name: 'النظام',
+      timestamp: b.created_at,
+      details: 'تم إضافة عمارة جديدة'
+    }))
+    const fromAssoc: Activity[] = associationEndReminders.map(r => {
+      // ترتيب العرض: انتهت اليوم أولاً ثم 3 ثم 5 ثم 10 أيام (الأقرب أولاً)
+      const sortTime = new Date(Date.now() - r.daysLeft * 24 * 60 * 60 * 1000).toISOString()
+      return {
+        id: `assoc-${r.buildingId}-${r.daysLeft}`,
+        type: 'association_end' as const,
+        building_name: r.buildingName,
+        building_id: r.buildingId,
+        user_name: 'النظام',
+        timestamp: sortTime,
+        details: r.daysLeft === 0
+          ? 'انتهت مدة اتحاد الملاك اليوم'
+          : r.daysLeft === 3
+            ? 'تنتهي مدة اتحاد الملاك بعد 3 أيام'
+            : r.daysLeft === 5
+              ? 'تنتهي مدة اتحاد الملاك بعد 5 أيام'
+              : 'تنتهي مدة اتحاد الملاك بعد 10 أيام',
+        endDate: r.endDate
+      }
+    })
+    return [...fromUnits, ...fromBuildings, ...fromAssoc]
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 10)
+  }, [units, buildings, associationEndReminders])
+
   // حساب النسب المئوية
   const availablePercentage = totalUnits > 0 ? Math.round((availableUnits / totalUnits) * 100) : 0
   const reservedPercentage = totalUnits > 0 ? Math.round((reservedUnits / totalUnits) * 100) : 0
@@ -292,8 +438,8 @@ export default function DashboardPage() {
     {
       title: 'إجمالي العماير',
       value: totalBuildings,
-      change: '+12%',
-      trend: 'up',
+      change: totalBuildings > 0 ? `${totalBuildings} عمارة` : '—',
+      trend: 'up' as const,
       icon: Building2,
       color: 'blue',
       bgGradient: 'from-blue-500 to-cyan-500',
@@ -307,8 +453,8 @@ export default function DashboardPage() {
     {
       title: 'إجمالي الوحدات',
       value: totalUnits,
-      change: '+8%',
-      trend: 'up',
+      change: `${totalUnits} وحدة`,
+      trend: 'up' as const,
       icon: Home,
       color: 'emerald',
       bgGradient: 'from-emerald-500 to-teal-500',
@@ -322,8 +468,8 @@ export default function DashboardPage() {
     {
       title: 'الشقق المتاحة',
       value: availableUnits,
-      change: '+5%',
-      trend: 'up',
+      change: `${availablePercentage}%`,
+      trend: 'up' as const,
       icon: CheckSquare,
       color: 'purple',
       bgGradient: 'from-purple-500 to-pink-500',
@@ -337,8 +483,8 @@ export default function DashboardPage() {
     {
       title: 'الشقق المحجوزة',
       value: reservedUnits,
-      change: '+3%',
-      trend: 'up',
+      change: `${reservedPercentage}%`,
+      trend: 'up' as const,
       icon: Calendar,
       color: 'amber',
       bgGradient: 'from-amber-500 to-orange-500',
@@ -352,8 +498,8 @@ export default function DashboardPage() {
     {
       title: 'الشقق المباعة',
       value: soldUnits,
-      change: '+15%',
-      trend: 'up',
+      change: `${soldPercentage}%`,
+      trend: 'up' as const,
       icon: ShoppingCart,
       color: 'rose',
       bgGradient: 'from-rose-500 to-pink-500',
@@ -368,8 +514,8 @@ export default function DashboardPage() {
       title: 'معدل الإشغال',
       value: totalUnits > 0 ? Math.round(((reservedUnits + soldUnits) / totalUnits) * 100) : 0,
       suffix: '%',
-      change: '+7%',
-      trend: 'up',
+      change: totalUnits > 0 ? `${Math.round(((reservedUnits + soldUnits) / totalUnits) * 100)}%` : '—',
+      trend: 'up' as const,
       icon: TrendingUp,
       color: 'indigo',
       bgGradient: 'from-indigo-500 to-purple-500',
@@ -396,7 +542,10 @@ export default function DashboardPage() {
       case 'add': return <Plus className="w-4 h-4 text-green-600" />
       case 'edit': return <Edit className="w-4 h-4 text-blue-600" />
       case 'delete': return <Trash2 className="w-4 h-4 text-red-600" />
-      case 'booking': return <ShoppingCart className="w-4 h-4 text-purple-600" />
+      case 'booking':
+      case 'sold': return <ShoppingCart className="w-4 h-4 text-purple-600" />
+      case 'reserved': return <Calendar className="w-4 h-4 text-amber-600" />
+      case 'association_end': return <Users className="w-4 h-4 text-emerald-600" />
       default: return <Activity className="w-4 h-4 text-gray-600" />
     }
   }
@@ -474,14 +623,135 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3">
               {/* الإشعارات */}
               <div className="relative">
-                <button className="p-2 hover:bg-gray-100 rounded-xl transition-colors relative">
-                  <Bell className="w-5 h-5 text-gray-600" />
-                  {notifications > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse">
-                      {notifications}
+                <button
+                  type="button"
+                  onClick={() => setNotificationsOpen(v => !v)}
+                  className={`relative flex items-center justify-center w-11 h-11 rounded-xl border transition-all duration-200 ${
+                    notificationsOpen
+                      ? 'bg-amber-50 border-amber-200 text-amber-700 shadow-sm'
+                      : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300'
+                  }`}
+                  aria-expanded={notificationsOpen}
+                  aria-haspopup="true"
+                  aria-label={unreadCount > 0 ? `${unreadCount} تنبيه غير مقروء` : 'التنبيهات'}
+                >
+                  <Bell className="w-5 h-5 flex-shrink-0" />
+                  {unreadCount > 0 && (
+                    <span
+                      className="absolute -top-0.5 -right-0.5 min-w-[1.25rem] h-5 px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-md ring-2 ring-white"
+                      aria-hidden
+                    >
+                      {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                   )}
                 </button>
+                {notificationsOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40 cursor-pointer" onClick={() => setNotificationsOpen(false)} aria-hidden="true" />
+                    <div className="absolute left-0 mt-2 w-[22rem] max-h-[28rem] overflow-hidden bg-white rounded-2xl shadow-xl border border-gray-200 z-50" dir="rtl">
+                      {/* رأس القائمة */}
+                      <div className="bg-gradient-to-b from-amber-50 to-white border-b border-amber-100/80 px-4 py-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-amber-100 text-amber-600">
+                              <Bell className="w-5 h-5" />
+                            </span>
+                            <div>
+                              <h3 className="font-bold text-gray-800">التنبيهات</h3>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                {notificationsCount > 0 ? (
+                                  <span className="text-amber-600 font-medium">{notificationsCount} تنبيه</span>
+                                ) : (
+                                  'فواتير كهرباء • حجز • اتحاد ملاك'
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          {notificationsCount > 0 && unreadCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={markAllNotificationsRead}
+                              className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition border border-emerald-200/60"
+                            >
+                              تحديد الكل كمقروء
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {/* محتوى القائمة */}
+                      <div className="max-h-80 overflow-y-auto py-1">
+                        {notificationsCount === 0 ? (
+                          <div className="px-5 py-8 text-center">
+                            <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 text-gray-400 mb-3">
+                              <Bell className="w-6 h-6" />
+                            </span>
+                            <p className="text-sm text-gray-500 font-medium">لا توجد تنبيهات</p>
+                            <p className="text-xs text-gray-400 mt-1">ستظهر هنا فواتير الكهرباء وتذكيرات الحجز وانتهاء اتحاد الملاك</p>
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-gray-100">
+                            {associationEndReminders.map(({ buildingId, buildingName, endDate, daysLeft }) => (
+                              <Link
+                                key={`assoc-${buildingId}-${daysLeft}`}
+                                href={`/dashboard/buildings/details?buildingId=${buildingId}#card-association`}
+                                onClick={() => setNotificationsOpen(false)}
+                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-emerald-50/70 transition"
+                              >
+                                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                                  <Users className="w-5 h-5" />
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-gray-800">
+                                    {daysLeft === 0
+                                      ? 'انتهت مدة اتحاد الملاك اليوم'
+                                      : `تنتهي خلال ${daysLeft} أيام`}
+                                  </p>
+                                  <p className="text-xs text-gray-600 mt-0.5">{buildingName}</p>
+                                  <p className="text-xs text-gray-400 mt-0.5">النهاية: {endDate}</p>
+                                </div>
+                              </Link>
+                            ))}
+                            {reservationReminders.map(({ unit, buildingName }) => (
+                              <Link
+                                key={`res-${unit.id}`}
+                                href={`/dashboard/buildings/details?buildingId=${unit.building_id}`}
+                                onClick={() => setNotificationsOpen(false)}
+                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-amber-50/70 transition"
+                              >
+                                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
+                                  <Calendar className="w-5 h-5" />
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-gray-800">تذكير بمتابعة الحجز</p>
+                                  <p className="text-xs text-gray-600 mt-0.5">
+                                    الوحدة {unit.unit_number} (د{unit.floor}) — {buildingName}
+                                  </p>
+                                </div>
+                              </Link>
+                            ))}
+                            {electricityReminders.map(({ unit, buildingName }) => (
+                              <Link
+                                key={`elec-${unit.id}`}
+                                href={`/dashboard/buildings/details?buildingId=${unit.building_id}#card-electricity`}
+                                onClick={() => setNotificationsOpen(false)}
+                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-amber-50/70 transition"
+                              >
+                                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
+                                  <Zap className="w-5 h-5" />
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-gray-800">فاتورة كهرباء</p>
+                                  <p className="text-xs text-gray-600 mt-0.5 font-mono text-amber-700">{unit.electricity_meter_number}</p>
+                                  <p className="text-xs text-gray-400 mt-0.5">{buildingName} — وحدة {unit.unit_number}</p>
+                                </div>
+                              </Link>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* الوقت والتاريخ */}
@@ -535,7 +805,7 @@ export default function DashboardPage() {
 
       {/* القائمة الجانبية للجوال */}
       {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden" onClick={() => setSidebarOpen(false)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden cursor-pointer" onClick={() => setSidebarOpen(false)}>
           <div className="fixed right-0 top-0 bottom-0 w-64 bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-gray-100">
               <div className="flex items-center justify-between">
@@ -669,14 +939,24 @@ export default function DashboardPage() {
               </div>
 
               <div className="space-y-3">
-                {activities.map((activity) => (
-                  <div key={activity.id} className="relative flex items-start gap-4 p-4 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 rounded-xl transition-all duration-300 group border border-transparent hover:border-blue-200 cursor-pointer">
+                {activities.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 text-sm">لا توجد نشاطات بعد — ستظهر هنا عند إضافة عمارة أو بيع/حجز وحدة</div>
+                ) : activities.map((activity) => (
+                  <Link
+                    key={activity.id}
+                    href={activity.building_id
+                      ? `/dashboard/buildings/details?buildingId=${activity.building_id}${activity.type === 'association_end' ? '#card-association' : ''}`
+                      : '#'}
+                    className="relative flex items-start gap-4 p-4 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 rounded-xl transition-all duration-300 group border border-transparent hover:border-blue-200 cursor-pointer block"
+                  >
                     {/* Colored Bar */}
                     <div className={`absolute right-0 top-0 bottom-0 w-1 rounded-r-xl ${
                       activity.type === 'add' ? 'bg-gradient-to-b from-green-400 to-emerald-600' :
                       activity.type === 'edit' ? 'bg-gradient-to-b from-blue-400 to-cyan-600' :
                       activity.type === 'delete' ? 'bg-gradient-to-b from-red-400 to-rose-600' :
-                      activity.type === 'booking' ? 'bg-gradient-to-b from-purple-400 to-pink-600' :
+                      activity.type === 'booking' || activity.type === 'sold' ? 'bg-gradient-to-b from-purple-400 to-pink-600' :
+                      activity.type === 'reserved' ? 'bg-gradient-to-b from-amber-400 to-orange-600' :
+                      activity.type === 'association_end' ? 'bg-gradient-to-b from-emerald-400 to-teal-600' :
                       'bg-gradient-to-b from-gray-400 to-slate-600'
                     } opacity-0 group-hover:opacity-100 transition-opacity`}></div>
                     
@@ -684,7 +964,9 @@ export default function DashboardPage() {
                       activity.type === 'add' ? 'from-green-100 to-emerald-200' :
                       activity.type === 'edit' ? 'from-blue-100 to-cyan-200' :
                       activity.type === 'delete' ? 'from-red-100 to-rose-200' :
-                      activity.type === 'booking' ? 'from-purple-100 to-pink-200' :
+                      activity.type === 'booking' || activity.type === 'sold' ? 'from-purple-100 to-pink-200' :
+                      activity.type === 'reserved' ? 'from-amber-100 to-orange-200' :
+                      activity.type === 'association_end' ? 'from-emerald-100 to-teal-200' :
                       'from-gray-100 to-slate-200'
                     } rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 group-hover:rotate-6 transition-all duration-300`}>
                       {getActivityIcon(activity.type)}
@@ -694,7 +976,11 @@ export default function DashboardPage() {
                         <h4 className="font-bold text-gray-800 group-hover:text-blue-600 transition-colors truncate">{activity.building_name}</h4>
                         <div className="flex items-center gap-1.5 text-xs text-gray-400">
                           <Clock className="w-3.5 h-3.5" />
-                          <span>{formatDate(activity.timestamp)}</span>
+                          <span>
+                            {activity.type === 'association_end' && activity.endDate
+                              ? `تاريخ النهاية: ${activity.endDate}`
+                              : formatDate(activity.timestamp)}
+                          </span>
                         </div>
                       </div>
                       <p className="text-sm text-gray-600 mb-2 leading-relaxed">{activity.details}</p>
@@ -705,7 +991,7 @@ export default function DashboardPage() {
                         <p className="text-xs text-gray-500">بواسطة <span className="font-semibold text-gray-700">{activity.user_name}</span></p>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>

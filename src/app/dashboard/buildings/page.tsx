@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Plus, ArrowLeft, Building2, MapPin, Home, Search, Edit, Trash2, Eye } from 'lucide-react'
+import { Plus, ArrowLeft, Building2, MapPin, Home, Search, Trash2, Eye } from 'lucide-react'
 
 interface Building {
   id: string
@@ -228,7 +228,7 @@ export default function BuildingsPage() {
               <table className="w-full text-sm">
                 <thead>
                     <tr className="bg-gradient-to-r from-slate-50 to-white text-slate-700 border-b border-gray-200">
-                      <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">الاسم</th>
+                      <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">اسم العمارة</th>
                       <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">الحي</th>
                       <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">حالة البناء</th>
                       <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">الأدوار</th>
@@ -301,16 +301,6 @@ export default function BuildingsPage() {
                           >
                             <Home className="w-4 h-4" />
                           </Link>
-
-
-                          <Link
-                            href={`/dashboard/buildings/edit/${b.id}?id=${b.id}`}
-                            className="p-2 text-blue-600 hover:text-blue-700 rounded-full hover:bg-blue-50 hover:scale-110 transform transition"
-                            title="تعديل المبنى"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Link>
-
 
                           <button
                             onClick={() => openDeleteModal(b)}

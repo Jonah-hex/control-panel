@@ -5,6 +5,7 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { showToast } from '../details/toast'
 import { 
   ArrowLeft, 
   Save,
@@ -140,7 +141,7 @@ interface Unit {
   kitchens: number
   maidRoom: boolean
   driverRoom: boolean
-  // entrances: number (تم حذفه من قاعدة البيانات)
+  entrances: number
   acType: 'split' | 'window' | 'splitWindow' | 'central' | 'none'
   status: 'available' | 'sold' | 'reserved'
   price: number
@@ -181,6 +182,7 @@ export default function NewBuildingPage() {
     
     // تفاصيل العمارة المتقدمة
     totalFloors: 1,
+    unitsPerFloor: 2,
     totalUnits: 0,
     reservedUnits: 0,
     parkingSlots: 0,
@@ -246,6 +248,7 @@ export default function NewBuildingPage() {
             kitchens: 1,
             maidRoom: false,
             driverRoom: false,
+            entrances: 1,
             acType: 'split',
             status: 'available',
             price: 0
@@ -274,11 +277,12 @@ export default function NewBuildingPage() {
               bathrooms: 1,
               livingRooms: 1,
               kitchens: 1,
-              maidRoom: false,
-              driverRoom: false,
-              acType: 'split',
-              status: 'available',
-              price: 0
+            maidRoom: false,
+            driverRoom: false,
+            entrances: 1,
+            acType: 'split',
+            status: 'available',
+            price: 0
             });
           }
         } else if (units.length > formData.unitsPerFloor) {
@@ -392,7 +396,7 @@ export default function NewBuildingPage() {
         kitchens: 1,
         maidRoom: false,
         driverRoom: false,
-        // entrances: 1, (تم حذفه من قاعدة البيانات)
+        entrances: 1,
         acType: 'split',
         status: 'available',
         price: 0
@@ -414,7 +418,7 @@ export default function NewBuildingPage() {
 
   const removeFloor = (floorNumber: number) => {
     if (floors.length === 1) {
-      alert('يجب أن يكون هناك دور واحد على الأقل')
+      showToast('تنبيه من النظام: يجب أن يكون هناك دور واحد على الأقل')
       return
     }
     
@@ -465,7 +469,7 @@ export default function NewBuildingPage() {
             kitchens: 1,
             maidRoom: false,
             driverRoom: false,
-            // entrances: 1, (تم حذفه من قاعدة البيانات)
+            entrances: 1,
             acType: 'split',
             status: 'available',
             price: 0
@@ -513,7 +517,7 @@ export default function NewBuildingPage() {
           kitchens: 1,
           maidRoom: false,
           driverRoom: false,
-          // entrances: 1, (تم حذفه من قاعدة البيانات)
+          entrances: 1,
           acType: 'split',
           status: 'available',
           price: 0
@@ -627,20 +631,68 @@ export default function NewBuildingPage() {
     setTimeout(() => setSuccess(''), 3000)
   }
 
-  // إضافة وحدات بشكل سريع - Quick Add Units
-  const quickAddUnits = () => {
-    if (floors.length === 0) {
-      alert('الرجاء إضافة دور واحد على الأقل')
+  // تطبيق الدور الأول على المكرر فقط (من الدور 2 حتى ما قبل الأخير، باستثناء الأخير)
+  const applyFirstFloorToRepeater = () => {
+    if (floors.length < 2) {
+      showToast('يجب أن يكون هناك دوران على الأقل لتطبيق المكرر')
       return
     }
 
     const floor1 = floors[0]
-    if (floor1.units.length === 0) {
-      alert('الرجاء إضافة وحدة واحدة على الأقل في الدور الأول كنموذج')
+    if (!floor1 || floor1.units.length === 0) {
+      showToast('الرجاء إضافة وحدة واحدة على الأقل في الدور الأول كنموذج')
       return
     }
 
-    copyFloorToAll(1)
+    const lastFloorNumber = floors.length
+    const repeaterCount = lastFloorNumber - 2 // عدد أدوار المكرر: من 2 إلى قبل الأخير
+    if (repeaterCount < 1) {
+      showToast('لا يوجد مكرر (يُحتاج 3 أدوار على الأقل: أول، مكرر، أخير)')
+      return
+    }
+
+    if (!confirm(`تطبيق نظام الدور الأول على أدوار المكرر (من الدور 2 إلى الدور ${lastFloorNumber - 1})؟\n\nسيتم استبدال الوحدات في ${repeaterCount} ${repeaterCount === 1 ? 'دور' : 'أدوار'} فقط. الدور الأخير (${lastFloorNumber}) لن يتأثر.`)) {
+      return
+    }
+
+    let updatedFloors = floors.map((floor) => {
+      // نطبق فقط على الأدوار من 2 إلى قبل الأخير
+      if (floor.number === 1 || floor.number === lastFloorNumber) return floor
+
+      const newUnits = floor1.units.map((unit) => ({
+        ...unit,
+        unitNumber: '',
+        floor: floor.number
+      }))
+
+      return {
+        ...floor,
+        units: newUnits,
+        floorPlan: floor1.floorPlan,
+        unitsPerFloor: floor1.unitsPerFloor
+      }
+    })
+
+    let sequentialNumber = 1
+    updatedFloors = updatedFloors.map((floor) => ({
+      ...floor,
+      units: floor.units.map((unit) => ({
+        ...unit,
+        unitNumber: String(sequentialNumber++)
+      }))
+    }))
+
+    setFloors(updatedFloors)
+    const total = updatedFloors.reduce((sum, floor) => sum + floor.units.length, 0)
+    setFormData((prev) => ({ ...prev, totalUnits: total }))
+
+    setSuccess(`تم تطبيق الدور الأول على ${repeaterCount} ${repeaterCount === 1 ? 'دور المكرر' : 'أدوار المكرر'} بنجاح (الدور الأخير غير متأثر).`)
+    setTimeout(() => setSuccess(''), 3000)
+  }
+
+  // إضافة وحدات بشكل سريع - يستدعي تطبيق المكرر
+  const quickAddUnits = () => {
+    applyFirstFloorToRepeater()
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -783,7 +835,7 @@ export default function NewBuildingPage() {
             parking_slots: formData.parkingSlots || 0,
             driver_rooms: formData.driverRooms || 0,
             elevators: formData.elevators || 1,
-            // entrances: 1, (تم حذفه من قاعدة البيانات)
+            entrances: 1,
             street_type: formData.streetType || 'one',
             building_facing: formData.buildingFacing || 'north',
             year_built: formData.yearBuilt || null,
@@ -915,7 +967,7 @@ export default function NewBuildingPage() {
                   kitchens: unit.kitchens || 1,
                   maid_room: unit.maidRoom || false,
                   driver_room: unit.driverRoom || false,
-                  // entrances: unit.entrances || 1, (تم حذفه من قاعدة البيانات)
+                  entrances: unit.entrances ?? 1,
                   ac_type: unit.acType || 'split',
                   status: unit.status || 'available',
                   price: unit.price || null,
@@ -1058,8 +1110,8 @@ export default function NewBuildingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-4">
             <div className="flex items-center gap-5">
-              {/* زر الرجوع */}
-              <Link href="/dashboard/buildings" className="inline-flex items-center justify-center p-2.5 rounded-2xl hover:bg-indigo-50 transition-all duration-300 group">
+              {/* زر الرجوع إلى لوحة التحكم */}
+              <Link href="/dashboard" className="inline-flex items-center justify-center p-2.5 rounded-2xl hover:bg-indigo-50 transition-all duration-300 group" title="رجوع إلى لوحة التحكم">
                 <span className="w-11 h-11 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
                   <ArrowLeft className="w-5 h-5 text-white" />
                 </span>
@@ -1584,7 +1636,7 @@ export default function NewBuildingPage() {
                                 kitchens: 1,
                                 maidRoom: false,
                                 driverRoom: false,
-                                // entrances: 1, (تم حذفه من قاعدة البيانات)
+                                entrances: 1,
                                 acType: 'split',
                                 status: 'available',
                                 price: 0
@@ -1769,7 +1821,7 @@ export default function NewBuildingPage() {
                     >
                       <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                       <Zap className="w-4 h-4 relative z-10 group-hover:rotate-12 transition-transform" />
-                      <span className="relative z-10 font-semibold text-sm">تطبيق الدور الأول على الكل</span>
+                      <span className="relative z-10 font-semibold text-sm">تطبيق الدور الأول على المكرر</span>
                       <Sparkles className="w-3 h-3 relative z-10" />
                     </button>
                   </div>
@@ -1794,10 +1846,13 @@ export default function NewBuildingPage() {
 
                 {floors.map((floor) => (
                   <div key={floor.number} className="border-2 border-emerald-200/30 rounded-3xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-500 backdrop-blur-sm">
-                    {/* رأس الدور - تصميم محسّن */}
+                    {/* رأس الدور - النقر في أي مكان يفتح/يطوي */}
                     <div
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setExpandedFloor(expandedFloor === floor.number ? null : floor.number)}
-                      className="bg-gradient-to-r from-green-100/30 via-emerald-100/30 to-teal-100/30 text-slate-800 p-6 hover:from-green-100/40 hover:via-emerald-100/40 hover:to-teal-100/40 transition-all duration-300 relative overflow-hidden group backdrop-blur-md cursor-pointer"
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedFloor(expandedFloor === floor.number ? null : floor.number); } }}
+                      className="bg-gradient-to-r from-green-100/30 via-emerald-100/30 to-teal-100/30 text-slate-800 p-6 hover:from-green-100/40 hover:via-emerald-100/40 hover:to-teal-100/40 transition-all duration-300 relative overflow-hidden group backdrop-blur-md cursor-pointer select-none"
                     >
                       {/* Animated Background */}
                       <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
@@ -1813,8 +1868,12 @@ export default function NewBuildingPage() {
                               </span>
                               <span className="text-sm text-slate-800 font-medium">
                                 نظام: {
-                                  floor.floorPlan === '4shuqq' ? '٤ شقق' :
-                                  floor.floorPlan === '3shuqq' ? '٣ شقق' : 'شقتين'
+                                  (() => {
+                                    const n = floor.units.length;
+                                    if (n === 1) return 'شقة واحدة';
+                                    if (n === 2) return 'شقتين';
+                                    return `${n} شقق`;
+                                  })()
                                 }
                               </span>
                             </div>
@@ -1872,8 +1931,14 @@ export default function NewBuildingPage() {
                         ) : (
                           floor.units.map((unit, unitIndex) => (
                           <div key={unitIndex} className="bg-white/70 backdrop-blur-sm rounded-2xl border-2 border-emerald-200/30 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
-                            {/* رأس الوحدة */}
-                            <div className="bg-gradient-to-r from-emerald-50/60 to-teal-50/60 border-b-2 border-emerald-200/30 p-5 flex items-center justify-between backdrop-blur-sm">
+                            {/* رأس الوحدة - النقر في أي مكان يفتح/يطوي التفاصيل */}
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => setExpandedUnit(expandedUnit === `${floor.number}-${unitIndex}` ? null : `${floor.number}-${unitIndex}`)}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedUnit(expandedUnit === `${floor.number}-${unitIndex}` ? null : `${floor.number}-${unitIndex}`); } }}
+                              className="bg-gradient-to-r from-emerald-50/60 to-teal-50/60 border-b-2 border-emerald-200/30 p-5 flex items-center justify-between backdrop-blur-sm cursor-pointer hover:from-emerald-100/70 hover:to-teal-100/70 transition-colors select-none"
+                            >
                               <div className="flex items-center gap-4">
                                 <Home className="w-6 h-6 text-emerald-600/80" />
                                 <div>
@@ -2091,9 +2156,9 @@ export default function NewBuildingPage() {
                                     <input
                                       type="number"
                                       min="1"
-                                      // value={unit.entrances}
-                                      // onChange={(e) => updateUnit(floor.number, unitIndex, { entrances: parseInt(e.target.value) || 1 })}
-                                      // className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-semibold text-sm shadow-sm hover:shadow-md"
+                                      value={unit.entrances ?? 1}
+                                      onChange={(e) => updateUnit(floor.number, unitIndex, { entrances: parseInt(e.target.value, 10) || 1 })}
+                                      className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-semibold text-sm shadow-sm hover:shadow-md"
                                     />
                                   </div>
                                   
@@ -2216,8 +2281,8 @@ export default function NewBuildingPage() {
                       <Shield className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <h2 className="text-2xl font-bold text-gray-800">معلومات الحارس والصور</h2>
-                      <p className="text-xs text-gray-500">بيانات الحارس وصور العمارة</p>
+                      <h2 className="text-2xl font-bold text-gray-800">معلومات الحارس والموقع</h2>
+                      <p className="text-xs text-gray-500">بيانات الحارس والموقع</p>
                     </div>
                   </div>
                 </div>
@@ -2368,62 +2433,6 @@ export default function NewBuildingPage() {
                       </div>
                     </div>
                   </div>
-                </div>
-
-                {/* رفع الصور */}
-                <div className="bg-gradient-to-br from-gray-50 to-purple-50 rounded-2xl p-8 border-2 border-gray-200">
-                  <div className="flex items-center gap-3 mb-6">
-                    <Camera className="w-6 h-6 text-purple-600" />
-                    <h3 className="text-xl font-semibold text-gray-800">صور العمارة</h3>
-                  </div>
-                  
-                  <div className="mb-6">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={handleImageUpload}
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-full p-12 border-3 border-dashed border-gray-300 rounded-2xl hover:border-purple-500 hover:bg-purple-50 transition-all duration-300 group"
-                    >
-                      <Upload className="w-10 h-10 text-gray-400 mx-auto mb-4 group-hover:text-purple-500 transition-colors" />
-                      <p className="text-gray-600 text-sm group-hover:text-purple-600 transition-colors">
-                        اضغط لرفع الصور أو اسحب وأفلت
-                      </p>
-                      <p className="text-sm text-gray-400 mt-3">PNG, JPG, JPEG (الحد الأقصى 5MB لكل صورة)</p>
-                    </button>
-                  </div>
-
-                  {imagePreviews.length > 0 && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                      {imagePreviews.map((preview, index) => (
-                        <div key={index} className="relative group rounded-2xl overflow-hidden border-2 border-gray-200 hover:border-purple-500 transition-all">
-                          <img
-                            src={preview}
-                            alt={`Preview ${index + 1}`}
-                            className="w-full h-32 object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeImage(index)}
-                            className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-2xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600 hover:scale-110"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                          {index === 0 && (
-                            <div className="absolute bottom-2 left-2 px-3 py-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs rounded-full shadow-lg">
-                              الرئيسية
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 {/* الموقع */}

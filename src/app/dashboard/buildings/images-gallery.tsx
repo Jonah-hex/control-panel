@@ -62,7 +62,7 @@ export default function ImagesGallery({ title, images, onAdd, onDelete, onDownlo
       </div>
       {previewImg && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm cursor-pointer"
           onClick={() => setPreviewImg(null)}
         >
           <div className="relative max-w-full max-h-full p-2" onClick={e => e.stopPropagation()}>

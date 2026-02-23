@@ -7,6 +7,12 @@ interface BuildingCardProps {
   iconColor?: string; // tailwind text color
   children: ReactNode;
   defaultOpen?: boolean;
+  /** Controlled: open state */
+  open?: boolean;
+  /** Controlled: toggle callback */
+  onToggle?: () => void;
+  /** Animation effect (optional) - kept for compatibility */
+  effect?: string;
 }
 
 const BuildingCard: React.FC<BuildingCardProps> = ({
@@ -16,14 +22,26 @@ const BuildingCard: React.FC<BuildingCardProps> = ({
   iconColor = "text-white",
   children,
   defaultOpen = true,
+  open: controlledOpen,
+  onToggle,
+  effect: _effect,
 }) => {
-  const [open, setOpen] = useState(defaultOpen);
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+
+  const handleToggle = () => {
+    if (onToggle) onToggle();
+    else setInternalOpen((v) => !v);
+  };
 
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 mb-8">
       <button
-        className="flex flex-col items-center w-full focus:outline-none mb-4"
-        onClick={() => setOpen((v) => !v)}
+        type="button"
+        className="flex flex-col items-center w-full focus:outline-none mb-4 cursor-pointer select-none hover:opacity-95 transition-opacity"
+        onClick={handleToggle}
         aria-expanded={open}
       >
         <span

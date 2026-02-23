@@ -15,7 +15,7 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import BuildingCard from "@/components/BuildingCard";
 import {
-  Building2, Grid3x3, Home, BarChart3, Shield, Image, UserCheck, Users, Pencil, Trash2, Share2, Printer, ArrowRight
+  Building2, Grid3x3, Home, BarChart3, Shield, Image, UserCheck, Users, Pencil, Trash2, Share2, Printer, ArrowRight, Eye
 } from 'lucide-react';
 const step1 = [
   { key: "name", label: "اسم المبنى" },
@@ -100,8 +100,19 @@ export default function BuildingPage() {
         const { data: unitsData, error: unitsError } = await supabase
           .from("units")
           .select("*")
-          .eq("building_id", params.id);
-        setUnits(unitsData || []);
+          .eq("building_id", params.id)
+          .order("floor", { ascending: true })
+          .order("unit_number", { ascending: true });
+        const raw = unitsData || [];
+        const sorted = [...raw].sort((a, b) => {
+          const fA = Number(a.floor) ?? 0;
+          const fB = Number(b.floor) ?? 0;
+          if (fA !== fB) return fA - fB;
+          const uA = Number(a.unit_number) || 0;
+          const uB = Number(b.unit_number) || 0;
+          return uA - uB;
+        });
+        setUnits(sorted);
       }
       setLoading(false);
     };
@@ -318,7 +329,7 @@ export default function BuildingPage() {
             </div>
           </BuildingCard>
         </div>
-        <div ref={el => cardRefs.current[3] = el}>
+        <div ref={el => { cardRefs.current[3] = el; }}>
           <BuildingCard
             title="معلومات الحارس"
             open={openCard===4}
@@ -451,13 +462,13 @@ export default function BuildingPage() {
             </div>
           </BuildingCard>
         </div>
-        <div ref={el => cardRefs.current[4] = el}>
+        <div ref={el => { cardRefs.current[4] = el; }}>
           <BuildingCard
             title="معلومات إضافية"
             open={openCard===5}
             onToggle={()=>setOpenCard(openCard===5?0:5)}
             effect="js"
-            icon={Image}
+            icon={<Image />}
             gradient="from-pink-500 to-fuchsia-500"
             iconColor="text-white"
           >
@@ -546,11 +557,11 @@ export default function BuildingPage() {
                             const endDate = oa.endDate || '—';
                             const monthlyFee = oa.monthlyFee || '—';
                             // تنسيق رقم الحساب والآيبان
-                            const formatIban = (iban) => {
+                            const formatIban = (iban: string | undefined) => {
                               if (!iban || typeof iban !== 'string') return iban || '—';
                               return iban.replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim().slice(0, 29); // 24 رقم + رمز الدولة
                             };
-                            const formatAccount = (acc) => {
+                            const formatAccount = (acc: string | undefined) => {
                               if (!acc || typeof acc !== 'string') return acc || '—';
                               return acc.replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim().slice(0, 17); // 14 رقم تقريباً
                             };
@@ -606,8 +617,9 @@ export default function BuildingPage() {
                                       <span style={{color:'#888',fontWeight:500}}>عدد الوحدات المسجلة</span>
                                       <span style={{color:'#1976d2',fontWeight:700}}>{
                                         (() => {
-                                          const v = rest.find(([k]) => k === 'registeredUnitsCount')[1];
-                                          return v || '—';
+                                          const f = rest.find(([k]) => k === 'registeredUnitsCount');
+                                          const v = f ? f[1] : undefined;
+                                          return v != null ? String(v) : '—';
                                         })()
                                       }</span>
                                     </div>
@@ -620,8 +632,9 @@ export default function BuildingPage() {
                                           <span style={{color:'#888',fontWeight:500}}>يشمل الماء</span>
                                           <span style={{color:'#1976d2',fontWeight:700}}>{
                                             (() => {
-                                              const v = rest.find(([k]) => k === 'includesWater')[1];
-                                              return typeof v === 'boolean' ? (v ? 'نعم' : 'لا') : (v || '—');
+                                              const f = rest.find(([k]) => k === 'includesWater');
+                                              const v = f ? f[1] : undefined;
+                                              return typeof v === 'boolean' ? (v ? 'نعم' : 'لا') : (typeof v === 'string' || typeof v === 'number' ? String(v) : '—');
                                             })()
                                           }</span>
                                         </div>
@@ -631,8 +644,9 @@ export default function BuildingPage() {
                                           <span style={{color:'#888',fontWeight:500}}>يشمل الكهرباء</span>
                                           <span style={{color:'#1976d2',fontWeight:700}}>{
                                             (() => {
-                                              const v = rest.find(([k]) => k === 'includesElectricity')[1];
-                                              return typeof v === 'boolean' ? (v ? 'نعم' : 'لا') : (v || '—');
+                                              const f = rest.find(([k]) => k === 'includesElectricity');
+                                              const v = f ? f[1] : undefined;
+                                              return typeof v === 'boolean' ? (v ? 'نعم' : 'لا') : (typeof v === 'string' || typeof v === 'number' ? String(v) : '—');
                                             })()
                                           }</span>
                                         </div>
@@ -647,8 +661,9 @@ export default function BuildingPage() {
                                           <span style={{color:'#888',fontWeight:500}}>رقم الحساب</span>
                                           <span style={{color:'#1976d2',fontWeight:700}}>{
                                             (() => {
-                                              const v = rest.find(([k]) => k === 'accountNumber')[1];
-                                              return formatAccount(v);
+                                              const f = rest.find(([k]) => k === 'accountNumber');
+                                              const v = f ? f[1] : undefined;
+                                              return formatAccount(typeof v === 'string' ? v : undefined);
                                             })()
                                           }</span>
                                         </div>
@@ -658,8 +673,9 @@ export default function BuildingPage() {
                                           <span style={{color:'#888',fontWeight:500}}>الآيبان</span>
                                           <span style={{color:'#1976d2',fontWeight:700}}>{
                                             (() => {
-                                              const v = rest.find(([k]) => k === 'iban')[1];
-                                              return formatIban(v);
+                                              const f = rest.find(([k]) => k === 'iban');
+                                              const v = f ? f[1] : undefined;
+                                              return formatIban(typeof v === 'string' ? v : undefined);
                                             })()
                                           }</span>
                                         </div>
@@ -676,7 +692,7 @@ export default function BuildingPage() {
                                           : k
                                         }</span>
                                         <span style={{color:'#1976d2',fontWeight:700}}>{
-                                          typeof value === 'boolean' ? (value ? 'نعم' : 'لا') : (value || '—')
+                                          typeof value === 'boolean' ? (value ? 'نعم' : 'لا') : (typeof value === 'string' || typeof value === 'number' ? String(value) : '—')
                                         }</span>
                                       </div>
                                     );
@@ -769,7 +785,7 @@ export default function BuildingPage() {
           open={openCard===6}
           onToggle={()=>setOpenCard(openCard===6?0:6)}
           effect="js"
-          icon={Home}
+          icon={<Home />}
           gradient="from-blue-600 to-indigo-600"
           iconColor="text-white"
         >
@@ -790,8 +806,8 @@ export default function BuildingPage() {
                 {units.length === 0 ? (
                   <tr><td colSpan={7} className="text-center py-6 text-gray-400">لا توجد وحدات مسجلة لهذا المبنى.</td></tr>
                 ) : (
-                  units.map((unit) => (
-                    <tr key={unit.id} className="border-b hover:bg-blue-50 transition">
+                  units.map((unit, index) => (
+                    <tr key={unit.id} className="border-b hover:bg-blue-50 transition" data-seq={index + 1}>
                       <td className="px-3 py-2 font-bold">{unit.unit_number}</td>
                       <td className="px-3 py-2">{unit.floor}</td>
                       <td className="px-3 py-2">{unit.status === 'available' ? 'متاحة' : unit.status === 'reserved' ? 'محجوزة' : 'مباعة'}</td>
@@ -828,7 +844,7 @@ export default function BuildingPage() {
           open={openCard===7}
           onToggle={()=>setOpenCard(openCard===7?0:7)}
           effect="js"
-          icon={BarChart3}
+          icon={<BarChart3 />}
           gradient="from-gray-500 to-gray-700"
           iconColor="text-white"
         >
@@ -841,7 +857,7 @@ export default function BuildingPage() {
           open={openCard===8}
           onToggle={()=>setOpenCard(openCard===8?0:8)}
           effect="js"
-          icon={Users}
+          icon={<Users />}
           gradient="from-green-500 to-lime-500"
           iconColor="text-white"
         >
