@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 interface Building {
   id: string;
   name: string;
+  owner_name?: string | null;
   plot_number: string;
   neighborhood?: string;
   address?: string;
@@ -78,7 +79,7 @@ export default function EditBuildingPage() {
                 total_floors: Number(formData.get("total_floors")),
                 total_units: Number(formData.get("total_units")),
                 year_built: Number(formData.get("year_built")),
-                owner: formData.get("owner") as string,
+                owner_name: formData.get("owner_name") as string,
               };
               handleSave(updatedData);
             }}
@@ -107,8 +108,8 @@ export default function EditBuildingPage() {
             <label className="font-bold text-gray-700">سنة البناء
               <input name="year_built" type="number" defaultValue={building.year_built} className="w-full border rounded px-2 py-1 mt-1" />
             </label>
-            <label className="font-bold text-gray-700">المالك
-              <input name="owner" defaultValue={building.owner} className="w-full border rounded px-2 py-1 mt-1" />
+            <label className="font-bold text-gray-700">اسم المالك
+              <input name="owner_name" defaultValue={building.owner_name ?? building.owner ?? ""} className="w-full border rounded px-2 py-1 mt-1" />
             </label>
             <div className="col-span-2 flex gap-4 mt-4">
               <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-full shadow hover:bg-green-700 transition">حفظ</button>

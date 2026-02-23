@@ -229,12 +229,11 @@ export default function DashboardPage() {
         .select('*')
         .eq('owner_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(6)
 
       if (error) throw error
       setBuildings(data || [])
 
-      // جلب جميع العماير (بدون حد) لاستخراج تنبيهات انتهاء مدة اتحاد الملاك
+      // جلب جميع العماير لاستخراج تنبيهات انتهاء مدة اتحاد الملاك
       const { data: assocData } = await supabase
         .from('buildings')
         .select('id, name, owner_association')
@@ -426,7 +425,7 @@ export default function DashboardPage() {
     })
     return [...fromUnits, ...fromBuildings, ...fromAssoc]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      .slice(0, 10)
+      .slice(0, 7)
   }, [units, buildings, associationEndReminders])
 
   // حساب النسب المئوية
@@ -588,8 +587,8 @@ export default function DashboardPage() {
                   <h1 className="text-xl font-bold text-gray-800">لوحة التحكم الرئيسية</h1>
                   <p className="text-xs text-gray-500">ادارة العماير</p>
                   <div className="flex gap-2 mt-2">
-                    <a href="/dashboard/reservations" className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-200 transition">سجل الحجوزات</a>
-                    <a href="/dashboard/sales" className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-semibold hover:bg-green-200 transition">سجل المبيعات</a>
+                    <a href="/dashboard/reservations" className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-200 transition cursor-pointer">سجل الحجوزات</a>
+                    <a href="/dashboard/sales" className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-semibold hover:bg-green-200 transition cursor-pointer">سجل المبيعات</a>
                   </div>
                 </div>
               </div>
@@ -626,25 +625,25 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setNotificationsOpen(v => !v)}
-                  className={`relative flex items-center justify-center w-11 h-11 rounded-xl border transition-all duration-200 ${
+                  className={`relative flex items-center justify-center w-11 h-11 rounded-xl border transition-all duration-200 overflow-visible ${
                     notificationsOpen
-                      ? 'bg-amber-50 border-amber-200 text-amber-700 shadow-sm'
-                      : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300'
+                      ? 'border-amber-200 bg-amber-50/80 text-amber-600'
+                      : 'border-gray-200 bg-white/60 text-gray-600 hover:bg-gray-50 hover:border-gray-300'
                   }`}
                   aria-expanded={notificationsOpen}
                   aria-haspopup="true"
                   aria-label={unreadCount > 0 ? `${unreadCount} تنبيه غير مقروء` : 'التنبيهات'}
                 >
                   <Bell className="w-5 h-5 flex-shrink-0" />
-                  {unreadCount > 0 && (
-                    <span
-                      className="absolute -top-0.5 -right-0.5 min-w-[1.25rem] h-5 px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-md ring-2 ring-white"
-                      aria-hidden
-                    >
-                      {unreadCount > 99 ? '99+' : unreadCount}
-                    </span>
-                  )}
                 </button>
+                {unreadCount > 0 && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-0.5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center ring-2 ring-white z-10 leading-tight"
+                    aria-hidden
+                  >
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
                 {notificationsOpen && (
                   <>
                     <div className="fixed inset-0 z-40 cursor-pointer" onClick={() => setNotificationsOpen(false)} aria-hidden="true" />
@@ -695,7 +694,7 @@ export default function DashboardPage() {
                                 key={`assoc-${buildingId}-${daysLeft}`}
                                 href={`/dashboard/buildings/details?buildingId=${buildingId}#card-association`}
                                 onClick={() => setNotificationsOpen(false)}
-                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-emerald-50/70 transition"
+                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-emerald-50/70 transition cursor-pointer"
                               >
                                 <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
                                   <Users className="w-5 h-5" />
@@ -716,7 +715,7 @@ export default function DashboardPage() {
                                 key={`res-${unit.id}`}
                                 href={`/dashboard/buildings/details?buildingId=${unit.building_id}`}
                                 onClick={() => setNotificationsOpen(false)}
-                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-amber-50/70 transition"
+                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-amber-50/70 transition cursor-pointer"
                               >
                                 <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
                                   <Calendar className="w-5 h-5" />
@@ -734,7 +733,7 @@ export default function DashboardPage() {
                                 key={`elec-${unit.id}`}
                                 href={`/dashboard/buildings/details?buildingId=${unit.building_id}#card-electricity`}
                                 onClick={() => setNotificationsOpen(false)}
-                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-amber-50/70 transition"
+                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-amber-50/70 transition cursor-pointer"
                               >
                                 <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
                                   <Zap className="w-5 h-5" />
@@ -780,11 +779,11 @@ export default function DashboardPage() {
                     <p className="text-xs text-gray-500">مدير النظام</p>
                   </div>
                   <div className="p-2">
-                    <a href="/user" className="w-full px-3 py-2 text-right text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
+                    <a href="/user" className="w-full px-3 py-2 text-right text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2 cursor-pointer">
                       <User2 className="w-4 h-4" />
                       ملف المستخدم
                     </a>
-                    <a href="/user/settings" className="w-full px-3 py-2 text-right text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
+                    <a href="/user/settings" className="w-full px-3 py-2 text-right text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2 cursor-pointer">
                       <Settings className="w-4 h-4" />
                       إعدادات متقدمة
                     </a>
@@ -820,7 +819,7 @@ export default function DashboardPage() {
                 <Link
                   key={index}
                   href={action.href}
-                  className="flex items-center gap-3 p-3 text-gray-700 hover:bg-gray-50 rounded-xl transition mb-1"
+                  className="flex items-center gap-3 p-3 text-gray-700 hover:bg-gray-50 rounded-xl transition mb-1 cursor-pointer"
                 >
                   <action.icon className={`w-5 h-5 text-${action.color}-600`} />
                   <span>{action.label}</span>
@@ -896,7 +895,7 @@ export default function DashboardPage() {
             <Link
               key={index}
               href={action.href}
-              className="group relative bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 p-6 border border-gray-200 hover:border-transparent overflow-hidden hover:-translate-y-2"
+              className="group relative bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 p-6 border border-gray-200 hover:border-transparent overflow-hidden hover:-translate-y-2 cursor-pointer"
             >
               {/* Background Gradient on Hover */}
               <div className={`absolute inset-0 bg-gradient-to-br ${action.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
@@ -932,34 +931,20 @@ export default function DashboardPage() {
                   </div>
                   آخر النشاطات
                 </h2>
-                <button className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1 hover:gap-2 transition-all group">
+                <Link href="/dashboard/activities" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1 hover:gap-2 transition-all group cursor-pointer">
                   <span>عرض الكل</span>
                   <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </button>
+                </Link>
               </div>
 
               <div className="space-y-3">
                 {activities.length === 0 ? (
                   <div className="text-center py-8 text-gray-500 text-sm">لا توجد نشاطات بعد — ستظهر هنا عند إضافة عمارة أو بيع/حجز وحدة</div>
                 ) : activities.map((activity) => (
-                  <Link
+                  <div
                     key={activity.id}
-                    href={activity.building_id
-                      ? `/dashboard/buildings/details?buildingId=${activity.building_id}${activity.type === 'association_end' ? '#card-association' : ''}`
-                      : '#'}
-                    className="relative flex items-start gap-4 p-4 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 rounded-xl transition-all duration-300 group border border-transparent hover:border-blue-200 cursor-pointer block"
+                    className="relative flex items-start gap-4 p-4 rounded-xl border border-transparent"
                   >
-                    {/* Colored Bar */}
-                    <div className={`absolute right-0 top-0 bottom-0 w-1 rounded-r-xl ${
-                      activity.type === 'add' ? 'bg-gradient-to-b from-green-400 to-emerald-600' :
-                      activity.type === 'edit' ? 'bg-gradient-to-b from-blue-400 to-cyan-600' :
-                      activity.type === 'delete' ? 'bg-gradient-to-b from-red-400 to-rose-600' :
-                      activity.type === 'booking' || activity.type === 'sold' ? 'bg-gradient-to-b from-purple-400 to-pink-600' :
-                      activity.type === 'reserved' ? 'bg-gradient-to-b from-amber-400 to-orange-600' :
-                      activity.type === 'association_end' ? 'bg-gradient-to-b from-emerald-400 to-teal-600' :
-                      'bg-gradient-to-b from-gray-400 to-slate-600'
-                    } opacity-0 group-hover:opacity-100 transition-opacity`}></div>
-                    
                     <div className={`w-12 h-12 bg-gradient-to-br ${
                       activity.type === 'add' ? 'from-green-100 to-emerald-200' :
                       activity.type === 'edit' ? 'from-blue-100 to-cyan-200' :
@@ -968,12 +953,12 @@ export default function DashboardPage() {
                       activity.type === 'reserved' ? 'from-amber-100 to-orange-200' :
                       activity.type === 'association_end' ? 'from-emerald-100 to-teal-200' :
                       'from-gray-100 to-slate-200'
-                    } rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 group-hover:rotate-6 transition-all duration-300`}>
+                    } rounded-xl flex items-center justify-center shadow-sm`}>
                       {getActivityIcon(activity.type)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1.5">
-                        <h4 className="font-bold text-gray-800 group-hover:text-blue-600 transition-colors truncate">{activity.building_name}</h4>
+                        <h4 className="font-bold text-gray-800 truncate">{activity.building_name}</h4>
                         <div className="flex items-center gap-1.5 text-xs text-gray-400">
                           <Clock className="w-3.5 h-3.5" />
                           <span>
@@ -991,7 +976,7 @@ export default function DashboardPage() {
                         <p className="text-xs text-gray-500">بواسطة <span className="font-semibold text-gray-700">{activity.user_name}</span></p>
                       </div>
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
             </div>
@@ -1062,7 +1047,7 @@ export default function DashboardPage() {
                   <Building2 className="w-5 h-5 text-blue-600" />
                   آخر العماير
                 </h2>
-                <Link href="/dashboard/buildings" className="text-sm text-blue-600 hover:text-blue-700">
+                <Link href="/dashboard/buildings" className="text-sm text-blue-600 hover:text-blue-700 cursor-pointer">
                   عرض الكل
                 </Link>
               </div>
@@ -1128,7 +1113,7 @@ export default function DashboardPage() {
                   <p className="text-gray-500 mb-4 text-sm">لا توجد عماير مضافة حتى الآن</p>
                   <Link
                     href="/dashboard/buildings/new"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 font-semibold"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 font-semibold cursor-pointer"
                   >
                     <Plus className="w-5 h-5" />
                     إضافة أول عمارة

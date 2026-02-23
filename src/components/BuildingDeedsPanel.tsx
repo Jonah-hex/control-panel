@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { FileText, Zap, Building2, Pencil, X, FileUp, ExternalLink, User, ArrowRightLeft, Eye, Phone } from "lucide-react";
 
@@ -26,11 +26,14 @@ interface Unit {
 interface Building {
   id: string;
   name?: string;
+  owner_name?: string | null;
   [key: string]: unknown;
 }
 
 interface BuildingDeedsPanelProps {
   buildingId?: string;
+  /** عند التوجّه من صفحة تعديل الوحدة لاستكمال نقل الملكية */
+  openTransferUnitId?: string;
 }
 
 const DEEDS_BUCKET = "building-images";
@@ -38,7 +41,7 @@ const DEEDS_PATH_PREFIX = "deeds";
 const SORTING_MINUTES_PATH_PREFIX = "sorting-minutes";
 const TAX_EXEMPTION_PATH_PREFIX = "tax-exemption";
 
-export default function BuildingDeedsPanel({ buildingId }: BuildingDeedsPanelProps) {
+export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: BuildingDeedsPanelProps) {
   const [building, setBuilding] = useState<Building | null>(null);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(!!buildingId);
@@ -62,6 +65,7 @@ export default function BuildingDeedsPanel({ buildingId }: BuildingDeedsPanelPro
   });
   const [taxExemptionFile, setTaxExemptionFile] = useState<File | null>(null);
   const [viewOwnerUnit, setViewOwnerUnit] = useState<Unit | null>(null);
+  const openedTransferForUnitIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!buildingId) {
@@ -77,7 +81,7 @@ export default function BuildingDeedsPanel({ buildingId }: BuildingDeedsPanelPro
       setError(null);
       try {
         const [buildingRes, unitsRes] = await Promise.all([
-          supabase.from("buildings").select("id, name").eq("id", buildingId).single(),
+          supabase.from("buildings").select("id, name, owner_name").eq("id", buildingId).single(),
           supabase.from("units").select("*").eq("building_id", buildingId).order("floor", { ascending: true }).order("unit_number", { ascending: true }),
         ]);
 
@@ -117,6 +121,19 @@ export default function BuildingDeedsPanel({ buildingId }: BuildingDeedsPanelPro
     fetchData();
   }, [buildingId]);
 
+  useEffect(() => {
+    if (!openTransferUnitId || units.length === 0) return;
+    if (openedTransferForUnitIdRef.current === openTransferUnitId) return;
+    const unit = units.find((u) => u.id === openTransferUnitId);
+    if (unit && unit.status !== "sold") {
+      openedTransferForUnitIdRef.current = openTransferUnitId;
+      setTransferUnit(unit);
+      setTransferForm({ buyer_name: "", buyer_phone: "", tax_exemption: false });
+      setTaxExemptionFile(null);
+      setSaveError(null);
+    }
+  }, [openTransferUnitId, units]);
+
   const statusLabel = (s?: string) => {
     if (!s) return "-";
     if (s === "available") return "متاحة";
@@ -128,7 +145,7 @@ export default function BuildingDeedsPanel({ buildingId }: BuildingDeedsPanelPro
   const openEditModal = (unit: Unit) => {
     setEditUnit(unit);
     setEditForm({
-      owner_name: unit.owner_name || "",
+      owner_name: unit.owner_name || building?.owner_name || "",
       deed_number: unit.deed_number || "",
       sorting_minutes_ref: unit.sorting_minutes_ref || "",
       electricity_meter_number: unit.electricity_meter_number || "",
@@ -145,11 +162,11 @@ export default function BuildingDeedsPanel({ buildingId }: BuildingDeedsPanelPro
     setSaveError(null);
   };
 
-  const openTransferModal = (unit: Unit) => {
+  const openTransferModal = (unit: Unit, forNewTransfer = false) => {
     setTransferUnit(unit);
     setTransferForm({
-      buyer_name: unit.owner_name || "",
-      buyer_phone: unit.owner_phone || "",
+      buyer_name: forNewTransfer ? "" : (unit.owner_name || ""),
+      buyer_phone: forNewTransfer ? "" : (unit.owner_phone || ""),
       tax_exemption: !!unit.tax_exemption_status,
     });
     setTaxExemptionFile(null);
@@ -430,7 +447,7 @@ export default function BuildingDeedsPanel({ buildingId }: BuildingDeedsPanelPro
                 <tr key={unit.id} className="border-b border-slate-100 hover:bg-teal-50/50 transition" data-seq={index + 1}>
                   <td className="p-3 font-bold text-teal-700 align-middle">{unit.unit_number}</td>
                   <td className="p-3 text-slate-600 align-middle">{unit.floor}</td>
-                  <td className="p-3 text-slate-600 align-middle">{unit.owner_name || "-"}</td>
+                  <td className="p-3 text-slate-600 align-middle">{unit.owner_name || building?.owner_name || "-"}</td>
                   <td className="p-3 align-middle">
                     <span
                       className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-medium ${
@@ -634,12 +651,17 @@ export default function BuildingDeedsPanel({ buildingId }: BuildingDeedsPanelPro
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-teal-800">
-                <span className="flex items-center gap-2">
-                  <ArrowRightLeft className="w-5 h-5" />
-                  نقل ملكية — الوحدة {transferUnit.unit_number}
-                </span>
-              </h3>
+              <div>
+                <h3 className="text-lg font-bold text-teal-800">
+                  <span className="flex items-center gap-2">
+                    <ArrowRightLeft className="w-5 h-5" />
+                    نقل ملكية — الوحدة {transferUnit.unit_number}
+                  </span>
+                </h3>
+                {transferUnit.status !== "sold" && (
+                  <p className="text-sm text-slate-500 mt-1">أضف اسم المشتري واضغط حفظ لإتمام النقل. عند الإلغاء تبقى الوحدة متاحة.</p>
+                )}
+              </div>
               <button onClick={closeTransferModal} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500" disabled={saving}>
                 <X className="w-5 h-5" />
               </button>
@@ -769,13 +791,13 @@ export default function BuildingDeedsPanel({ buildingId }: BuildingDeedsPanelPro
                 </div>
               )}
             </div>
+      <p className="mt-4 text-xs text-slate-400 text-center" style={{ boxShadow: "0px 4px 12px 0px rgba(0, 0, 0, 0.15)" }}>
+        «تعديل»: إضافة أو تعديل رقم الصك ومحضر الفرز ورفع ملفات PDF. «نقل ملكية»: تسجيل المشتري الجديد وتغيير حالة الوحدة إلى مباعة.
+      </p>
           </div>
         </div>
       )}
 
-      <p className="mt-4 text-xs text-slate-400 text-center" style={{ boxShadow: "0px 4px 12px 0px rgba(0, 0, 0, 0.15)" }}>
-        «تعديل»: إضافة أو تعديل رقم الصك ومحضر الفرز ورفع ملفات PDF. «نقل ملكية»: تسجيل المشتري الجديد وتغيير حالة الوحدة إلى مباعة.
-      </p>
     </section>
   );
 }

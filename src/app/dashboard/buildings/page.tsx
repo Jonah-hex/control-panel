@@ -118,19 +118,25 @@ export default function BuildingsPage() {
     closeDeleteModal()
   }
 
-  const filteredBuildings = buildings.filter(building =>
-    building.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    building.plot_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    building.neighborhood?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    building.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    building.phone?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
   const getBuildStatusLabel = (status?: Building['build_status']) => {
     if (status === 'under_construction') return { label: 'تحت الإنشاء', className: 'bg-amber-100 text-amber-700' }
     if (status === 'old') return { label: 'قديم', className: 'bg-slate-200 text-slate-700' }
     return { label: 'جاهز', className: 'bg-emerald-100 text-emerald-700' }
   }
+
+  const filteredBuildings = buildings.filter(building => {
+    const term = searchTerm.toLowerCase().trim()
+    if (!term) return true
+    const statusLabel = getBuildStatusLabel(building.build_status).label.toLowerCase()
+    return (
+      building.name.toLowerCase().includes(term) ||
+      building.plot_number.toLowerCase().includes(term) ||
+      building.neighborhood?.toLowerCase().includes(term) ||
+      building.address?.toLowerCase().includes(term) ||
+      building.phone?.toLowerCase().includes(term) ||
+      statusLabel.includes(term)
+    )
+  })
 
   // Sort by newest first (last added)
   const displayedBuildings = [...filteredBuildings].sort((a, b) =>
@@ -157,17 +163,17 @@ export default function BuildingsPage() {
               <div className="flex items-center gap-3">
                 <Link
                   href="/dashboard"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-gray-200 hover:shadow-md transition transform hover:-translate-y-0.5"
+                  className="inline-flex items-center gap-3 px-4 py-2 bg-white/80 border-2 border-slate-200 text-slate-700 rounded-full hover:border-purple-300 hover:bg-slate-50 shadow-sm hover:shadow-md transform transition hover:-translate-y-0.5"
                 >
-                  <span className="w-9 h-9 rounded-full bg-slate-50 flex items-center justify-center">
-                    <ArrowLeft className="w-4 h-4 text-slate-800" />
+                  <span className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center">
+                    <ArrowLeft className="w-4 h-4 text-slate-700" />
                   </span>
-                  <span className="text-sm font-semibold text-slate-800">لوحة التحكم</span>
+                  <span className="text-sm font-semibold">لوحة التحكم</span>
                 </Link>
 
                 <Link
                   href="/dashboard/buildings/new"
-                  className="inline-flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-700 text-white rounded-full shadow-2xl hover:shadow-xl transform transition hover:-translate-y-0.5"
+                  className="inline-flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-slate-800/90 via-purple-800/90 to-slate-800/90 backdrop-blur-sm text-white rounded-full shadow-xl hover:shadow-2xl transform transition hover:-translate-y-0.5"
                 >
                   <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
                     <Plus className="w-4 h-4 text-white" />
@@ -184,11 +190,21 @@ export default function BuildingsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Search Bar */}
         <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-semibold text-slate-600">
+              إجمالي العماير: <span className="text-slate-600 font-bold">{buildings.length}</span>
+              {searchTerm && (
+                <span className="mr-2 text-slate-500">
+                  (ظاهر: {filteredBuildings.length})
+                </span>
+              )}
+            </p>
+          </div>
           <div className="relative">
             <Search className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="ابحث عن العمارة..."
+              placeholder="ابحث بالاسم، الحي، حالة البناء..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pr-12 pl-4 py-3 bg-white border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none"

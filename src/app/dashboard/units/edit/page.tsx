@@ -10,7 +10,7 @@ function EditUnitPageContent() {
   const searchParams = useSearchParams();
   const unitId = searchParams.get("unitId");
   const [unit, setUnit] = useState<Record<string, unknown> | null>(null);
-  const [building, setBuilding] = useState<{ id: string; name?: string } | null>(null);
+  const [building, setBuilding] = useState<{ id: string; name?: string; owner_name?: string | null } | null>(null);
   const [form, setForm] = useState({
     unit_number: "",
     floor: "",
@@ -36,6 +36,7 @@ function EditUnitPageContent() {
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState("");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [showSoldConfirm, setShowSoldConfirm] = useState(false);
 
   useEffect(() => {
     if (!unitId) {
@@ -65,8 +66,8 @@ function EditUnitPageContent() {
         setUnit(data);
         const bid = String(data.building_id ?? "");
         if (bid) {
-          const { data: bData } = await supabase.from("buildings").select("id, name").eq("id", bid).single();
-          setBuilding(bData ? { id: String(bData.id), name: String(bData.name ?? "") } : { id: bid, name: "" });
+          const { data: bData } = await supabase.from("buildings").select("id, name, owner_name").eq("id", bid).single();
+          setBuilding(bData ? { id: String(bData.id), name: String(bData.name ?? ""), owner_name: bData.owner_name ?? null } : { id: bid, name: "", owner_name: null });
         } else {
           setBuilding(null);
         }
@@ -116,18 +117,16 @@ function EditUnitPageContent() {
     return Number.isFinite(n) ? n : null;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!unitId || !form.building_id) {
-      setError("بيانات غير كاملة للتحديث");
-      return;
-    }
+  const formatPriceWithCommas = (n: number) => (n || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const parsePriceInput = (s: string) => parseInt(String(s).replace(/[^\d]/g, "")) || 0;
+
+  const performSave = async () => {
+    if (!unitId || !form.building_id) return;
     setLoading(true);
     setError("");
     setToast(null);
 
     const supabase = createClient();
-
     const updateData: Record<string, unknown> = {
       status: form.status || "available",
       type: form.type || "apartment",
@@ -137,13 +136,13 @@ function EditUnitPageContent() {
       bathrooms: toNum(form.bathrooms) ?? 1,
       living_rooms: toNum(form.living_rooms) ?? 1,
       kitchens: toNum(form.kitchens) ?? 1,
+      owner_name: form.owner_name.trim() || null,
       maid_room: !!form.maid_room,
       driver_room: !!form.driver_room,
       ac_type: form.ac_type || null,
       entrances: toNum(form.entrances) ?? 1,
       price: toNum(form.price) ?? null,
       description: form.description.trim() || null,
-      owner_name: form.owner_name.trim() || null,
       electricity_meter_number: form.electricity_meter_number.trim() || null,
       updated_at: new Date().toISOString(),
     };
@@ -153,10 +152,10 @@ function EditUnitPageContent() {
     if (updateError) {
       setToast({ message: "تعذر حفظ التعديلات: " + (updateError.message || "خطأ غير معروف"), type: "error" });
       setLoading(false);
+      setShowSoldConfirm(false);
       return;
     }
 
-    // مزامنة إحصائيات المبنى: reserved_units = عدد الوحدات المحجوزة
     const { count } = await supabase
       .from("units")
       .select("*", { count: "exact", head: true })
@@ -170,7 +169,29 @@ function EditUnitPageContent() {
 
     setToast({ message: "تم حفظ التعديلات بنجاح", type: "success" });
     setLoading(false);
-    setTimeout(() => router.push("/dashboard/units"), 1500);
+    setShowSoldConfirm(false);
+    setTimeout(() => router.push(`/dashboard/units?buildingId=${form.building_id}`), 1500);
+  };
+
+  const goToTransferOwnership = () => {
+    setShowSoldConfirm(false);
+    setForm((prev) => ({ ...prev, status: "available" }));
+    router.push(`/building-deeds?buildingId=${form.building_id}&unitId=${unitId}`);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!unitId || !form.building_id) {
+      setError("بيانات غير كاملة للتحديث");
+      return;
+    }
+
+    if (unit?.status !== "sold" && form.status === "sold") {
+      setShowSoldConfirm(true);
+      return;
+    }
+
+    await performSave();
   };
 
   if (fetching) {
@@ -195,6 +216,40 @@ function EditUnitPageContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8 px-4">
+      {/* نافذة تأكيد عند اختيار حالة مباعة */}
+      {showSoldConfirm && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 border border-gray-200">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">إتمام نقل الملكية</h3>
+            <p className="text-gray-600 mb-2">
+              يجب التوجّه إلى صفحة إدارة صكوك المبنى لإتمام نقل الملكية. أضِف اسم المشتري الجديد واضغط حفظ لإتمام النقل.
+            </p>
+            <p className="text-sm text-amber-700 mb-6 font-medium">
+              في حال عدم الحفظ، تبقى حالة الشقة متاحة.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={goToTransferOwnership}
+                className="flex-1 px-4 py-3 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-xl font-bold hover:from-emerald-600 hover:to-emerald-700 transition"
+              >
+                نعم، التوجّه الآن
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSoldConfirm(false);
+                  setForm((prev) => ({ ...prev, status: "available" }));
+                }}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition"
+              >
+                لا، إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* تنبيه يظهر بعد الحفظ */}
       {toast && (
         <div
@@ -230,6 +285,11 @@ function EditUnitPageContent() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {form.status === "sold" && (
+            <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm font-medium">
+              الوحدة مباعة — العرض فقط، لا يمكن تعديل البيانات
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-gray-700 font-bold mb-1">رقم الوحدة</label>
@@ -243,27 +303,38 @@ function EditUnitPageContent() {
 
           <div>
             <label className="block text-gray-700 font-bold mb-1">الحالة</label>
-            <select name="status" value={form.status} onChange={handleChange} className="w-full border border-gray-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-emerald-400" required>
+            <select
+              name="status"
+              value={form.status}
+              onChange={handleChange}
+              disabled={form.status === "sold"}
+              className={`w-full border border-gray-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-emerald-400 ${form.status === "sold" ? "bg-gray-100 cursor-not-allowed" : ""}`}
+              required
+            >
               <option value="available">متاحة</option>
               <option value="reserved">محجوزة</option>
               <option value="sold">مباعة</option>
             </select>
-            <p className="text-xs text-gray-500 mt-1">تعديل الحالة يحدّث قاعدة البيانات وإحصائيات المبنى تلقائياً</p>
+            <p className="text-xs text-gray-500 mt-1">
+              {form.status === "sold"
+                ? "الوحدة مباعة وتم نقل الملكية — لا يمكن تغيير الحالة مرة أخرى"
+                : "تعديل الحالة يحدّث قاعدة البيانات وإحصائيات المبنى تلقائياً"}
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-gray-700 font-bold mb-1">نوع الوحدة</label>
-              <select name="type" value={form.type} onChange={handleChange} className="w-full border border-gray-200 rounded-xl px-4 py-2">
+              <select name="type" value={form.type} onChange={handleChange} disabled={form.status === "sold"} className={`w-full border border-gray-200 rounded-xl px-4 py-2 ${form.status === "sold" ? "bg-gray-100 cursor-not-allowed" : ""}`}>
                 <option value="apartment">شقة</option>
-                <option value="studio">ملحق - سطح</option>
+                <option value="studio">ملحق</option>
                 <option value="duplex">دوبلكس</option>
                 <option value="penthouse">بنتهاوس</option>
               </select>
             </div>
             <div>
               <label className="block text-gray-700 font-bold mb-1">واجهة الوحدة</label>
-              <select name="facing" value={form.facing} onChange={handleChange} className="w-full border border-gray-200 rounded-xl px-4 py-2">
+              <select name="facing" value={form.facing} onChange={handleChange} disabled={form.status === "sold"} className={`w-full border border-gray-200 rounded-xl px-4 py-2 ${form.status === "sold" ? "bg-gray-100 cursor-not-allowed" : ""}`}>
                 <option value="front">أمامية</option>
                 <option value="back">خلفية</option>
                 <option value="corner">زاوية</option>
@@ -277,10 +348,10 @@ function EditUnitPageContent() {
           </div>
           <input
             name="owner_name"
-            value={form.owner_name}
-            onChange={handleChange}
-            placeholder="اسم مالك الوحدة"
-            className="w-full border border-gray-200 rounded-xl px-4 py-2"
+            value={unit?.status === "sold" ? (form.owner_name || "") : (building?.owner_name || form.owner_name || "")}
+            readOnly
+            placeholder="اسم المالك (من بيانات العمارة)"
+            className="w-full border border-gray-200 rounded-xl px-4 py-2 bg-gray-50 cursor-not-allowed"
           />
 
           <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
@@ -291,26 +362,27 @@ function EditUnitPageContent() {
             name="electricity_meter_number"
             value={form.electricity_meter_number}
             onChange={handleChange}
+            disabled={form.status === "sold"}
             placeholder="رقم العداد"
-            className="w-full border border-gray-200 rounded-xl px-4 py-2"
+            className={`w-full border border-gray-200 rounded-xl px-4 py-2 ${form.status === "sold" ? "bg-gray-100 cursor-not-allowed" : ""}`}
           />
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
               <label className="block text-gray-700 font-bold mb-1">المساحة (م²)</label>
-              <input name="area" value={form.area} onChange={handleChange} type="number" min={0} className="w-full border border-gray-200 rounded-xl px-4 py-2" />
+              <input name="area" value={form.area} onChange={handleChange} type="number" min={0} disabled={form.status === "sold"} className={`w-full border border-gray-200 rounded-xl px-4 py-2 ${form.status === "sold" ? "bg-gray-100 cursor-not-allowed" : ""}`} />
             </div>
             <div>
               <label className="block text-gray-700 font-bold mb-1">الغرف</label>
-              <input name="rooms" value={form.rooms} onChange={handleChange} type="number" min={0} className="w-full border border-gray-200 rounded-xl px-4 py-2" />
+              <input name="rooms" value={form.rooms} onChange={handleChange} type="number" min={0} disabled={form.status === "sold"} className={`w-full border border-gray-200 rounded-xl px-4 py-2 ${form.status === "sold" ? "bg-gray-100 cursor-not-allowed" : ""}`} />
             </div>
             <div>
               <label className="block text-gray-700 font-bold mb-1">الحمامات</label>
-              <input name="bathrooms" value={form.bathrooms} onChange={handleChange} type="number" min={0} className="w-full border border-gray-200 rounded-xl px-4 py-2" />
+              <input name="bathrooms" value={form.bathrooms} onChange={handleChange} type="number" min={0} disabled={form.status === "sold"} className={`w-full border border-gray-200 rounded-xl px-4 py-2 ${form.status === "sold" ? "bg-gray-100 cursor-not-allowed" : ""}`} />
             </div>
             <div>
               <label className="block text-gray-700 font-bold mb-1">المطابخ</label>
-              <input name="kitchens" value={form.kitchens} onChange={handleChange} type="number" min={0} className="w-full border border-gray-200 rounded-xl px-4 py-2" />
+              <input name="kitchens" value={form.kitchens} onChange={handleChange} type="number" min={0} disabled={form.status === "sold"} className={`w-full border border-gray-200 rounded-xl px-4 py-2 ${form.status === "sold" ? "bg-gray-100 cursor-not-allowed" : ""}`} />
             </div>
           </div>
 
@@ -324,28 +396,29 @@ function EditUnitPageContent() {
             onChange={handleChange}
             type="number"
             min={1}
-            className="w-full border border-gray-200 rounded-xl px-4 py-2"
+            disabled={form.status === "sold"}
+            className={`w-full border border-gray-200 rounded-xl px-4 py-2 ${form.status === "sold" ? "bg-gray-100 cursor-not-allowed" : ""}`}
           />
 
           <div>
             <label className="block text-gray-700 font-bold mb-1">غرف المعيشة</label>
-            <input name="living_rooms" value={form.living_rooms} onChange={handleChange} type="number" min={0} className="w-full border border-gray-200 rounded-xl px-4 py-2" />
+            <input name="living_rooms" value={form.living_rooms} onChange={handleChange} type="number" min={0} disabled={form.status === "sold"} className={`w-full border border-gray-200 rounded-xl px-4 py-2 ${form.status === "sold" ? "bg-gray-100 cursor-not-allowed" : ""}`} />
           </div>
 
           <div className="flex gap-6">
-            <label className="flex items-center gap-2">
-              <input name="maid_room" type="checkbox" checked={form.maid_room} onChange={handleChange} className="rounded" />
+            <label className={`flex items-center gap-2 ${form.status === "sold" ? "cursor-not-allowed opacity-75" : ""}`}>
+              <input name="maid_room" type="checkbox" checked={form.maid_room} onChange={handleChange} disabled={form.status === "sold"} className="rounded" />
               <span className="font-medium text-gray-700">غرفة خادمة</span>
             </label>
-            <label className="flex items-center gap-2">
-              <input name="driver_room" type="checkbox" checked={form.driver_room} onChange={handleChange} className="rounded" />
+            <label className={`flex items-center gap-2 ${form.status === "sold" ? "cursor-not-allowed opacity-75" : ""}`}>
+              <input name="driver_room" type="checkbox" checked={form.driver_room} onChange={handleChange} disabled={form.status === "sold"} className="rounded" />
               <span className="font-medium text-gray-700">غرفة سائق</span>
             </label>
           </div>
 
           <div>
             <label className="block text-gray-700 font-bold mb-1">نوع التكييف</label>
-            <select name="ac_type" value={form.ac_type} onChange={handleChange} className="w-full border border-gray-200 rounded-xl px-4 py-2">
+            <select name="ac_type" value={form.ac_type} onChange={handleChange} disabled={form.status === "sold"} className={`w-full border border-gray-200 rounded-xl px-4 py-2 ${form.status === "sold" ? "bg-gray-100 cursor-not-allowed" : ""}`}>
               <option value="">اختر</option>
               <option value="split">سبليت</option>
               <option value="window">شباك</option>
@@ -357,28 +430,39 @@ function EditUnitPageContent() {
 
           <div>
             <label className="block text-gray-700 font-bold mb-1">السعر (ر.س)</label>
-            <input name="price" value={form.price} onChange={handleChange} type="number" min={0} placeholder="السعر" className="w-full border border-gray-200 rounded-xl px-4 py-2" />
+            <input
+              name="price"
+              type="text"
+              inputMode="numeric"
+              value={form.price ? formatPriceWithCommas(parsePriceInput(form.price)) : ""}
+              onChange={(e) => setForm({ ...form, price: String(parsePriceInput(e.target.value)) })}
+              placeholder="السعر"
+              disabled={form.status === "sold"}
+              className={`w-full border border-gray-200 rounded-xl px-4 py-2 ${form.status === "sold" ? "bg-gray-100 cursor-not-allowed" : ""}`}
+            />
           </div>
 
           <div>
             <label className="block text-gray-700 font-bold mb-1">وصف الوحدة</label>
-            <textarea name="description" value={form.description} onChange={handleChange} rows={2} placeholder="وصف اختياري" className="w-full border border-gray-200 rounded-xl px-4 py-2" />
+            <textarea name="description" value={form.description} onChange={handleChange} rows={2} placeholder="وصف اختياري" disabled={form.status === "sold"} className={`w-full border border-gray-200 rounded-xl px-4 py-2 ${form.status === "sold" ? "bg-gray-100 cursor-not-allowed" : ""}`} />
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 pt-4">
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 px-6 py-3 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-xl font-bold hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-70 transition"
-            >
-              {loading ? "جاري الحفظ..." : "حفظ التعديلات"}
-            </button>
+            {form.status !== "sold" && (
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 px-6 py-3 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-xl font-bold hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-70 transition"
+              >
+                {loading ? "جاري الحفظ..." : "حفظ التعديلات"}
+              </button>
+            )}
             <Link
-              href="/dashboard/units"
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition"
+              href={form.building_id ? `/dashboard/units?buildingId=${form.building_id}` : "/dashboard/units"}
+              className={`inline-flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition ${form.status === "sold" ? "flex-1" : ""}`}
             >
               <ArrowRight className="w-4 h-4" />
-              إلغاء
+              {form.status === "sold" ? "رجوع لقائمة الوحدات" : "إلغاء"}
             </Link>
           </div>
         </form>

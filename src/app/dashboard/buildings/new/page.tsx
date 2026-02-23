@@ -106,15 +106,15 @@ import {
   EyeOff,
   Lock,
   Unlock,
+  DollarSign,
   Key,
   CreditCard,
   Wallet,
-  DollarSign,
   Euro,
+  BadgeCheck,
   PoundSterling,
   Bitcoin,
   Percent,
-  BadgeCheck,
   BadgeX,
   BadgeAlert,
   BadgeInfo,
@@ -176,6 +176,7 @@ export default function NewBuildingPage() {
   const [formData, setFormData] = useState({
     // معلومات أساسية
     name: '',
+    ownerName: '',
     plotNumber: '',
     neighborhood: '',
     description: '',
@@ -305,6 +306,8 @@ export default function NewBuildingPage() {
   const [expandedFloor, setExpandedFloor] = useState<number | null>(1)
   const [expandedUnit, setExpandedUnit] = useState<string | null>(null)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [showApplyRepeaterModal, setShowApplyRepeaterModal] = useState(false)
+  const [applyRepeaterModalInfo, setApplyRepeaterModalInfo] = useState<{ lastFloorNumber: number; repeaterCount: number } | null>(null)
   
   const [ownerAssociation, setOwnerAssociation] = useState<OwnerAssociation>({
     hasAssociation: false,
@@ -571,6 +574,9 @@ export default function NewBuildingPage() {
     setFormData(prev => ({ ...prev, totalUnits: total }))
   }
 
+  const formatPriceWithCommas = (n: number) => (n || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  const parsePriceInput = (s: string) => parseInt(String(s).replace(/[^\d]/g, '')) || 0
+
   const updateUnit = (floorNumber: number, unitIndex: number, updates: Partial<Unit>) => {
     setFloors(floors.map(floor => {
       if (floor.number === floorNumber) {
@@ -651,9 +657,18 @@ export default function NewBuildingPage() {
       return
     }
 
-    if (!confirm(`تطبيق نظام الدور الأول على أدوار المكرر (من الدور 2 إلى الدور ${lastFloorNumber - 1})؟\n\nسيتم استبدال الوحدات في ${repeaterCount} ${repeaterCount === 1 ? 'دور' : 'أدوار'} فقط. الدور الأخير (${lastFloorNumber}) لن يتأثر.`)) {
-      return
-    }
+    setApplyRepeaterModalInfo({ lastFloorNumber, repeaterCount })
+    setShowApplyRepeaterModal(true)
+    return
+  }
+
+  const executeApplyFirstFloorToRepeater = () => {
+    if (!applyRepeaterModalInfo) return
+    const floor1 = floors[0]
+    if (!floor1) return
+    const { lastFloorNumber, repeaterCount } = applyRepeaterModalInfo
+    setShowApplyRepeaterModal(false)
+    setApplyRepeaterModalInfo(null)
 
     let updatedFloors = floors.map((floor) => {
       // نطبق فقط على الأدوار من 2 إلى قبل الأخير
@@ -752,6 +767,7 @@ export default function NewBuildingPage() {
       // Verify User Authentication
       // ==========================================
       const { data: { user } } = await supabase.auth.getUser()
+      }
       
       if (!user) {
         setError('يجب تسجيل الدخول أولاً')
@@ -765,6 +781,9 @@ export default function NewBuildingPage() {
       // ==========================================
       if (!formData.name) {
         throw new Error('الرجاء إدخال اسم العمارة')
+      }
+      if (!formData.ownerName?.trim()) {
+        throw new Error('الرجاء إدخال اسم المالك')
       }
 
       const totalUnits = floorsWithSequentialNumbers.reduce((sum, floor) => sum + floor.units.length, 0)
@@ -820,6 +839,7 @@ export default function NewBuildingPage() {
             // 📋 الخطوة 1 - معلومات العمارة الأساسية
             // Step 1 - Basic Building Information
             name: formData.name,
+            owner_name: formData.ownerName?.trim() || null,
             plot_number: formData.plotNumber || null,
             neighborhood: formData.neighborhood || null,
             address: [formData.neighborhood, formData.plotNumber ? `قطعة ${formData.plotNumber}` : ''].filter(Boolean).join(' - ') || null,
@@ -1021,7 +1041,7 @@ export default function NewBuildingPage() {
       } else if (errorMessage.includes('duplicate key')) {
         errorMessage += '\n\n💡 الحل: تم تحديث كود توليد أرقام الوحدات ليكون تلقائياً (رقم_الدور-رقم_الوحدة). حاول إضافة إدارة حقول الوحدات من جديد أو تحديث أرقامها يدوياً لتكون فريدة تماماً'
       } else if (errorMessage.includes('violates not-null')) {
-        errorMessage += '\n\n💡 الحل: حقل مطلوب فارغ. تأكد من ملء اسم العمارة ورقم القطعة'
+        errorMessage += '\n\n💡 الحل: حقل مطلوب فارغ. تأكد من ملء اسم العمارة واسم المالك ورقم القطعة'
       }
       
       setError(errorMessage)
@@ -1274,6 +1294,26 @@ export default function NewBuildingPage() {
                     </div>
                   </div>
 
+                  {/* اسم المالك */}
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      اسم المالك <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
+                        <User className="w-5 h-5" />
+                      </div>
+                      <input
+                        type="text"
+                        value={formData.ownerName}
+                        onChange={(e) => setFormData({...formData, ownerName: e.target.value})}
+                        required
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition text-lg"
+                        placeholder="مثال: مؤسسة أحمد العتيبي"
+                      />
+                    </div>
+                  </div>
+
                   {/* سنة البناء */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -1360,6 +1400,44 @@ export default function NewBuildingPage() {
                     </div>
                   </div>
 
+                  {/* مساحة الأرض */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  {/* مساحة الأرض */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      مساحة الأرض (م²)
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
+                        <Ruler className="w-5 h-5" />
+                      </div>
+                      <input
+                        type="number"
+                        value={formData.landArea || ''}
+                        onChange={(e) => setFormData({...formData, landArea: parseInt(e.target.value) || 0})}
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                        placeholder="مثال: 500"
+                      />
+                    </div>
+                  </div>
+
+                      مساحة الأرض (م²)
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
+                        <Ruler className="w-5 h-5" />
+                      </div>
+                      <input
+                        type="number"
+                        value={formData.landArea || ''}
+                        onChange={(e) => setFormData({...formData, landArea: parseInt(e.target.value) || 0})}
+                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                        placeholder="مثال: 500"
+                      />
+                    </div>
+                  </div>
+
                   {/* رقم الصك */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -1380,6 +1458,23 @@ export default function NewBuildingPage() {
                     </div>
                   </div>
 
+                  {/* رقم رخصة البناء + وصف العمارة (حقلين جنب بعض - أعلى) */}
+                  <div className="col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">
+                        رقم رخصة البناء <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative group">
+                        <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
+                          <FileText className="w-5 h-5" />
+                        </div>
+                        <input
+                          type="text"
+                          value={formData.buildingLicenseNumber}
+                          onChange={(e) => setFormData({...formData, buildingLicenseNumber: e.target.value})}
+                          required
+                          className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                          placeholder="مثال: 12345/2023"
                   {/* مساحة الأرض */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -1399,177 +1494,40 @@ export default function NewBuildingPage() {
                     </div>
                   </div>
 
-                  {/* رقم رخصة البناء */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      رقم رخصة البناء <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative group">
-                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
-                        <FileText className="w-5 h-5" />
+                        />
                       </div>
-                      <input
-                        type="text"
-                        value={formData.buildingLicenseNumber}
-                        onChange={(e) => setFormData({...formData, buildingLicenseNumber: e.target.value})}
-                        required
-                        className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                        placeholder="مثال: 12345/2023"
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">
+                        وصف العمارة
+                      </label>
+                      <textarea
+                        value={formData.description}
+                        onChange={(e) => setFormData({...formData, description: e.target.value})}
+                        rows={2}
+                        className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition text-sm resize-y min-h-[60px]"
+                        placeholder="اكتب وصفاً موجزاً للعمارة..."
                       />
                     </div>
                   </div>
 
-                  {/* حالة التأمين */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      هل يوجد تأمين على المبنى
-                    </label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          value="yes"
-                          checked={formData.insuranceAvailable === true}
-                          onChange={() => setFormData({...formData, insuranceAvailable: true})}
-                          className="w-4 h-4 accent-indigo-500"
-                        />
-                        <span className="text-gray-700">نعم</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          value="no"
-                          checked={formData.insuranceAvailable === false}
-                          onChange={() => setFormData({...formData, insuranceAvailable: false, insurancePolicyNumber: ''})}
-                          className="w-4 h-4 accent-indigo-500"
-                        />
-                        <span className="text-gray-700">لا</span>
-                      </label>
-                    </div>
-
-                    {/* رقم بوليصة التأمين - يظهر فقط إذا كان هناك تأمين */}
-                    {formData.insuranceAvailable && (
-                      <div className="mt-4 animate-fadeIn">
-                        <label className="block text-sm font-semibold text-gray-700 mb-3">
-                          رقم بوليصة التأمين <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative group">
-                          <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
-                            <Shield className="w-5 h-5" />
-                          </div>
-                          <input
-                            type="text"
-                            value={formData.insurancePolicyNumber}
-                            onChange={(e) => setFormData({...formData, insurancePolicyNumber: e.target.value})}
-                            required={formData.insuranceAvailable}
-                            className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                            placeholder="مثال: POL-2023-12345"
-                          />
+                  {/* التأمين - الكهرباء - المياه (أسفل الحقلين) */}
+                  <div className="col-span-2">
+                    <div className="space-y-4">
+                      {/* حالة التأمين */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <label className="text-sm font-semibold text-gray-700 shrink-0">هل يوجد تأمين على المبنى</label>
+                        <div className="flex gap-4 shrink-0">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" value="yes" checked={formData.insuranceAvailable === true} onChange={() => setFormData({...formData, insuranceAvailable: true})} className="w-4 h-4 accent-indigo-500" />
+                            <span className="text-gray-700">نعم</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" value="no" checked={formData.insuranceAvailable === false} onChange={() => setFormData({...formData, insuranceAvailable: false, insurancePolicyNumber: ''})} className="w-4 h-4 accent-indigo-500" />
+                            <span className="text-gray-700">لا</span>
+                          </label>
                         </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* عداد المياه الرئيسي */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      هل يوجد عداد مياه رئيسي
-                    </label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          value="yes"
-                          checked={formData.hasMainWaterMeter === true}
-                          onChange={() => setFormData({...formData, hasMainWaterMeter: true})}
-                          className="w-4 h-4 accent-indigo-500"
-                        />
-                        <span className="text-gray-700">نعم</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          value="no"
-                          checked={formData.hasMainWaterMeter === false}
-                          onChange={() => setFormData({...formData, hasMainWaterMeter: false, waterMeterNumber: ''})}
-                          className="w-4 h-4 accent-indigo-500"
-                        />
-                        <span className="text-gray-700">لا</span>
-                      </label>
-                    </div>
-
-                    {/* رقم عداد المياه */}
-                    {formData.hasMainWaterMeter && (
-                      <div className="mt-4 animate-fadeIn">
-                        <label className="block text-sm font-semibold text-gray-700 mb-3">
-                          رقم عداد المياه (اختياري)
-                        </label>
-                        <div className="relative group">
-                          <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
-                            <Hash className="w-5 h-5" />
-                          </div>
-                          <input
-                            type="text"
-                            value={formData.waterMeterNumber}
-                            onChange={(e) => setFormData({...formData, waterMeterNumber: e.target.value})}
-                            className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                            placeholder="مثال: W-12345678"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* عداد الكهرباء الرئيسي */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      هل يوجد عداد كهرباء رئيسي
-                    </label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          value="yes"
-                          checked={formData.hasMainElectricityMeter === true}
-                          onChange={() => setFormData({...formData, hasMainElectricityMeter: true})}
-                          className="w-4 h-4 accent-indigo-500"
-                        />
-                        <span className="text-gray-700">نعم</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          value="no"
-                          checked={formData.hasMainElectricityMeter === false}
-                          onChange={() => setFormData({...formData, hasMainElectricityMeter: false, electricityMeterNumber: ''})}
-                          className="w-4 h-4 accent-indigo-500"
-                        />
-                        <span className="text-gray-700">لا</span>
-                      </label>
-                    </div>
-
-                    {/* رقم عداد الكهرباء */}
-                    {formData.hasMainElectricityMeter && (
-                      <div className="mt-4 animate-fadeIn">
-                        <label className="block text-sm font-semibold text-gray-700 mb-3">
-                          رقم عداد الكهرباء (اختياري)
-                        </label>
-                        <div className="relative group">
-                          <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition">
-                            <Zap className="w-5 h-5" />
-                          </div>
-                          <input
-                            type="text"
-                            value={formData.electricityMeterNumber}
-                            onChange={(e) => setFormData({...formData, electricityMeterNumber: e.target.value})}
-                            className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                            placeholder="مثال: E-87654321"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
+                        {formData.insuranceAvailable && (
                   {/* الوصف */}
                   <div className="col-span-2">
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -1583,6 +1541,63 @@ export default function NewBuildingPage() {
                       placeholder="اكتب وصفاً للعمارة..."
                     />
                   </div>
+                          <div className="flex-1 min-w-[180px] animate-fadeIn">
+                            <div className="relative group">
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"><Shield className="w-4 h-4" /></div>
+                              <input type="text" value={formData.insurancePolicyNumber} onChange={(e) => setFormData({...formData, insurancePolicyNumber: e.target.value})} required={formData.insuranceAvailable} className="w-full pr-10 pl-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-100" placeholder="رقم البوليصة *" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* عداد الكهرباء الرئيسي */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <label className="text-sm font-semibold text-gray-700 shrink-0">هل يوجد عداد كهرباء رئيسي</label>
+                        <div className="flex gap-4 shrink-0">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" value="yes" checked={formData.hasMainElectricityMeter === true} onChange={() => setFormData({...formData, hasMainElectricityMeter: true})} className="w-4 h-4 accent-indigo-500" />
+                            <span className="text-gray-700">نعم</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" value="no" checked={formData.hasMainElectricityMeter === false} onChange={() => setFormData({...formData, hasMainElectricityMeter: false, electricityMeterNumber: ''})} className="w-4 h-4 accent-indigo-500" />
+                            <span className="text-gray-700">لا</span>
+                          </label>
+                        </div>
+                        {formData.hasMainElectricityMeter && (
+                          <div className="flex-1 min-w-[180px] animate-fadeIn">
+                            <div className="relative group">
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"><Zap className="w-4 h-4" /></div>
+                              <input type="text" value={formData.electricityMeterNumber} onChange={(e) => setFormData({...formData, electricityMeterNumber: e.target.value})} className="w-full pr-10 pl-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-100" placeholder="رقم العداد" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* عداد المياه الرئيسي */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <label className="text-sm font-semibold text-gray-700 shrink-0">هل يوجد عداد مياه رئيسي</label>
+                        <div className="flex gap-4 shrink-0">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" value="yes" checked={formData.hasMainWaterMeter === true} onChange={() => setFormData({...formData, hasMainWaterMeter: true})} className="w-4 h-4 accent-indigo-500" />
+                            <span className="text-gray-700">نعم</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" value="no" checked={formData.hasMainWaterMeter === false} onChange={() => setFormData({...formData, hasMainWaterMeter: false, waterMeterNumber: ''})} className="w-4 h-4 accent-indigo-500" />
+                            <span className="text-gray-700">لا</span>
+                          </label>
+                        </div>
+                        {formData.hasMainWaterMeter && (
+                          <div className="flex-1 min-w-[180px] animate-fadeIn">
+                            <div className="relative group">
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"><Hash className="w-4 h-4" /></div>
+                              <input type="text" value={formData.waterMeterNumber} onChange={(e) => setFormData({...formData, waterMeterNumber: e.target.value})} className="w-full pr-10 pl-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-100" placeholder="رقم العداد" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
               </div>
             )}
@@ -1945,7 +1960,7 @@ export default function NewBuildingPage() {
                                   <h4 className="font-bold text-gray-700 text-lg">الوحدة {unit.unitNumber}</h4>
                                   <div className="flex items-center gap-2 mt-1">
                                     <span className="text-xs bg-blue-100/70 backdrop-blur-sm text-blue-700 px-2 py-1 rounded-full font-medium">
-                                      {unit.type === 'apartment' ? 'شقة' : unit.type === 'studio' ? 'ملحق - سطح' : unit.type === 'duplex' ? 'دوبلكس' : 'بنتهاوس'}
+                                      {unit.type === 'apartment' ? 'شقة' : unit.type === 'studio' ? 'ملحق' : unit.type === 'duplex' ? 'دوبلكس' : 'بنتهاوس'}
                                     </span>
                                     <span className={`text-xs px-2 py-1 rounded-full font-medium backdrop-blur-sm ${
                                       unit.status === 'available' ? 'bg-green-100/70 text-green-700' :
@@ -1995,23 +2010,23 @@ export default function NewBuildingPage() {
 
                             {/* ملخص سريع - صف واحد */}
                             <div className="p-4 bg-white grid grid-cols-2 md:grid-cols-4 gap-3 border-b border-gray-100">
-                              <div className="flex flex-col items-center p-2 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200">
-                                <Maximize className="w-4 h-4 text-gray-600 mb-1" />
+                              <div className="flex flex-col items-center justify-center p-2 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200 min-h-[4.5rem]">
+                                <Maximize className="w-4 h-4 text-gray-600 mb-1 flex-shrink-0" />
                                 <span className="text-xs text-gray-600 font-medium">المساحة</span>
                                 <span className="text-sm font-bold text-gray-700">{unit.area || '—'} م²</span>
                               </div>
-                              <div className="flex flex-col items-center p-2 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200">
-                                <DollarSign className="w-4 h-4 text-gray-600 mb-1" />
+                              <div className="flex flex-col items-center justify-center p-2 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200 min-h-[4.5rem]">
+                                <span className="inline-flex items-center justify-center w-4 h-4 text-[15px] font-medium text-gray-600 mb-1 flex-shrink-0" title="الريال السعودي">&#x20C1;</span>
                                 <span className="text-xs text-gray-600 font-medium">السعر</span>
                                 <span className="text-sm font-bold text-gray-700">{unit.price ? unit.price.toLocaleString() : '—'} ر.س</span>
                               </div>
-                              <div className="flex flex-col items-center p-2 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200">
-                                <Bed className="w-4 h-4 text-gray-600 mb-1" />
+                              <div className="flex flex-col items-center justify-center p-2 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200 min-h-[4.5rem]">
+                                <Bed className="w-4 h-4 text-gray-600 mb-1 flex-shrink-0" />
                                 <span className="text-xs text-gray-600 font-medium">الغرف</span>
                                 <span className="text-sm font-bold text-gray-700">{unit.rooms}</span>
                               </div>
-                              <div className="flex flex-col items-center p-2 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200">
-                                <Bath className="w-4 h-4 text-gray-600 mb-1" />
+                              <div className="flex flex-col items-center justify-center p-2 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200 min-h-[4.5rem]">
+                                <Bath className="w-4 h-4 text-gray-600 mb-1 flex-shrink-0" />
                                 <span className="text-xs text-gray-600 font-medium">الحمامات</span>
                                 <span className="text-sm font-bold text-gray-700">{unit.bathrooms}</span>
                               </div>
@@ -2040,14 +2055,14 @@ export default function NewBuildingPage() {
 
                                   <div className="space-y-2">
                                     <label className="block text-xs font-semibold text-gray-600 flex items-center gap-1">
-                                      <DollarSign className="w-4 h-4 text-green-500/70" />
+                                      <span className="text-sm font-bold text-green-500/70" title="الريال السعودي">&#x20C1;</span>
                                       السعر (ر.س)
                                     </label>
                                     <input
-                                      type="number"
-                                      min="0"
-                                      value={unit.price}
-                                      onChange={(e) => updateUnit(floor.number, unitIndex, { price: parseInt(e.target.value) || 0 })}
+                                      type="text"
+                                      inputMode="numeric"
+                                      value={unit.price ? formatPriceWithCommas(unit.price) : ''}
+                                      onChange={(e) => updateUnit(floor.number, unitIndex, { price: parsePriceInput(e.target.value) })}
                                       className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-semibold text-sm shadow-sm hover:shadow-md"
                                       placeholder="0"
                                     />
@@ -2064,7 +2079,7 @@ export default function NewBuildingPage() {
                                       className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-medium text-sm shadow-sm hover:shadow-md"
                                     >
                                       <option value="apartment">شقة</option>
-                                      <option value="studio">ملحق - سطح</option>
+                                      <option value="studio">ملحق</option>
                                       <option value="duplex">دوبلكس</option>
                                       <option value="penthouse">بنتهاوس</option>
                                     </select>
@@ -2211,24 +2226,8 @@ export default function NewBuildingPage() {
                                   </div>
                                 </div>
 
-                                {/* الصف الرابع - الحالة والوصف */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
-                                      <BadgeCheck className="w-4 h-4 text-emerald-500/70" />
-                                      حالة الوحدة
-                                    </label>
-                                    <select
-                                      value={unit.status}
-                                      onChange={(e) => updateUnit(floor.number, unitIndex, { status: e.target.value as any })}
-                                      className="w-full px-3 py-2.5 bg-white/70 backdrop-blur-md border-2 border-emerald-200/30 rounded-2xl focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-100/40 outline-none transition font-medium shadow-sm hover:shadow-md"
-                                    >
-                                      <option value="available">متاح</option>
-                                      <option value="reserved">محجوز</option>
-                                      <option value="sold">مباع</option>
-                                    </select>
-                                  </div>
-
+                                {/* الصف الرابع - الوصف (حالة الوحدة: متاح افتراضياً عند الإضافة) */}
+                                <div className="grid grid-cols-1 gap-4">
                                   <div className="space-y-2">
                                     <label className="block text-sm font-semibold text-gray-600 flex items-center gap-2">
                                       <FileText className="w-4 h-4 text-slate-500/70" />
@@ -2694,6 +2693,51 @@ export default function NewBuildingPage() {
         </div>
       </div>
 
+      {/* Modal: تطبيق الدور الأول على المكرر */}
+      {showApplyRepeaterModal && applyRepeaterModalInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all animate-scaleIn">
+            <div className="bg-gradient-to-r from-emerald-500/90 to-teal-500/90 px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                  <Layers className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">تطبيق الدور الأول على المكرر</h3>
+                  <p className="text-emerald-100 text-sm mt-0.5">تأكيد من النظام</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-gray-700 leading-relaxed">
+                تطبيق نظام الدور الأول على أدوار المكرر (من الدور 2 إلى الدور {applyRepeaterModalInfo.lastFloorNumber - 1})؟
+              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <p className="text-sm text-amber-800">
+                  سيتم استبدال الوحدات في {applyRepeaterModalInfo.repeaterCount} {applyRepeaterModalInfo.repeaterCount === 1 ? 'دور' : 'أدوار'} فقط. الدور الأخير ({applyRepeaterModalInfo.lastFloorNumber}) لن يتأثر.
+                </p>
+              </div>
+            </div>
+            <div className="px-6 pb-6 flex gap-3">
+              <button
+                onClick={() => { setShowApplyRepeaterModal(false); setApplyRepeaterModalInfo(null) }}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold flex items-center justify-center gap-2"
+              >
+                <X className="w-4 h-4" />
+                إلغاء
+              </button>
+              <button
+                onClick={executeApplyFirstFloorToRepeater}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all font-semibold shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2"
+              >
+                <CheckCircle className="w-4 h-4" />
+                تأكيد
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Confirmation Modal */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
@@ -2722,6 +2766,10 @@ export default function NewBuildingPage() {
                   <div className="flex justify-between">
                     <span className="text-gray-600">اسم العمارة:</span>
                     <span className="font-semibold text-gray-900">{formData.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">اسم المالك:</span>
+                    <span className="font-semibold text-gray-900">{formData.ownerName}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">رقم القطعة:</span>

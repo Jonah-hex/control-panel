@@ -9,6 +9,7 @@ import { Suspense } from "react";
 function BuildingDeedsContent() {
   const searchParams = useSearchParams();
   const buildingId = searchParams.get("buildingId");
+  const unitId = searchParams.get("unitId");
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 lg:p-8">
@@ -25,7 +26,7 @@ function BuildingDeedsContent() {
             </Link>
           )}
         </div>
-        <BuildingDeedsPanel buildingId={buildingId || undefined} />
+        <BuildingDeedsPanel buildingId={buildingId || undefined} openTransferUnitId={unitId || undefined} />
       </div>
     </main>
   );

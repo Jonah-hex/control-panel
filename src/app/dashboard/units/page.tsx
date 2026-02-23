@@ -256,7 +256,7 @@ export default function UnitsFilterPage() {
     const headers = [
       'رقم الوحدة',
       'العمارة',
-      'الحي',
+      'اتجاه الشقة',
       'رقم القطعة',
       'الدور',
       'النوع',
@@ -270,7 +270,7 @@ export default function UnitsFilterPage() {
     const rows = filteredUnits.map((unit) => [
       unit.unit_number || '-',
       unit.building?.name || '-',
-      unit.building?.neighborhood || '-',
+      facingLabel(unit.facing),
       unit.building?.plot_number || '-',
       unit.floor ?? '-',
       unit.type || '-',
@@ -305,7 +305,7 @@ export default function UnitsFilterPage() {
 
   const typeLabel = (type: string) => {
     if (type === 'apartment') return 'شقة'
-    if (type === 'studio') return 'ملحق - سطح'
+    if (type === 'studio') return 'ملحق'
     if (type === 'duplex') return 'دوبلكس'
     if (type === 'penthouse') return 'بنتهاوس'
     return type || '—'
@@ -451,7 +451,7 @@ export default function UnitsFilterPage() {
               <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="ابحث برقم الشقة أو اسم العمارة"
+                placeholder="ابحث برقم الشقة"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pr-10 pl-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
@@ -473,7 +473,7 @@ export default function UnitsFilterPage() {
             >
               <option value="all">كل الأنواع</option>
               <option value="apartment">شقة</option>
-              <option value="studio">ملحق - سطح</option>
+              <option value="studio">ملحق</option>
             </select>
             <select
               value={statusFilter}
@@ -494,16 +494,16 @@ export default function UnitsFilterPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-right px-4 py-4 font-bold text-gray-700">العمارة</th>
-                    <th className="text-right px-4 py-4 font-bold text-gray-700">الحي</th>
-                    <th className="text-right px-4 py-4 font-bold text-gray-700">رقم الوحدة</th>
-                    <th className="text-right px-4 py-4 font-bold text-gray-700">الدور</th>
-                    <th className="text-right px-4 py-4 font-bold text-gray-700">النوع</th>
-                    <th className="text-right px-4 py-4 font-bold text-gray-700">المساحة</th>
-                    <th className="text-right px-4 py-4 font-bold text-gray-700">الغرف</th>
-                    <th className="text-right px-4 py-4 font-bold text-gray-700">الحمامات</th>
-                    <th className="text-right px-4 py-4 font-bold text-gray-700">السعر</th>
-                    <th className="text-right px-4 py-4 font-bold text-gray-700">الحالة</th>
+                    <th className="text-right px-4 py-4 font-bold text-gray-700 min-w-[180px]">العمارة</th>
+                    <th className="text-center px-4 py-4 font-bold text-gray-700">رقم الوحدة</th>
+                    <th className="text-center px-4 py-4 font-bold text-gray-700">الدور</th>
+                    <th className="text-center px-4 py-4 font-bold text-gray-700">النوع</th>
+                    <th className="text-center px-4 py-4 font-bold text-gray-700 min-w-[120px] whitespace-nowrap">اتجاه الشقة</th>
+                    <th className="text-center px-4 py-4 font-bold text-gray-700">المساحة</th>
+                    <th className="text-center px-4 py-4 font-bold text-gray-700">الغرف</th>
+                    <th className="text-center px-4 py-4 font-bold text-gray-700">الحمامات</th>
+                    <th className="text-center px-4 py-4 font-bold text-gray-700">السعر</th>
+                    <th className="text-center px-4 py-4 font-bold text-gray-700">الحالة</th>
                     <th className="text-center px-4 py-4 font-bold text-gray-700">إجراءات التعديل</th>
                   </tr>
                 </thead>
@@ -515,23 +515,22 @@ export default function UnitsFilterPage() {
                       className="border-b border-gray-100 hover:bg-emerald-50/40 transition-colors cursor-pointer"
                       data-seq={index + 1}
                     >
-                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-4 py-4 text-right min-w-[180px]" onClick={(e) => e.stopPropagation()}>
                         <Link href={`/dashboard/buildings/${unit.building_id}`} className="text-emerald-700 hover:underline font-semibold">
                           {unit.building?.name || '-'}
                         </Link>
-                        <div className="text-xs text-gray-500">قطعة: {unit.building?.plot_number || '-'}</div>
                       </td>
-                      <td className="px-4 py-4">{unit.building?.neighborhood || '-'}</td>
-                      <td className="px-4 py-4 font-semibold text-gray-900">{unit.unit_number || '-'}</td>
-                      <td className="px-4 py-4">{unit.floor ?? '-'}</td>
-                      <td className="px-4 py-4">{unit.type === 'apartment' ? 'شقة' : unit.type === 'studio' ? 'ملحق - سطح' : unit.type === 'duplex' ? 'دوبلكس' : unit.type === 'penthouse' ? 'بنتهاوس' : unit.type || '-'}</td>
-                      <td className="px-4 py-4">{unit.area ? `${unit.area} م²` : '-'}</td>
-                      <td className="px-4 py-4">{unit.rooms ?? '-'}</td>
-                      <td className="px-4 py-4">{unit.bathrooms ?? '-'}</td>
-                      <td className="px-4 py-4 font-semibold text-gray-800">
+                      <td className="px-4 py-4 text-center font-semibold text-gray-900">{unit.unit_number || '-'}</td>
+                      <td className="px-4 py-4 text-center">{unit.floor ?? '-'}</td>
+                      <td className="px-4 py-4 text-center">{unit.type === 'apartment' ? 'شقة' : unit.type === 'studio' ? 'ملحق' : unit.type === 'duplex' ? 'دوبلكس' : unit.type === 'penthouse' ? 'بنتهاوس' : unit.type || '-'}</td>
+                      <td className="px-4 py-4 text-center min-w-[120px]">{facingLabel(unit.facing)}</td>
+                      <td className="px-4 py-4 text-center">{unit.area ? `${unit.area} م²` : '-'}</td>
+                      <td className="px-4 py-4 text-center">{unit.rooms ?? '-'}</td>
+                      <td className="px-4 py-4 text-center">{unit.bathrooms ?? '-'}</td>
+                      <td className="px-4 py-4 text-center font-semibold text-gray-800">
                         {unit.price ? `${unit.price.toLocaleString('ar-SA')} ر.س` : '-'}
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 text-center">
                         <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${statusBadge(unit.status)}`}>
                           {statusLabel(unit.status)}
                         </span>

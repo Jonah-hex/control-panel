@@ -16,6 +16,7 @@ import { ChevronDown, LayoutDashboard, ArrowRight, Building2, Pencil, X, Check }
 interface Building {
   id: string;
   name: string;
+  owner_name?: string | null;
   plot_number: string;
   neighborhood?: string;
   address?: string;
@@ -101,6 +102,7 @@ function DetailsContent() {
             });
             const [basicEdit, setBasicEdit] = useState({
               name: '',
+              owner_name: '',
               plot_number: '',
               building_license_number: '',
               deed_number: '',
@@ -454,6 +456,7 @@ function DetailsContent() {
                   if (!isEditingBasicCard && building) {
                     setBasicEdit({
                       name: building.name ?? '',
+                      owner_name: building.owner_name ?? '',
                       plot_number: building.plot_number ?? '',
                       building_license_number: building.building_license_number ?? '',
                       deed_number: building.deed_number ?? '',
@@ -482,6 +485,20 @@ function DetailsContent() {
                   />
                 ) : (
                   <p className="text-gray-800 font-medium">{building.name ?? '—'}</p>
+                )}
+              </div>
+              {/* اسم المالك */}
+              <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">اسم المالك</p>
+                {isEditingBasicCard ? (
+                  <input
+                    className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none"
+                    type="text"
+                    value={basicEdit.owner_name ?? ''}
+                    onChange={e => setBasicEdit({ ...basicEdit, owner_name: e.target.value })}
+                  />
+                ) : (
+                  <p className="text-gray-800 font-medium">{building.owner_name ?? '—'}</p>
                 )}
               </div>
               {/* رقم القطعة */}
@@ -564,6 +581,7 @@ function DetailsContent() {
                         .from('buildings')
                         .update({
                           name: basicEdit.name,
+                          owner_name: basicEdit.owner_name || null,
                           plot_number: basicEdit.plot_number,
                           building_license_number: basicEdit.building_license_number,
                           deed_number: basicEdit.deed_number,
