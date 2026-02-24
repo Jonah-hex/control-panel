@@ -1,7 +1,7 @@
 // ملف: toast.ts
 // دالة بسيطة لعرض Toast احترافي بدون مكتبة خارجية (يمكنك استبدالها لاحقاً بمكتبة مثل react-hot-toast)
 
-export function showToast(message: string) {
+export function showToast(message: string, variant: 'success' | 'error' = 'success') {
   // تحقق إذا كان هناك Toast ظاهر مسبقاً
   if (document.getElementById('custom-toast')) return;
 
@@ -12,7 +12,7 @@ export function showToast(message: string) {
   toast.style.bottom = '32px';
   toast.style.left = '50%';
   toast.style.transform = 'translateX(-50%)';
-  toast.style.background = 'rgba(34,197,94,0.95)'; // أخضر
+  toast.style.background = variant === 'error' ? 'rgba(220,38,38,0.95)' : 'rgba(34,197,94,0.95)'; // أحمر أو أخضر
   toast.style.color = '#fff';
   toast.style.padding = '16px 32px';
   toast.style.borderRadius = '12px';

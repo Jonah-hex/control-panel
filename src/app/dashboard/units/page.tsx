@@ -4,6 +4,8 @@ import { useEffect, useState, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { useDashboardAuth } from '@/hooks/useDashboardAuth'
+import { showToast } from '@/app/dashboard/buildings/details/toast'
 import { 
   ArrowRight,
   Building2,
@@ -79,6 +81,15 @@ function UnitsFilterContent() {
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null)
   
   const supabase = createClient()
+  const { can, ready, effectiveOwnerId } = useDashboardAuth()
+
+  useEffect(() => {
+    if (!ready) return
+    if (!can('units')) {
+      showToast('ليس لديك صلاحية معاينة الوحدات.', 'error')
+      router.replace('/dashboard')
+    }
+  }, [ready, can, router])
 
   useEffect(() => {
     // Real-time subscription للوحدات
@@ -148,9 +159,9 @@ function UnitsFilterContent() {
 
   // إعادة جلب الوحدات عند تغيير العمارة من الرابط (مثلاً بعد الضغط على "عرض كل الوحدات")
   useEffect(() => {
-    if (!filtersInitialized) return
+    if (!filtersInitialized || !effectiveOwnerId) return
     fetchData()
-  }, [filtersInitialized, buildingIdFromUrl])
+  }, [filtersInitialized, buildingIdFromUrl, effectiveOwnerId])
 
   useEffect(() => {
     if (!filtersInitialized) return
@@ -167,6 +178,8 @@ function UnitsFilterContent() {
   }, [statusFilter, facingFilter, typeFilter, buildingIdFromUrl, router, filtersInitialized])
 
   const fetchData = async () => {
+    const ownerId = effectiveOwnerId
+    if (!ownerId) return
     try {
       setLoading(true)
       setErrorMsg(null)
@@ -177,11 +190,10 @@ function UnitsFilterContent() {
         return
       }
 
-      // جلب العماير الخاصة بالمستخدم
       const { data: buildingsData, error: buildingsError } = await supabase
         .from('buildings')
         .select('*')
-        .eq('owner_id', user.id)
+        .eq('owner_id', ownerId)
         .order('created_at', { ascending: false })
 
       if (buildingsError) throw buildingsError
@@ -504,7 +516,9 @@ function UnitsFilterContent() {
                     <th className="text-center px-4 py-4 font-bold text-gray-700">الحمامات</th>
                     <th className="text-center px-4 py-4 font-bold text-gray-700">السعر</th>
                     <th className="text-center px-4 py-4 font-bold text-gray-700">الحالة</th>
-                    <th className="text-center px-4 py-4 font-bold text-gray-700">إجراءات التعديل</th>
+                    {can('units_edit') && (
+                      <th className="text-center px-4 py-4 font-bold text-gray-700">إجراءات التعديل</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -516,7 +530,7 @@ function UnitsFilterContent() {
                       data-seq={index + 1}
                     >
                       <td className="px-4 py-4 text-right min-w-[180px]" onClick={(e) => e.stopPropagation()}>
-                        <Link href={`/dashboard/buildings/${unit.building_id}`} className="text-emerald-700 hover:underline font-semibold">
+                        <Link href={can('building_details') ? `/dashboard/buildings/details?buildingId=${unit.building_id}` : `/dashboard/buildings`} className="text-emerald-700 hover:underline font-semibold">
                           {unit.building?.name || '-'}
                         </Link>
                       </td>
@@ -535,6 +549,7 @@ function UnitsFilterContent() {
                           {statusLabel(unit.status)}
                         </span>
                       </td>
+                      {can('units_edit') && (
                       <td className="px-4 py-4 text-center align-middle flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
                         <Link
                           href={`/dashboard/units/edit?unitId=${unit.id}`}
@@ -544,6 +559,7 @@ function UnitsFilterContent() {
                           <Edit className="w-5 h-5" />
                         </Link>
                       </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

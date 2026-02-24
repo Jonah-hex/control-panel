@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+import { useDashboardAuth } from "@/hooks/useDashboardAuth";
+import { showToast } from "@/app/dashboard/buildings/details/toast";
 
 interface Sale {
   id: string;
@@ -26,6 +29,16 @@ export default function SalesPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
+  const router = useRouter();
+  const { can, ready } = useDashboardAuth();
+
+  useEffect(() => {
+    if (!ready) return;
+    if (!can("sales")) {
+      showToast("ليس لديك صلاحية الوصول لسجل المبيعات.", "error");
+      router.replace("/dashboard");
+    }
+  }, [ready, can, router]);
 
   useEffect(() => {
     async function fetchSales() {
@@ -39,6 +52,14 @@ export default function SalesPage() {
     }
     fetchSales();
   }, []);
+
+  if (ready && !can("sales")) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gray-50" dir="rtl">
+        <p className="text-gray-500">جاري التحويل...</p>
+      </main>
+    );
+  }
 
   return (
     <main className="p-8">

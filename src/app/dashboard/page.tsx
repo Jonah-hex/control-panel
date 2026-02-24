@@ -44,9 +44,12 @@ import {
   Clock,
   FileText,
   Edit,
-  Trash2
-  , User2
+  Trash2,
+  User2,
+  Crown
 } from 'lucide-react'
+import { showToast } from '@/app/dashboard/buildings/details/toast'
+import { useSubscription } from '@/hooks/useSubscription'
 
 interface Building {
   id: string
@@ -57,6 +60,8 @@ interface Building {
   total_floors: number
   image_urls: string[] | null
   created_at: string
+  owner_name?: string | null
+  created_by_name?: string | null
 }
 
 interface Unit {
@@ -89,8 +94,38 @@ interface BuildingAssocRow {
   owner_association?: string | Record<string, unknown> | null
 }
 
+type PermissionKey =
+  | 'dashboard'
+  | 'buildings'
+  | 'buildings_create'
+  | 'buildings_edit'
+  | 'building_details'
+  | 'buildings_delete'
+  | 'details_basic'
+  | 'details_building'
+  | 'details_facilities'
+  | 'details_guard'
+  | 'details_location'
+  | 'details_association'
+  | 'details_engineering'
+  | 'details_electricity'
+  | 'units'
+  | 'units_edit'
+  | 'deeds'
+  | 'statistics'
+  | 'activities'
+  | 'reports'
+  | 'reservations'
+  | 'sales'
+  | 'security'
+  | 'settings'
+
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
+  /** المالك الفعلي للبيانات: إما المالك نفسه أو المالك التابع له الموظف */
+  const [effectiveOwnerId, setEffectiveOwnerId] = useState<string | null>(null)
+  /** صلاحيات الموظف إن كان الدخول كموظف؛ null = مالك كامل الصلاحيات */
+  const [employeePermissions, setEmployeePermissions] = useState<Record<PermissionKey, boolean> | null>(null)
   const [buildings, setBuildings] = useState<Building[]>([])
   const [buildingsForAssoc, setBuildingsForAssoc] = useState<BuildingAssocRow[]>([])
   const [units, setUnits] = useState<Unit[]>([])
@@ -114,6 +149,8 @@ export default function DashboardPage() {
 
   const router = useRouter()
   const supabase = createClient()
+  const can = (key: PermissionKey) => employeePermissions === null || Boolean(employeePermissions[key])
+  const { planName, buildingsLimitLabel, canAddBuilding, loading: subscriptionLoading } = useSubscription()
 
   useEffect(() => {
     const getUser = async () => {
@@ -122,7 +159,19 @@ export default function DashboardPage() {
         router.push('/login')
       } else {
         setUser(user)
-        fetchBuildings()
+        const { data: empRows } = await supabase
+          .from('dashboard_employees')
+          .select('owner_id, permissions')
+          .eq('auth_user_id', user.id)
+          .eq('is_active', true)
+          .limit(1)
+        if (empRows?.[0]) {
+          setEffectiveOwnerId(empRows[0].owner_id)
+          setEmployeePermissions((empRows[0].permissions as Record<PermissionKey, boolean>) || null)
+        } else {
+          setEffectiveOwnerId(user.id)
+          setEmployeePermissions(null)
+        }
       }
     }
     getUser()
@@ -157,6 +206,10 @@ export default function DashboardPage() {
       clearInterval(timer)
     }
   }, [])
+
+  useEffect(() => {
+    if (effectiveOwnerId) fetchBuildings()
+  }, [effectiveOwnerId])
 
   // مراقبة التحديثات الفورية للوحدات
   useEffect(() => {
@@ -199,7 +252,7 @@ export default function DashboardPage() {
             const newBuilding = payload.new
             if (!newBuilding) return
             // فقط نشاطات المالك الحالي
-            if (newBuilding.owner_id && newBuilding.owner_id !== user.id) return
+            if (newBuilding.owner_id && newBuilding.owner_id !== effectiveOwnerId) return
 
             // إعادة جلب العماير لعرض أحدثها في البطاقات والنشاطات
             fetchBuildings()
@@ -213,12 +266,14 @@ export default function DashboardPage() {
     return () => {
       supabase.removeChannel(buildingsSub)
     }
-  }, [user])
+  }, [effectiveOwnerId])
 
   const fetchBuildings = async () => {
     try {
+      const ownerId = effectiveOwnerId
+      if (!ownerId) return
+
       const { data: { user } } = await supabase.auth.getUser()
-      
       if (!user) {
         router.push('/login')
         return
@@ -227,7 +282,7 @@ export default function DashboardPage() {
       const { data, error } = await supabase
         .from('buildings')
         .select('*')
-        .eq('owner_id', user.id)
+        .eq('owner_id', ownerId)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -237,7 +292,7 @@ export default function DashboardPage() {
       const { data: assocData } = await supabase
         .from('buildings')
         .select('id, name, owner_association')
-        .eq('owner_id', user.id)
+        .eq('owner_id', ownerId)
       setBuildingsForAssoc(assocData || [])
 
       // جلب جميع الوحدات لعماير هذا المستخدم فقط
@@ -341,16 +396,21 @@ export default function DashboardPage() {
     return out
   }, [buildingsForAssoc])
 
-  const notificationsCount = electricityReminders.length + reservationReminders.length + associationEndReminders.length
+  // تنبيهات معروضة حسب الصلاحيات (خاصة بلوحة الموظف حسب عمله)
+  const filteredAssociationEndReminders = can('details_association') ? associationEndReminders : []
+  const filteredReservationReminders = can('reservations') ? reservationReminders : []
+  const filteredElectricityReminders = can('details_electricity') ? electricityReminders : []
+
+  const notificationsCount = filteredElectricityReminders.length + filteredReservationReminders.length + filteredAssociationEndReminders.length
 
   // قائمة معرفات الإشعارات الحالية (لحساب غير المقروءة)
   const currentNotificationIds = useMemo(() => {
     const ids: string[] = []
-    associationEndReminders.forEach(({ buildingId, daysLeft }) => ids.push(`assoc-${buildingId}-${daysLeft}`))
-    reservationReminders.forEach(({ unit }) => ids.push(`res-${unit.id}`))
-    electricityReminders.forEach(({ unit }) => ids.push(`elec-${unit.id}`))
+    filteredAssociationEndReminders.forEach(({ buildingId, daysLeft }) => ids.push(`assoc-${buildingId}-${daysLeft}`))
+    filteredReservationReminders.forEach(({ unit }) => ids.push(`res-${unit.id}`))
+    filteredElectricityReminders.forEach(({ unit }) => ids.push(`elec-${unit.id}`))
     return ids
-  }, [associationEndReminders, reservationReminders, electricityReminders])
+  }, [filteredAssociationEndReminders, filteredReservationReminders, filteredElectricityReminders])
 
   const unreadCount = useMemo(() => {
     return currentNotificationIds.filter((id) => !readNotificationIds.has(id)).length
@@ -399,11 +459,12 @@ export default function DashboardPage() {
       type: 'add',
       building_name: b.name || 'عمارة جديدة',
       building_id: b.id,
-      user_name: 'النظام',
+      user_name: b.created_by_name?.trim() || b.owner_name?.trim() || 'النظام',
       timestamp: b.created_at,
       details: 'تم إضافة عمارة جديدة'
     }))
     const fromAssoc: Activity[] = associationEndReminders.map(r => {
+      const ownerName = buildings.find(b => b.id === r.buildingId)?.owner_name?.trim() || 'النظام'
       // ترتيب العرض: انتهت اليوم أولاً ثم 3 ثم 5 ثم 10 أيام (الأقرب أولاً)
       const sortTime = new Date(Date.now() - r.daysLeft * 24 * 60 * 60 * 1000).toISOString()
       return {
@@ -411,7 +472,7 @@ export default function DashboardPage() {
         type: 'association_end' as const,
         building_name: r.buildingName,
         building_id: r.buildingId,
-        user_name: 'النظام',
+        user_name: ownerName,
         timestamp: sortTime,
         details: r.daysLeft === 0
           ? 'انتهت مدة اتحاد الملاك اليوم'
@@ -427,6 +488,17 @@ export default function DashboardPage() {
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 7)
   }, [units, buildings, associationEndReminders])
+
+  // عرض النشاطات حسب الصلاحيات (خاص بلوحة الموظف)
+  const filteredActivities = useMemo(() => {
+    return activities.filter((a) => {
+      if (a.type === 'sold') return can('sales')
+      if (a.type === 'reserved') return can('reservations')
+      if (a.type === 'add') return can('building_details') || can('buildings')
+      if (a.type === 'association_end') return can('details_association')
+      return true
+    })
+  }, [activities, employeePermissions])
 
   // حساب النسب المئوية
   const availablePercentage = totalUnits > 0 ? Math.round((availableUnits / totalUnits) * 100) : 0
@@ -528,10 +600,10 @@ export default function DashboardPage() {
   ]
 
   const quickActions = [
-    { icon: Plus, label: 'إضافة عمارة', href: '/dashboard/buildings/new', color: 'blue', gradient: 'from-blue-500 to-cyan-500' },
-    { icon: Eye, label: 'عرض العماير', href: '/dashboard/buildings', color: 'green', gradient: 'from-emerald-500 to-green-500' },
-    { icon: Home, label: 'الوحدات', href: '/dashboard/units', color: 'purple', gradient: 'from-purple-500 to-pink-500' },
-    { icon: BarChart3, label: 'الإحصائيات', href: '/dashboard/statistics', color: 'indigo', gradient: 'from-indigo-500 to-purple-500' }
+    { icon: Plus, label: 'إضافة عمارة', href: '/dashboard/buildings/new', color: 'blue', gradient: 'from-blue-500 to-cyan-500', permission: 'buildings_create' as const, noPermissionMessage: 'ليس لديك صلاحية إضافة عمارة جديدة. تواصل مع المالك لتفعيل الصلاحية.' },
+    { icon: Eye, label: 'عرض العماير', href: '/dashboard/buildings', color: 'green', gradient: 'from-emerald-500 to-green-500', permission: 'buildings' as const, noPermissionMessage: 'ليس لديك صلاحية عرض العماير.' },
+    { icon: Home, label: 'الوحدات', href: '/dashboard/units', color: 'purple', gradient: 'from-purple-500 to-pink-500', permission: 'units' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول للوحدات.' },
+    { icon: BarChart3, label: 'الإحصائيات', href: '/dashboard/statistics', color: 'indigo', gradient: 'from-indigo-500 to-purple-500', permission: 'statistics' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول للإحصائيات.' }
   ]
 
   const recentBuildings = buildings.slice(0, 3)
@@ -586,9 +658,24 @@ export default function DashboardPage() {
                 <div>
                   <h1 className="text-xl font-bold text-gray-800">لوحة التحكم الرئيسية</h1>
                   <p className="text-xs text-gray-500">ادارة العماير</p>
+                  {!subscriptionLoading && planName && (
+                    <p className="text-xs text-indigo-600 font-medium mt-1">
+                      خطة {planName}: {buildingsLimitLabel}
+                      {!canAddBuilding && (
+                        <Link href="/subscriptions" className="mr-2 inline-flex items-center gap-1 text-amber-600 hover:text-amber-700">
+                          <Crown className="w-3.5 h-3.5" />
+                          ترقية
+                        </Link>
+                      )}
+                    </p>
+                  )}
                   <div className="flex gap-2 mt-2">
-                    <a href="/dashboard/reservations" className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-200 transition cursor-pointer">سجل الحجوزات</a>
-                    <a href="/dashboard/sales" className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-semibold hover:bg-green-200 transition cursor-pointer">سجل المبيعات</a>
+                    {can('reservations') && (
+                      <a href="/dashboard/reservations" className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-200 transition cursor-pointer">سجل الحجوزات</a>
+                    )}
+                    {can('sales') && (
+                      <a href="/dashboard/sales" className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-semibold hover:bg-green-200 transition cursor-pointer">سجل المبيعات</a>
+                    )}
                   </div>
                 </div>
               </div>
@@ -657,13 +744,6 @@ export default function DashboardPage() {
                             </span>
                             <div>
                               <h3 className="font-bold text-gray-800">التنبيهات</h3>
-                              <p className="text-xs text-gray-500 mt-0.5">
-                                {notificationsCount > 0 ? (
-                                  <span className="text-amber-600 font-medium">{notificationsCount} تنبيه</span>
-                                ) : (
-                                  'فواتير كهرباء • حجز • اتحاد ملاك'
-                                )}
-                              </p>
                             </div>
                           </div>
                           {notificationsCount > 0 && unreadCount > 0 && (
@@ -685,11 +765,10 @@ export default function DashboardPage() {
                               <Bell className="w-6 h-6" />
                             </span>
                             <p className="text-sm text-gray-500 font-medium">لا توجد تنبيهات</p>
-                            <p className="text-xs text-gray-400 mt-1">ستظهر هنا فواتير الكهرباء وتذكيرات الحجز وانتهاء اتحاد الملاك</p>
                           </div>
                         ) : (
                           <div className="divide-y divide-gray-100">
-                            {associationEndReminders.map(({ buildingId, buildingName, endDate, daysLeft }) => (
+                            {filteredAssociationEndReminders.map(({ buildingId, buildingName, endDate, daysLeft }) => (
                               <Link
                                 key={`assoc-${buildingId}-${daysLeft}`}
                                 href={`/dashboard/buildings/details?buildingId=${buildingId}#card-association`}
@@ -710,7 +789,7 @@ export default function DashboardPage() {
                                 </div>
                               </Link>
                             ))}
-                            {reservationReminders.map(({ unit, buildingName }) => (
+                            {filteredReservationReminders.map(({ unit, buildingName }) => (
                               <Link
                                 key={`res-${unit.id}`}
                                 href={`/dashboard/buildings/details?buildingId=${unit.building_id}`}
@@ -728,7 +807,7 @@ export default function DashboardPage() {
                                 </div>
                               </Link>
                             ))}
-                            {electricityReminders.map(({ unit, buildingName }) => (
+                            {filteredElectricityReminders.map(({ unit, buildingName }) => (
                               <Link
                                 key={`elec-${unit.id}`}
                                 href={`/dashboard/buildings/details?buildingId=${unit.building_id}#card-electricity`}
@@ -776,17 +855,21 @@ export default function DashboardPage() {
                 <div className="absolute left-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                   <div className="p-3 border-b border-gray-100">
                     <p className="text-sm font-semibold text-gray-800">{user?.email}</p>
-                    <p className="text-xs text-gray-500">مدير النظام</p>
+                    {employeePermissions === null && (
+                      <p className="text-xs text-gray-500">مدير النظام</p>
+                    )}
                   </div>
                   <div className="p-2">
                     <a href="/user" className="w-full px-3 py-2 text-right text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2 cursor-pointer">
                       <User2 className="w-4 h-4" />
                       ملف المستخدم
                     </a>
-                    <a href="/user/settings" className="w-full px-3 py-2 text-right text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2 cursor-pointer">
-                      <Settings className="w-4 h-4" />
-                      إعدادات متقدمة
-                    </a>
+                    {(employeePermissions === null || employeePermissions.settings) && (
+                      <Link href="/user/settings" className="w-full px-3 py-2 text-right text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2 cursor-pointer">
+                        <Settings className="w-4 h-4" />
+                        إعدادات متقدمة
+                      </Link>
+                    )}
                     <button 
                       onClick={handleLogout}
                       className="w-full px-3 py-2 text-right text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2"
@@ -815,16 +898,34 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="p-4">
-              {quickActions.map((action, index) => (
-                <Link
-                  key={index}
-                  href={action.href}
-                  className="flex items-center gap-3 p-3 text-gray-700 hover:bg-gray-50 rounded-xl transition mb-1 cursor-pointer"
-                >
-                  <action.icon className={`w-5 h-5 text-${action.color}-600`} />
-                  <span>{action.label}</span>
-                </Link>
-              ))}
+              {quickActions.map((action, index) => {
+                const allowed = can(action.permission)
+                const showWithoutPermission = action.permission === 'buildings_create' || action.permission === 'statistics'
+                if (!allowed && !showWithoutPermission) return null
+                if (allowed) {
+                  return (
+                    <Link
+                      key={index}
+                      href={action.href}
+                      className="flex items-center gap-3 p-3 text-gray-700 hover:bg-gray-50 rounded-xl transition mb-1 cursor-pointer"
+                    >
+                      <action.icon className={`w-5 h-5 text-${action.color}-600`} />
+                      <span>{action.label}</span>
+                    </Link>
+                  )
+                }
+                return (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => showToast(action.noPermissionMessage, 'error')}
+                    className="flex items-center gap-3 p-3 text-gray-700 hover:bg-gray-50 rounded-xl transition mb-1 cursor-pointer w-full text-right"
+                  >
+                    <action.icon className={`w-5 h-5 text-${action.color}-600`} />
+                    <span>{action.label}</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -891,29 +992,50 @@ export default function DashboardPage() {
 
         {/* إجراءات سريعة */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
-          {quickActions.map((action, index) => (
-            <Link
-              key={index}
-              href={action.href}
-              className="group relative bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 p-6 border border-gray-200 hover:border-transparent overflow-hidden hover:-translate-y-2 cursor-pointer"
-            >
-              {/* Background Gradient on Hover */}
-              <div className={`absolute inset-0 bg-gradient-to-br ${action.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
-              
-              {/* Content */}
-              <div className="relative z-10 text-center">
-                <div className={`w-14 h-14 bg-gradient-to-br ${action.gradient} rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-500`}>
-                  <action.icon className="w-7 h-7 text-white" />
+          {quickActions.map((action, index) => {
+            const allowed = can(action.permission)
+            const showWithoutPermission = action.permission === 'buildings_create' || action.permission === 'statistics'
+            if (!allowed && !showWithoutPermission) return null
+            if (allowed) {
+              return (
+                <Link
+                  key={index}
+                  href={action.href}
+                  className="group relative bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 p-6 border border-gray-200 hover:border-transparent overflow-hidden hover:-translate-y-2 cursor-pointer"
+                >
+                  <div className={`absolute inset-0 bg-gradient-to-br ${action.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
+                  <div className="relative z-10 text-center">
+                    <div className={`w-14 h-14 bg-gradient-to-br ${action.gradient} rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-500`}>
+                      <action.icon className="w-7 h-7 text-white" />
+                    </div>
+                    <h3 className="font-bold text-gray-800 group-hover:text-white transition-colors duration-300 text-sm">
+                      {action.label}
+                    </h3>
+                  </div>
+                  <Sparkles className="absolute top-2 right-2 w-4 h-4 text-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                </Link>
+              )
+            }
+            return (
+              <button
+                key={index}
+                type="button"
+                onClick={() => showToast(action.noPermissionMessage, 'error')}
+                className="group relative bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 p-6 border border-gray-200 overflow-hidden cursor-pointer w-full text-right opacity-90 hover:opacity-100"
+              >
+                <div className={`absolute inset-0 bg-gradient-to-br ${action.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
+                <div className="relative z-10 text-center">
+                  <div className={`w-14 h-14 bg-gradient-to-br ${action.gradient} rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg`}>
+                    <action.icon className="w-7 h-7 text-white" />
+                  </div>
+                  <h3 className="font-bold text-gray-800 text-sm">
+                    {action.label}
+                  </h3>
                 </div>
-                <h3 className="font-bold text-gray-800 group-hover:text-white transition-colors duration-300 text-sm">
-                  {action.label}
-                </h3>
-              </div>
-              
-              {/* Sparkle Effect */}
-              <Sparkles className="absolute top-2 right-2 w-4 h-4 text-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            </Link>
-          ))}
+                <Sparkles className="absolute top-2 right-2 w-4 h-4 text-yellow-400 opacity-50" />
+              </button>
+            )
+          })}
         </div>
 
         {/* صفين من المحتوى */}
@@ -938,9 +1060,9 @@ export default function DashboardPage() {
               </div>
 
               <div className="space-y-3">
-                {activities.length === 0 ? (
+                {filteredActivities.length === 0 ? (
                   <div className="text-center py-8 text-gray-500 text-sm">لا توجد نشاطات بعد — ستظهر هنا عند إضافة عمارة أو بيع/حجز وحدة</div>
-                ) : activities.map((activity) => (
+                ) : filteredActivities.map((activity) => (
                   <div
                     key={activity.id}
                     className="relative flex items-start gap-4 p-4 rounded-xl border border-transparent"
@@ -1060,7 +1182,7 @@ export default function DashboardPage() {
                   return (
                     <Link 
                       key={building.id} 
-                      href={`/dashboard/buildings/${building.id}`}
+                      href={can('building_details') ? `/dashboard/buildings/details?buildingId=${building.id}` : '/dashboard/buildings'}
                       className="group relative flex items-center gap-4 p-4 bg-gradient-to-r from-white to-gray-50 hover:from-blue-50 hover:to-purple-50 rounded-2xl transition-all duration-300 border border-gray-100 hover:border-blue-200 hover:shadow-lg cursor-pointer overflow-hidden"
                     >
                       {/* Animated Background */}
@@ -1111,13 +1233,17 @@ export default function DashboardPage() {
                     <Building2 className="w-10 h-10 text-gray-400" />
                   </div>
                   <p className="text-gray-500 mb-4 text-sm">لا توجد عماير مضافة حتى الآن</p>
-                  <Link
-                    href="/dashboard/buildings/new"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 font-semibold cursor-pointer"
-                  >
-                    <Plus className="w-5 h-5" />
-                    إضافة أول عمارة
-                  </Link>
+                  {can('buildings_create') ? (
+                    <Link
+                      href="/dashboard/buildings/new"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 font-semibold cursor-pointer"
+                    >
+                      <Plus className="w-5 h-5" />
+                      إضافة أول عمارة
+                    </Link>
+                  ) : (
+                    <p className="text-amber-600 text-sm font-medium">ليس لديك صلاحية إضافة عمارة. تواصل مع المالك.</p>
+                  )}
                 </div>
               )}
             </div>

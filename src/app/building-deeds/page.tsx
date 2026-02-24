@@ -1,15 +1,35 @@
 "use client";
 
 import BuildingDeedsPanel from "../../components/BuildingDeedsPanel";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
+import { useDashboardAuth } from "@/hooks/useDashboardAuth";
+import { showToast } from "@/app/dashboard/buildings/details/toast";
 
 function BuildingDeedsContent() {
   const searchParams = useSearchParams();
   const buildingId = searchParams.get("buildingId");
   const unitId = searchParams.get("unitId");
+  const router = useRouter();
+  const { can, ready } = useDashboardAuth();
+
+  useEffect(() => {
+    if (!ready) return;
+    if (!can("deeds")) {
+      showToast("ليس لديك صلاحية الوصول لإدارة الصكوك ومحاضر الفرز.", "error");
+      router.replace(buildingId ? `/dashboard/buildings/details?buildingId=${buildingId}` : "/dashboard");
+    }
+  }, [ready, can, router, buildingId]);
+
+  if (ready && !can("deeds")) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gray-50" dir="rtl">
+        <p className="text-gray-500">جاري التحويل...</p>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 lg:p-8">

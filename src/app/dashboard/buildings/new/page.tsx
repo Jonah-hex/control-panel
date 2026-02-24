@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { showToast } from '../details/toast'
+import { useDashboardAuth } from '@/hooks/useDashboardAuth'
+import { useSubscription } from '@/hooks/useSubscription'
 import { 
   ArrowLeft, 
   Save,
@@ -171,7 +173,26 @@ interface OwnerAssociation {
 }
 
 export default function NewBuildingPage() {
+  const router = useRouter()
+  const { can, ready, effectiveOwnerId, currentUserDisplayName } = useDashboardAuth()
+  const { canAddBuilding, canAddUnits, unitsPerBuildingLabel, loading: subscriptionLoading } = useSubscription()
 
+  useEffect(() => {
+    if (!ready) return
+    if (!can('buildings_create')) {
+      showToast('ليس لديك صلاحية إضافة عمارة جديدة. تواصل مع المالك لتفعيل الصلاحية.', 'error')
+      router.replace('/dashboard')
+    }
+  }, [ready, can, router])
+
+  // منع الإضافة عند وصول حد العماير لخطة الاشتراك
+  useEffect(() => {
+    if (!ready || !can('buildings_create') || !effectiveOwnerId || subscriptionLoading) return
+    if (!canAddBuilding) {
+      showToast('وصلت إلى حد العماير لخطتك. ترقّى من صفحة الاشتراكات.', 'error')
+      router.replace('/dashboard/buildings')
+    }
+  }, [ready, can, effectiveOwnerId, canAddBuilding, subscriptionLoading, router])
 
   const [formData, setFormData] = useState({
     // معلومات أساسية
@@ -325,7 +346,6 @@ export default function NewBuildingPage() {
   })
   
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const router = useRouter()
   const supabase = createClient()
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -813,6 +833,16 @@ export default function NewBuildingPage() {
       if (duplicateNumbers.length > 0) {
         throw new Error(`❌ أرقام وحدات مكررة: ${duplicateNumbers.join(', ')}. الرجاء تحديث الأرقام لجعلها فريدة`)
       }
+
+      // التحقق من حدود الاشتراك
+      if (!canAddBuilding) {
+        showToast('وصلت إلى حد العماير لخطتك. ترقّى خطتك من صفحة الاشتراكات.', 'error')
+        return
+      }
+      if (!canAddUnits(null, totalUnits)) {
+        showToast(`حد الوحدات لخطتك: ${unitsPerBuildingLabel}. قلّل عدد الوحدات أو ترقّى خطتك.`, 'error')
+        return
+      }
       
       console.log('📊 بدء حفظ العمارة:', {
         name: formData.name,
@@ -913,8 +943,11 @@ export default function NewBuildingPage() {
               includesWater: ownerAssociation.includesWater || false,
             } : null,
             
-            // معلومات المالك - Owner Info
-            owner_id: user.id,
+            // معلومات المالك - Owner Info (مالك فعلي: المالك أو المالك التابع له الموظف)
+            owner_id: effectiveOwnerId ?? user.id,
+            // من نفّذ الإضافة (للنشاط: مالك أو موظف)
+            created_by: user.id,
+            created_by_name: currentUserDisplayName?.trim() || null,
           }
         ])
         .select()
@@ -1121,6 +1154,14 @@ export default function NewBuildingPage() {
   useEffect(() => {
     if (typeof document !== 'undefined') setIsRTL(document.dir === 'rtl')
   }, [])
+
+  if (ready && !can('buildings_create')) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50" dir="rtl">
+        <p className="text-gray-500">جاري التحويل...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50" dir="rtl">

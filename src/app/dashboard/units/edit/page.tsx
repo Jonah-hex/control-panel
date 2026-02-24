@@ -4,11 +4,22 @@ import { useEffect, useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { Building2, ArrowRight, User, Zap, DoorOpen } from "lucide-react";
+import { useDashboardAuth } from "@/hooks/useDashboardAuth";
+import { showToast } from "@/app/dashboard/buildings/details/toast";
 
 function EditUnitPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const unitId = searchParams.get("unitId");
+  const { can, ready } = useDashboardAuth();
+
+  useEffect(() => {
+    if (!ready) return;
+    if (!can("units_edit")) {
+      showToast("ليس لديك صلاحية تعديل الوحدات.", "error");
+      router.replace("/dashboard/units");
+    }
+  }, [ready, can, router]);
   const [unit, setUnit] = useState<Record<string, unknown> | null>(null);
   const [building, setBuilding] = useState<{ id: string; name?: string; owner_name?: string | null } | null>(null);
   const [form, setForm] = useState({
@@ -210,6 +221,14 @@ function EditUnitPageContent() {
           <ArrowRight className="w-4 h-4" />
           رجوع لقائمة الوحدات
         </Link>
+      </div>
+    );
+  }
+
+  if (ready && !can("units_edit")) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50" dir="rtl">
+        <p className="text-gray-500">جاري التحويل...</p>
       </div>
     );
   }

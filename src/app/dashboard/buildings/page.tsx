@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Plus, ArrowLeft, Building2, MapPin, Home, Search, Trash2, Eye } from 'lucide-react'
+import { Plus, ArrowLeft, Building2, MapPin, Home, Search, Trash2, Eye, Crown } from 'lucide-react'
+import { useDashboardAuth } from '@/hooks/useDashboardAuth'
+import { useSubscription } from '@/hooks/useSubscription'
 
 interface Building {
   id: string
@@ -33,22 +35,26 @@ export default function BuildingsPage() {
   const [buildingToDelete, setBuildingToDelete] = useState<Building | null>(null)
   const [unitStatsByBuilding, setUnitStatsByBuilding] = useState<Record<string, { available: number; reserved: number; sold: number }>>({})
   const supabase = createClient()
+  const { effectiveOwnerId, can, ready } = useDashboardAuth()
+  const { planName, canAddBuilding, buildingsLimitLabel, loading: subscriptionLoading } = useSubscription()
 
   useEffect(() => {
-    fetchBuildings()
-  }, [])
+    if (effectiveOwnerId) fetchBuildings()
+    else if (ready) setLoading(false)
+  }, [effectiveOwnerId, ready])
 
   const fetchBuildings = async () => {
+    const ownerId = effectiveOwnerId
+    if (!ownerId) return
     try {
       setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
-      
       if (!user) return
 
       const { data, error } = await supabase
         .from('buildings')
         .select('*')
-        .eq('owner_id', user.id)
+        .eq('owner_id', ownerId)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -171,15 +177,26 @@ export default function BuildingsPage() {
                   <span className="text-sm font-semibold">لوحة التحكم</span>
                 </Link>
 
-                <Link
-                  href="/dashboard/buildings/new"
-                  className="inline-flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-slate-800/90 via-purple-800/90 to-slate-800/90 backdrop-blur-sm text-white rounded-full shadow-xl hover:shadow-2xl transform transition hover:-translate-y-0.5"
-                >
-                  <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
-                    <Plus className="w-4 h-4 text-white" />
-                  </span>
-                  <span className="text-sm font-semibold">إضافة عمارة جديدة</span>
-                </Link>
+                {ready && can('buildings_create') && canAddBuilding && (
+                  <Link
+                    href="/dashboard/buildings/new"
+                    className="inline-flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-slate-800/90 via-purple-800/90 to-slate-800/90 backdrop-blur-sm text-white rounded-full shadow-xl hover:shadow-2xl transform transition hover:-translate-y-0.5"
+                  >
+                    <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+                      <Plus className="w-4 h-4 text-white" />
+                    </span>
+                    <span className="text-sm font-semibold">إضافة عمارة جديدة</span>
+                  </Link>
+                )}
+                {ready && can('buildings_create') && !subscriptionLoading && !canAddBuilding && (
+                  <Link
+                    href="/subscriptions"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/90 text-white rounded-full shadow-lg hover:bg-amber-600 transition text-sm font-semibold"
+                  >
+                    <Crown className="w-4 h-4" />
+                    ترقية الخطة لإضافة المزيد
+                  </Link>
+                )}
               </div>
             </div>
           </div>
@@ -196,6 +213,11 @@ export default function BuildingsPage() {
               {searchTerm && (
                 <span className="mr-2 text-slate-500">
                   (ظاهر: {filteredBuildings.length})
+                </span>
+              )}
+              {!subscriptionLoading && planName && (
+                <span className="mr-2 text-indigo-600 font-medium">
+                  — خطة {planName}: {buildingsLimitLabel}
                 </span>
               )}
             </p>
@@ -229,13 +251,21 @@ export default function BuildingsPage() {
             <p className="text-gray-500 mb-6">
               {buildings.length === 0 ? 'ابدأ بإضافة عمارتك الأولى' : 'حاول البحث عن عمارة أخرى'}
             </p>
-            {buildings.length === 0 && (
+            {buildings.length === 0 && ready && can('buildings_create') && canAddBuilding && (
               <Link
                 href="/dashboard/buildings/new"
                 className="inline-block px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl hover:from-indigo-700 hover:to-purple-700 transition-all"
               >
                 إضافة عمارة جديدة
               </Link>
+            )}
+            {buildings.length === 0 && ready && can('buildings_create') && !canAddBuilding && !subscriptionLoading && (
+              <Link href="/subscriptions" className="inline-block px-6 py-3 bg-amber-500 text-white rounded-2xl hover:bg-amber-600 transition font-semibold">
+                ترقية الخطة لإضافة عمارة
+              </Link>
+            )}
+            {buildings.length === 0 && ready && !can('buildings_create') && (
+              <p className="text-amber-600 text-sm font-medium">ليس لديك صلاحية إضافة عمارة. تواصل مع المالك.</p>
             )}
           </div>
         ) : (
@@ -302,6 +332,7 @@ export default function BuildingsPage() {
                       
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-2">
+                          {ready && can('building_details') && (
                           <Link
                             href={`/dashboard/buildings/details?buildingId=${b.id}`}
                             className="p-2 text-blue-600 hover:text-blue-700 rounded-full hover:bg-blue-50 hover:scale-110 transform transition"
@@ -309,6 +340,7 @@ export default function BuildingsPage() {
                           >
                             <Eye className="w-4 h-4" />
                           </Link>
+                          )}
 
                           <Link
                             href={`/dashboard/units?buildingId=${b.id}`}
@@ -318,6 +350,7 @@ export default function BuildingsPage() {
                             <Home className="w-4 h-4" />
                           </Link>
 
+                          {ready && can('buildings_delete') && (
                           <button
                             onClick={() => openDeleteModal(b)}
                             className="p-2 text-red-600 hover:text-red-700 rounded-full hover:bg-red-50 hover:scale-110 transform transition"
@@ -325,6 +358,7 @@ export default function BuildingsPage() {
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
+                          )}
                         </div>
                       </td>
                     </tr>

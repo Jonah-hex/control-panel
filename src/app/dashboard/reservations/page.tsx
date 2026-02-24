@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+import { useDashboardAuth } from "@/hooks/useDashboardAuth";
+import { showToast } from "@/app/dashboard/buildings/details/toast";
 
 interface Reservation {
   id: string;
@@ -24,6 +27,16 @@ export default function ReservationsPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
+  const router = useRouter();
+  const { can, ready } = useDashboardAuth();
+
+  useEffect(() => {
+    if (!ready) return;
+    if (!can("reservations")) {
+      showToast("ليس لديك صلاحية الوصول لسجل الحجوزات.", "error");
+      router.replace("/dashboard");
+    }
+  }, [ready, can, router]);
 
   useEffect(() => {
     async function fetchReservations() {
@@ -37,6 +50,14 @@ export default function ReservationsPage() {
     }
     fetchReservations();
   }, []);
+
+  if (ready && !can("reservations")) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gray-50" dir="rtl">
+        <p className="text-gray-500">جاري التحويل...</p>
+      </main>
+    );
+  }
 
   return (
     <main className="p-8">

@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { useDashboardAuth } from '@/hooks/useDashboardAuth'
+import { showToast } from '@/app/dashboard/buildings/details/toast'
 import {
   ArrowLeft,
   Activity,
@@ -22,6 +24,8 @@ interface Building {
   id: string
   name: string
   created_at: string
+  owner_name?: string | null
+  created_by_name?: string | null
   owner_association?: string | Record<string, unknown> | null
 }
 
@@ -56,9 +60,24 @@ export default function ActivitiesPage() {
   const [filter, setFilter] = useState<FilterType>('all')
   const router = useRouter()
   const supabase = createClient()
+  const { effectiveOwnerId, can, ready, employeePermissions } = useDashboardAuth()
+
+  useEffect(() => {
+    if (!ready) return
+    if (!can('activities')) {
+      showToast('ليس لديك صلاحية الوصول لسجل النشاطات.', 'error')
+      router.replace('/dashboard')
+      return
+    }
+  }, [ready, can, router])
 
   useEffect(() => {
     const fetchData = async () => {
+      const ownerId = effectiveOwnerId
+      if (!ownerId) {
+        setLoading(false)
+        return
+      }
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
@@ -68,8 +87,8 @@ export default function ActivitiesPage() {
 
         const { data: buildingsData, error: buildingsError } = await supabase
           .from('buildings')
-          .select('id, name, created_at, owner_association')
-          .eq('owner_id', user.id)
+          .select('id, name, created_at, owner_name, created_by_name, owner_association')
+          .eq('owner_id', ownerId)
           .order('created_at', { ascending: false })
 
         if (buildingsError) throw buildingsError
@@ -93,7 +112,7 @@ export default function ActivitiesPage() {
       }
     }
     fetchData()
-  }, [router])
+  }, [router, effectiveOwnerId, supabase])
 
   // تنبيهات انتهاء اتحاد الملاك
   const associationEndReminders = useMemo(() => {
@@ -150,18 +169,19 @@ export default function ActivitiesPage() {
       type: 'add',
       building_name: b.name || 'عمارة جديدة',
       building_id: b.id,
-      user_name: 'النظام',
+      user_name: b.created_by_name?.trim() || b.owner_name?.trim() || 'النظام',
       timestamp: b.created_at,
       details: 'تم إضافة عمارة جديدة'
     }))
     const fromAssoc: ActivityItem[] = associationEndReminders.map(r => {
+      const ownerName = buildings.find(b => b.id === r.buildingId)?.owner_name?.trim() || 'النظام'
       const sortTime = new Date(Date.now() - r.daysLeft * 24 * 60 * 60 * 1000).toISOString()
       return {
         id: `assoc-${r.buildingId}-${r.daysLeft}`,
         type: 'association_end' as const,
         building_name: r.buildingName,
         building_id: r.buildingId,
-        user_name: 'النظام',
+        user_name: ownerName,
         timestamp: sortTime,
         details: r.daysLeft === 0
           ? 'انتهت مدة اتحاد الملاك اليوم'
@@ -181,6 +201,17 @@ export default function ActivitiesPage() {
     }
     return all
   }, [units, buildings, associationEndReminders, filter])
+
+  // عرض النشاطات حسب الصلاحيات (خاص بلوحة الموظف)
+  const filteredActivities = useMemo(() => {
+    return activities.filter((a) => {
+      if (a.type === 'sold') return can('sales')
+      if (a.type === 'reserved') return can('reservations')
+      if (a.type === 'add') return can('building_details') || can('buildings')
+      if (a.type === 'association_end') return can('details_association')
+      return true
+    })
+  }, [activities, can])
 
   const formatDate = (date: string) => {
     const d = new Date(date)
@@ -248,7 +279,7 @@ export default function ActivitiesPage() {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-gray-800">سجل النشاطات</h1>
-                  <p className="text-sm text-gray-500">{activities.length} نشاط</p>
+                  <p className="text-sm text-gray-500">{filteredActivities.length} نشاط</p>
                 </div>
               </div>
             </div>
@@ -277,7 +308,7 @@ export default function ActivitiesPage() {
 
         {/* قائمة النشاطات */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-          {activities.length === 0 ? (
+          {filteredActivities.length === 0 ? (
             <div className="text-center py-16 px-4">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Activity className="w-8 h-8 text-gray-400" />
@@ -289,7 +320,7 @@ export default function ActivitiesPage() {
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
-              {activities.map((activity) => (
+              {filteredActivities.map((activity) => (
                 <Link
                   key={activity.id}
                   href={activity.building_id

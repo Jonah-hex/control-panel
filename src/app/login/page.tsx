@@ -22,16 +22,18 @@ export default function LoginPage() {
   const [resetLoading, setResetLoading] = useState(false)
   const [resetSuccess, setResetSuccess] = useState('')
   const [passwordStrength, setPasswordStrength] = useState(0)
+  const [showPasswordStrength, setShowPasswordStrength] = useState(false)
   
   const router = useRouter()
   const supabase = createClient()
 
-  // تحقق من التخزين المؤقت عند التحميل
+  // تحقق من التخزين المؤقت عند التحميل (تذكرني)
   useEffect(() => {
+    if (typeof window === 'undefined') return
     const savedEmail = localStorage.getItem('rememberedEmail')
     const savedAttempts = localStorage.getItem('loginAttempts')
     const lockTime = localStorage.getItem('lockTime')
-    
+
     if (savedEmail) {
       setEmail(savedEmail)
       setRememberMe(true)
@@ -52,9 +54,15 @@ export default function LoginPage() {
     }
 
     if (savedAttempts) {
-      setAttempts(parseInt(savedAttempts))
+      setAttempts(parseInt(savedAttempts, 10))
     }
   }, [])
+
+  // مزامنة البريد مع التخزين عند تفعيل "تذكرني"
+  useEffect(() => {
+    if (typeof window === 'undefined' || !rememberMe) return
+    if (email) localStorage.setItem('rememberedEmail', email)
+  }, [rememberMe, email])
 
   // حساب قوة كلمة المرور
   useEffect(() => {
@@ -107,11 +115,11 @@ export default function LoginPage() {
         throw error
       }
       
-      // حفظ البريد إذا تم اختيار "تذكرني"
+      // حفظ البريد إذا تم اختيار "تذكرني" (يُحفظ أيضاً عند تفعيل الخيار قبل الدخول)
       if (rememberMe) {
-        localStorage.setItem('rememberedEmail', email)
+        if (typeof window !== 'undefined') localStorage.setItem('rememberedEmail', email)
       } else {
-        localStorage.removeItem('rememberedEmail')
+        if (typeof window !== 'undefined') localStorage.removeItem('rememberedEmail')
       }
 
       // امسح محاولات الدخول عند النجاح
@@ -119,10 +127,11 @@ export default function LoginPage() {
       localStorage.removeItem('lockTime')
 
       setSuccess('تم تسجيل الدخول بنجاح!')
+      // التوجيه إلى لوحة التحكم فقط بعد النجاح عند الضغط على تسجيل الدخول
       setTimeout(() => {
         router.push('/dashboard')
         router.refresh()
-      }, 1000)
+      }, 800)
       
     } catch (error: any) {
       console.error('Login error:', error)
@@ -280,6 +289,7 @@ export default function LoginPage() {
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      onBlur={() => setShowPasswordStrength(true)}
                       placeholder="••••••••"
                       className="w-full pr-10 pl-10 py-3 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition duration-300"
                       dir="ltr"
@@ -296,8 +306,8 @@ export default function LoginPage() {
                     </button>
                   </div>
 
-                  {/* Password Strength */}
-                  {password && (
+                  {/* قوة كلمة المرور — تظهر بعد خروج المؤشر من الحقل لتفادي استهلاك الضغطة الأولى على تسجيل الدخول */}
+                  {password && showPasswordStrength && (
                     <div className="mt-2">
                       <div className="flex justify-between items-center mb-1">
                         <span className="text-xs text-slate-400">قوة كلمة المرور:</span>
@@ -321,7 +331,14 @@ export default function LoginPage() {
                     <input
                       type="checkbox"
                       checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
+                      onChange={(e) => {
+                        const checked = e.target.checked
+                        setRememberMe(checked)
+                        if (typeof window !== 'undefined') {
+                          if (checked) localStorage.setItem('rememberedEmail', email)
+                          else localStorage.removeItem('rememberedEmail')
+                        }
+                      }}
                       className="w-4 h-4 rounded border border-slate-600 bg-slate-700 checked:bg-blue-600 checked:border-blue-500 cursor-pointer"
                       disabled={isLocked}
                     />

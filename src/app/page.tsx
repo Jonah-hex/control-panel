@@ -17,7 +17,8 @@ import {
   BarChart3,
   Lightbulb,
   Smartphone,
-  Clock
+  Clock,
+  Activity
 } from 'lucide-react'
 
 export default function HomePage() {
@@ -58,7 +59,7 @@ export default function HomePage() {
               </div>
             <div className="flex flex-col gap-1">
                 <h1 className="text-2xl font-bold text-white tracking-tight group-hover:text-blue-400 transition duration-300">عماير Pro</h1>
-                <span className="text-xs text-blue-300/70 font-semibold group-hover:text-blue-300 transition duration-300">إدارة عقارات ذكية</span>
+                <span className="text-xs text-blue-300/70 font-semibold group-hover:text-blue-300 transition duration-300">منصة إدارة عقارات ذكية</span>
               </div>
             </div>
 
@@ -135,27 +136,27 @@ export default function HomePage() {
               {
                 icon: HomeIcon,
                 title: 'إدارة الوحدات',
-                description: 'لوحة تحكم شاملة لتتبع حالة جميع الوحدات'
+                description: 'لوحة تحكم شاملة في جميع تفاصيل الوحدات'
+              },
+              {
+                icon: TrendingUp,
+                title: 'الحجوزات والمبيعات',
+                description: 'إدارة احترافية لسجل الحجوزات والمبيعات مع تنبيهات ذكية'
               },
               {
                 icon: BarChart3,
                 title: 'تقارير شاملة',
-                description: 'احصائيات ودراسات مفصلة للأداء'
+                description: 'إحصائيات وتقارير مفصلة للعماير والوحدات'
               },
               {
                 icon: Users,
-                title: 'إدارة اتحاد الملاك',
-                description: 'نظم اجتماعات وقرارات اتحاد الملاك بكفاءة'
+                title: 'موظفون بصلاحيات',
+                description: 'العمل على المنصة حسب الصلاحيات لكل موظف'
               },
               {
-                icon: Clock,
-                title: 'الجدولة الذكية',
-                description: 'نظم المواعيد والعروض بسهولة'
-              },
-              {
-                icon: Smartphone,
-                title: 'توافق الأجهزة',
-                description: 'استخدم المنصة على أي جهاز'
+                icon: Activity,
+                title: 'سجل النشاطات',
+                description: 'تتبع كل التغييرات والإضافات في العماير والوحدات في مكان واحد'
               }
             ].map((feature, i) => (
               <div key={i} className="stat-card feature-card p-8 rounded-xl border border-slate-800 bg-slate-800/30 hover:bg-slate-800/50 transition duration-300 group hover:scale-105 animate-slideInUp overflow-hidden" style={{animationDelay: `${0.1 + i * 0.08}s`}}>
@@ -172,6 +173,10 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+
+          <p className="text-center mt-12 text-slate-300 text-base sm:text-lg leading-relaxed max-w-3xl mx-auto">
+            والكثير من المميزات لتسهيل جميع أعمالك العقارية بأحدث الطرق — منصة عماير Pro مدعومة بالذكاء الصناعي لخدمتك بشكل أذكى وأسرع.
+          </p>
         </div>
       </div>
 
@@ -282,10 +287,10 @@ export default function HomePage() {
               <ArrowRight className="w-5 h-5" />
             </Link>
             <Link
-              href="/login"
+              href="/subscriptions"
               className="px-8 py-3.5 bg-white/10 backdrop-blur-md text-white border border-white/30 rounded-xl font-semibold text-base hover:bg-white/20 hover:border-white/40 transition duration-200 hover:scale-105 active:scale-95"
             >
-              تسجيل الدخول
+              اشترك الآن
             </Link>
           </div>
         </div>

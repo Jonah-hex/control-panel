@@ -11,6 +11,19 @@ import ImagesGallery from "../images-gallery";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ChevronDown, LayoutDashboard, ArrowRight, Building2, Pencil, X, Check } from "lucide-react";
+import { useDashboardAuth } from "@/hooks/useDashboardAuth";
+
+// مفتاح الكارد -> صلاحية العرض
+const CARD_PERMISSION_MAP: Record<string, 'details_basic' | 'details_building' | 'details_facilities' | 'details_guard' | 'details_location' | 'details_association' | 'details_engineering' | 'details_electricity'> = {
+  basic: 'details_basic',
+  building: 'details_building',
+  facilities: 'details_facilities',
+  guard: 'details_guard',
+  location: 'details_location',
+  association: 'details_association',
+  engineering: 'details_engineering',
+  electricity: 'details_electricity',
+};
 
 // تعريف أنواع البيانات
 interface Building {
@@ -113,7 +126,6 @@ function DetailsContent() {
           const [newMapLink, setNewMapLink] = useState("");
           const [savingMapLink, setSavingMapLink] = useState(false);
           const [isEditingMapLink, setIsEditingMapLink] = useState(false);
-        const router = useRouter();
       // إضافة صور جديدة (معاينة محلية فقط حالياً)
       const [newImages, setNewImages] = useState<string[]>([]);
       const handleAddImages = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -144,6 +156,22 @@ function DetailsContent() {
   const [quickAccessOpen, setQuickAccessOpen] = useState(false);
   const searchParams = useSearchParams();
   const supabase = createClient();
+  const { can, ready } = useDashboardAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!ready) return;
+    if (!can('building_details')) {
+      showToast('ليس لديك صلاحية الوصول لتفاصيل المبنى.', 'error');
+      router.replace('/dashboard/buildings');
+    }
+  }, [ready, can, router]);
+
+  const canEditBuilding = can('buildings_edit');
+  const allowedCardKeys = (['basic', 'building', 'facilities', 'guard', 'location', 'association', 'engineering', 'electricity'] as const).filter(
+    (key) => can(CARD_PERMISSION_MAP[key])
+  );
+
   const [building, setBuilding] = useState<Building | null>(null);
   const [loading, setLoading] = useState(true);
   const [units, setUnits] = useState<Array<{ id: string; unit_number: string; floor: number | string; electricity_meter_number?: string | null }>>([]);
@@ -357,6 +385,14 @@ function DetailsContent() {
     );
   }
 
+  if (ready && !can('building_details')) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50" dir="rtl">
+        <p className="text-gray-500">جاري التحويل...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100" dir="rtl">
       {/* شريط علوي */}
@@ -399,7 +435,9 @@ function DetailsContent() {
                       { id: "card-association", key: "association", label: "اتحاد الملاك", icon: FaUsers },
                       { id: "card-engineering", key: "engineering", label: "المكتب الهندسي", icon: FaTools },
                       { id: "card-electricity", key: "electricity", label: "عدادات الكهرباء", icon: FaBolt },
-                    ].map(({ id, key, label, icon: Icon }) => (
+                    ]
+                      .filter(({ key }) => allowedCardKeys.includes(key as (typeof allowedCardKeys)[number]))
+                      .map(({ id, key, label, icon: Icon }) => (
                       <button
                         key={key}
                         type="button"
@@ -434,6 +472,7 @@ function DetailsContent() {
 
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* كارد معلومات أساسية قابل للطي */}
+        {can('details_basic') && (
         <div id="card-basic" className="rounded-2xl mb-8 overflow-hidden border border-indigo-200/60 shadow-xl shadow-indigo-900/5 bg-gradient-to-b from-white to-indigo-50/30">
           <div className="relative flex items-center justify-between">
             <button
@@ -448,7 +487,7 @@ function DetailsContent() {
               <span className="text-xl font-bold bg-gradient-to-l from-indigo-700 to-indigo-600 bg-clip-text text-transparent">معلومات أساسية</span>
               <span className="mt-2 text-indigo-500">{openCard === 'basic' ? <FaChevronUp className="text-indigo-500" /> : <FaChevronDown className="text-indigo-500" />}</span>
             </button>
-            {openCard === 'basic' && (
+            {openCard === 'basic' && canEditBuilding && (
               <button
                 className="absolute left-4 top-4 text-indigo-500 hover:text-indigo-700 bg-indigo-50 rounded-full p-2 shadow"
                 title={isEditingBasicCard ? "إلغاء" : "تعديل"}
@@ -607,8 +646,10 @@ function DetailsContent() {
             </div>
           )}
         </div>
+        )}
 
         {/* كارد معلومات المبنى قابل للطي */}
+        {can('details_building') && (
         <div id="card-building" className="rounded-2xl mb-8 overflow-hidden border border-blue-200/60 shadow-xl shadow-blue-900/5 bg-gradient-to-b from-white to-blue-50/30">
           <div className="relative">
             <button
@@ -623,7 +664,7 @@ function DetailsContent() {
               <span className="text-xl font-bold bg-gradient-to-l from-blue-700 to-blue-600 bg-clip-text text-transparent">معلومات المبنى</span>
               <span className="mt-2 text-blue-500">{openCard === 'building' ? <FaChevronUp className="text-blue-500" /> : <FaChevronDown className="text-blue-500" />}</span>
             </button>
-            {openCard === 'building' && (
+            {openCard === 'building' && canEditBuilding && (
               <button
                 className="absolute top-4 left-4 bg-blue-100 text-blue-700 rounded-full p-2 border border-blue-300 hover:bg-blue-200 transition"
                 onClick={() => setIsEditingBuildingCard(v => !v)}
@@ -810,8 +851,10 @@ function DetailsContent() {
             </div>
           )}
         </div>
+        )}
 
         {/* كارد المرافق والتأمين قابل للطي */}
+        {can('details_facilities') && (
         <div id="card-facilities" className="rounded-2xl mb-8 overflow-hidden border border-green-200/60 shadow-xl shadow-green-900/5 bg-gradient-to-b from-white to-green-50/30">
           <div className="relative">
             <button
@@ -826,7 +869,7 @@ function DetailsContent() {
               <span className="text-xl font-bold bg-gradient-to-l from-green-700 to-green-600 bg-clip-text text-transparent">المرافق والتأمين</span>
               <span className="mt-2 text-green-500">{openCard === 'facilities' ? <FaChevronUp className="text-green-500" /> : <FaChevronDown className="text-green-500" />}</span>
             </button>
-            {openCard === 'facilities' && (
+            {openCard === 'facilities' && canEditBuilding && (
               <button
                 className="absolute top-4 left-4 bg-green-100 text-green-700 rounded-full p-2 border border-green-300 hover:bg-green-200 transition"
                 onClick={() => setIsEditingFacilitiesCard(v => !v)}
@@ -920,8 +963,10 @@ function DetailsContent() {
             </div>
           )}
         </div>
+        )}
 
         {/* كارد بيانات الحارس */}
+        {can('details_guard') && (
         <div id="card-guard" className="rounded-2xl mb-8 overflow-hidden border border-amber-200/60 shadow-xl shadow-amber-900/5 bg-gradient-to-b from-white to-amber-50/30">
           <div className="relative">
             <button
@@ -936,7 +981,7 @@ function DetailsContent() {
               <span className="text-xl font-bold bg-gradient-to-l from-amber-700 to-orange-700 bg-clip-text text-transparent">بيانات الحارس</span>
               <span className="mt-2 text-amber-500">{openCard === 'guard' ? <FaChevronUp className="text-amber-500" /> : <FaChevronDown className="text-amber-500" />}</span>
             </button>
-            {openCard === 'guard' && (
+            {openCard === 'guard' && canEditBuilding && (
               <button
                 className="absolute top-4 left-4 bg-amber-100 text-amber-700 rounded-full p-2 border border-amber-300 hover:bg-amber-200 transition"
                 onClick={() => setIsEditingGuardCard(v => !v)}
@@ -1097,8 +1142,9 @@ function DetailsContent() {
             </div>
           )}
         </div>
+        )}
 
-        {/* مودال معاينة صورة هوية الحارس — مقاس الهوية الوطنية */}
+        {/* مودال معاينة صورة هوية الحارس - مقاس الهوية الوطنية */}
         {guardIdPreview && (
           <>
             <div
@@ -1128,6 +1174,7 @@ function DetailsContent() {
         )}
 
         {/* كارد الموقع والصور قابل للطي */}
+        {can('details_location') && (
         <div id="card-location" className="rounded-2xl mb-8 overflow-hidden border border-pink-200/60 shadow-xl shadow-pink-900/5 bg-gradient-to-b from-white to-pink-50/30">
           <div className="relative">
             <button
@@ -1243,8 +1290,10 @@ function DetailsContent() {
             </div>
           )}
         </div>
+        )}
 
         {/* كارد اتحاد الملاك قابل للطي */}
+        {can('details_association') && (
         <div id="card-association" className="rounded-2xl mb-8 overflow-hidden border border-emerald-200/60 shadow-xl shadow-emerald-900/5 bg-gradient-to-b from-white to-emerald-50/30">
           <div className="relative">
             <button
@@ -1259,7 +1308,7 @@ function DetailsContent() {
               <span className="text-xl font-bold bg-gradient-to-l from-emerald-700 to-emerald-600 bg-clip-text text-transparent">اتحاد الملاك</span>
               <span className="mt-2 text-emerald-500">{openCard === 'association' ? <FaChevronUp className="text-emerald-500" /> : <FaChevronDown className="text-emerald-500" />}</span>
             </button>
-            {openCard === 'association' && (
+            {openCard === 'association' && canEditBuilding && (
               <button
                 className="absolute top-4 left-4 bg-emerald-100 text-emerald-700 rounded-full p-2 border border-emerald-300 hover:bg-emerald-200 transition"
                 onClick={() => setIsEditingAssociationCard(v => !v)}
@@ -1398,8 +1447,10 @@ function DetailsContent() {
             </div>
           )}
         </div>
+        )}
 
         {/* كارد المكتب الهندسي قابل للطي */}
+        {can('details_engineering') && (
         <div id="card-engineering" className="rounded-2xl mb-8 overflow-hidden border border-teal-200/60 shadow-xl shadow-teal-900/5 bg-gradient-to-b from-white to-teal-50/30">
           <div className="relative">
             <button
@@ -1419,9 +1470,11 @@ function DetailsContent() {
             <div className="px-5 pb-5">
               <div className="rounded-xl bg-white/90 border border-teal-100 px-4 py-4 shadow-sm flex flex-col items-center justify-center">
                 <div className="flex flex-wrap gap-3 justify-center">
+                  {can('deeds') && (
                   <button className="px-4 py-2 bg-white border border-teal-200 text-teal-700 rounded-xl hover:bg-teal-50 transition text-sm font-bold" onClick={() => router.push(`/building-deeds?buildingId=${building.id}`)}>
                     الصكوك ومحاضر الفرز
                   </button>
+                  )}
                   <button className="px-4 py-2 bg-white border border-teal-200 text-teal-700 rounded-xl hover:bg-teal-50 transition text-sm font-bold">
                     الخرائط الهندسيه
                   </button>
@@ -1433,8 +1486,10 @@ function DetailsContent() {
             </div>
           )}
         </div>
+        )}
 
         {/* كارد عدادات الكهرباء قابل للطي */}
+        {can('details_electricity') && (
         <div id="card-electricity" className="rounded-2xl mb-8 overflow-hidden border border-amber-200/60 shadow-xl shadow-amber-900/5 bg-gradient-to-b from-white to-amber-50/30">
           <div className="relative">
             <button
@@ -1526,6 +1581,7 @@ function DetailsContent() {
             </div>
           )}
         </div>
+        )}
 
         {/* كارد وحدات المبنى */}
       </div>
