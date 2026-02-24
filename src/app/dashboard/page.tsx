@@ -639,11 +639,11 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100" dir="rtl">
       {/* الشريط العلوي */}
-      <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20 backdrop-blur-lg bg-white/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20">
+      <div className="bg-white/80 shadow-sm border-b border-gray-200 sticky top-0 z-20 backdrop-blur-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 lg:py-0">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:h-20">
             {/* القسم الأيمن */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
                 className="lg:hidden p-2 hover:bg-gray-100 rounded-xl transition-colors"
@@ -651,25 +651,25 @@ export default function DashboardPage() {
                 <Menu className="w-6 h-6 text-gray-600" />
               </button>
               
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0">
                   <Building2 className="w-5 h-5 text-white" />
                 </div>
-                <div>
-                  <h1 className="text-xl font-bold text-gray-800">لوحة التحكم الرئيسية</h1>
+                <div className="min-w-0">
+                  <h1 className="text-lg sm:text-xl font-bold text-gray-800 leading-tight">لوحة التحكم الرئيسية</h1>
                   <p className="text-xs text-gray-500">ادارة العماير</p>
                   {!subscriptionLoading && planName && (
-                    <p className="text-xs text-indigo-600 font-medium mt-1">
+                    <p className="text-xs text-indigo-600 font-medium mt-1 flex flex-wrap items-center gap-2">
                       خطة {planName}: {buildingsLimitLabel}
                       {!canAddBuilding && (
-                        <Link href="/subscriptions" className="mr-2 inline-flex items-center gap-1 text-amber-600 hover:text-amber-700">
+                        <Link href="/subscriptions" className="inline-flex items-center gap-1 text-amber-600 hover:text-amber-700">
                           <Crown className="w-3.5 h-3.5" />
                           ترقية
                         </Link>
                       )}
                     </p>
                   )}
-                  <div className="flex gap-2 mt-2">
+                  <div className="hidden sm:flex gap-2 mt-2 flex-wrap">
                     {can('reservations') && (
                       <a href="/dashboard/reservations" className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-200 transition cursor-pointer">سجل الحجوزات</a>
                     )}
@@ -682,7 +682,7 @@ export default function DashboardPage() {
             </div>
 
             {/* القسم الأوسط - مخفي على الشاشات الصغيرة */}
-            <div className="hidden md:flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-2 order-3 lg:order-none">
               <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
                 <button className="px-4 py-2 bg-white text-gray-700 rounded-lg shadow-sm text-sm font-medium">
                   <div className="flex items-center gap-2">
@@ -706,7 +706,7 @@ export default function DashboardPage() {
             </div>
 
             {/* القسم الأيسر */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between sm:justify-start gap-3 order-2 lg:order-none">
               {/* الإشعارات */}
               <div className="relative">
                 <button
