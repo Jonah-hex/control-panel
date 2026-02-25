@@ -666,7 +666,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100" dir="rtl">
       {/* وحدة الهيدر + شريط التنقل (ديسكتوب) */}
       <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-gradient-to-b from-white/95 to-white/85 backdrop-blur-xl shadow-[0_4px_20px_rgba(15,23,42,0.06)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-2 md:pt-4 md:pb-3">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-2 md:pt-4 md:pb-3">
           <div className="flex flex-col gap-3 rounded-2xl border border-white/80 bg-white/70 px-3 sm:px-4 lg:px-5 py-3 md:flex-row md:items-center md:justify-between md:min-h-[80px] shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
             {/* القسم الأيمن */}
             <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0 md:flex-1">
@@ -897,23 +897,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* شريط التنقل - نظرة عامة / الحجز / المبيعات */}
-          <div className="hidden md:flex justify-center mt-3 md:mt-4">
-            <div className="w-full max-w-xl inline-flex items-center justify-center gap-2 bg-white/75 border border-slate-200/60 px-3 py-2 rounded-2xl shadow-[0_4px_14px_rgba(15,23,42,0.06)]">
-              <button className="inline-flex items-center justify-center gap-2 h-9 flex-1 min-w-0 max-w-[10rem] px-4 bg-gradient-to-b from-white to-slate-50/90 text-gray-700 rounded-xl shadow-sm border border-slate-200/60 text-sm font-medium">
-                <BarChart3 className="w-4 h-4 flex-shrink-0" />
-                <span className="truncate">نظرة عامة</span>
-              </button>
-              <Link href="/dashboard/reservations" className="inline-flex items-center justify-center gap-2 h-9 flex-1 min-w-0 max-w-[10rem] px-4 text-gray-600 hover:text-gray-800 hover:bg-white hover:border-slate-200/60 rounded-xl text-sm font-medium transition bg-white/50 border border-transparent">
-                <Calendar className="w-4 h-4 flex-shrink-0" />
-                <span className="truncate">الحجز</span>
-              </Link>
-              <Link href="/dashboard/sales" className="inline-flex items-center justify-center gap-2 h-9 flex-1 min-w-0 max-w-[10rem] px-4 text-gray-600 hover:text-gray-800 hover:bg-white hover:border-slate-200/60 rounded-xl text-sm font-medium transition bg-white/50 border border-transparent">
-                <DollarSign className="w-4 h-4 flex-shrink-0" />
-                <span className="truncate">المبيعات</span>
-              </Link>
-            </div>
-          </div>
         </div>
       </header>
 
