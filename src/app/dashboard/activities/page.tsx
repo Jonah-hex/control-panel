@@ -53,10 +53,13 @@ interface ActivityItem {
 
 type FilterType = 'all' | 'add' | 'sold' | 'reserved' | 'association_end'
 
+type ReservationRow = { id: string; unit_id: string; building_id: string; created_at: string; created_by_name?: string | null; customer_name: string; status: string; expiry_date?: string | null }
+
 export default function ActivitiesPage() {
   const [loading, setLoading] = useState(true)
   const [buildings, setBuildings] = useState<Building[]>([])
   const [units, setUnits] = useState<Unit[]>([])
+  const [reservations, setReservations] = useState<ReservationRow[]>([])
   const [filter, setFilter] = useState<FilterType>('all')
   const router = useRouter()
   const supabase = createClient()
@@ -96,14 +99,16 @@ export default function ActivitiesPage() {
 
         const buildingIds = (buildingsData || []).map(b => b.id)
         if (buildingIds.length > 0) {
-          const { data: unitsData, error: unitsError } = await supabase
-            .from('units')
-            .select('*')
-            .in('building_id', buildingIds)
-          if (unitsError) throw unitsError
-          setUnits(unitsData || [])
+          const [unitsRes, resRes] = await Promise.all([
+            supabase.from('units').select('*').in('building_id', buildingIds),
+            supabase.from('reservations').select('id, unit_id, building_id, created_at, created_by_name, customer_name, status, expiry_date').in('building_id', buildingIds).order('created_at', { ascending: false })
+          ])
+          if (unitsRes.error) throw unitsRes.error
+          setUnits(unitsRes.data || [])
+          setReservations(Array.isArray(resRes.data) ? resRes.data : [])
         } else {
           setUnits([])
+          setReservations([])
         }
       } catch (err) {
         console.error('Error fetching activities:', err)
@@ -152,18 +157,39 @@ export default function ActivitiesPage() {
           timestamp: u.updated_at || u.created_at,
           details: `تم بيع الوحدة ${u.unit_number} (الدور ${u.floor})`
         })
-      } else if (u.status === 'reserved') {
-        fromUnits.push({
-          id: u.id + '-reserved',
-          type: 'reserved',
-          building_name: bName,
-          building_id: u.building_id,
-          user_name: u.owner_name || '—',
-          timestamp: u.updated_at || u.created_at,
-          details: `تم حجز الوحدة ${u.unit_number} (الدور ${u.floor})`
-        })
       }
     }
+    const fromReservations: ActivityItem[] = reservations.map(r => {
+      const bName = buildings.find(b => b.id === r.building_id)?.name || '—'
+      const u = units.find(ux => ux.id === r.unit_id)
+      const unitLabel = u ? `الوحدة ${u.unit_number} (الدور ${u.floor})` : 'وحدة محجوزة'
+      return {
+        id: r.id + '-reserved',
+        type: 'reserved',
+        building_name: bName,
+        building_id: r.building_id,
+        user_name: (r.created_by_name && String(r.created_by_name).trim()) || 'صاحب الحساب',
+        timestamp: r.created_at,
+        details: `تم حجز ${unitLabel} — عميل: ${r.customer_name || '—'}`
+      }
+    })
+    const fromExpiredReservations: ActivityItem[] = reservations
+      .filter((r) => ['active', 'pending', 'confirmed', 'reserved'].includes(r.status))
+      .filter((r) => r.expiry_date && new Date(r.expiry_date).getTime() < Date.now())
+      .map((r) => {
+        const bName = buildings.find(b => b.id === r.building_id)?.name || '—'
+        const u = units.find(ux => ux.id === r.unit_id)
+        const unitLabel = u ? `الوحدة ${u.unit_number} (الدور ${u.floor})` : 'وحدة محجوزة'
+        return {
+          id: r.id + '-expired-review',
+          type: 'reserved',
+          building_name: bName,
+          building_id: r.building_id,
+          user_name: 'النظام',
+          timestamp: r.expiry_date || r.created_at,
+          details: `انتهت مدة الحجز — يرجى مراجعة وإلغاء حجز ${unitLabel}`
+        }
+      })
     const fromBuildings: ActivityItem[] = buildings.map(b => ({
       id: b.id + '-add',
       type: 'add',
@@ -193,14 +219,14 @@ export default function ActivitiesPage() {
         endDate: r.endDate
       }
     })
-    let all = [...fromUnits, ...fromBuildings, ...fromAssoc]
+    let all = [...fromUnits, ...fromReservations, ...fromExpiredReservations, ...fromBuildings, ...fromAssoc]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
     if (filter !== 'all') {
       all = all.filter(a => a.type === filter)
     }
     return all
-  }, [units, buildings, associationEndReminders, filter])
+  }, [units, buildings, reservations, associationEndReminders, filter])
 
   // عرض النشاطات حسب الصلاحيات (خاص بلوحة الموظف)
   const filteredActivities = useMemo(() => {

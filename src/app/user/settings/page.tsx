@@ -54,6 +54,9 @@ export type PermissionKey =
   | 'reports'
   | 'reservations'
   | 'sales'
+  | 'marketing_cancel_reservation'
+  | 'marketing_complete_sale'
+  | 'marketing_building_details'
   | 'security'
   | 'settings'
 
@@ -80,6 +83,9 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   reports: 'التقارير',
   reservations: 'سجل الحجوزات',
   sales: 'سجل المبيعات',
+  marketing_cancel_reservation: 'زر: إلغاء الحجز (في الحجوزات)',
+  marketing_complete_sale: 'زر: إتمام البيع (في الحجوزات)',
+  marketing_building_details: 'زر: تفاصيل المبنى (في الحجوزات)',
   security: 'الأمان',
   settings: 'الإعدادات المتقدمة',
 }
@@ -90,7 +96,8 @@ const PERMISSION_GROUPS: { title: string; keys: PermissionKey[] }[] = [
   { title: 'العماير', keys: ['buildings', 'building_details', 'buildings_create', 'buildings_edit', 'buildings_delete'] },
   { title: 'تفاصيل المبنى (الكاردات)', keys: ['details_basic', 'details_building', 'details_facilities', 'details_guard', 'details_location', 'details_association', 'details_engineering', 'details_electricity'] },
   { title: 'الوحدات', keys: ['units', 'units_edit'] },
-  { title: 'أخرى', keys: ['deeds', 'statistics', 'activities', 'reports', 'reservations', 'sales', 'security', 'settings'] },
+  { title: 'إدارة التسويق', keys: ['reservations', 'sales', 'marketing_cancel_reservation', 'marketing_complete_sale', 'marketing_building_details'] },
+  { title: 'أخرى', keys: ['deeds', 'statistics', 'activities', 'reports', 'security', 'settings'] },
 ]
 
 const DEFAULT_PERMISSIONS: Record<PermissionKey, boolean> = {
@@ -116,6 +123,9 @@ const DEFAULT_PERMISSIONS: Record<PermissionKey, boolean> = {
   reports: true,
   reservations: true,
   sales: true,
+  marketing_cancel_reservation: true,
+  marketing_complete_sale: true,
+  marketing_building_details: true,
   security: false,
   settings: false,
 }

@@ -24,7 +24,6 @@ import {
   Mail,
   Activity,
   BarChart3,
-  PieChart,
   Target,
   Award,
   AlertCircle,
@@ -129,6 +128,7 @@ export default function DashboardPage() {
   const [buildings, setBuildings] = useState<Building[]>([])
   const [buildingsForAssoc, setBuildingsForAssoc] = useState<BuildingAssocRow[]>([])
   const [units, setUnits] = useState<Unit[]>([])
+  const [reservations, setReservations] = useState<Array<{ id: string; unit_id: string; building_id: string; created_at: string; created_by_name?: string | null; customer_name: string; status: string; expiry_date?: string | null }>>([])
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -295,17 +295,18 @@ export default function DashboardPage() {
         .eq('owner_id', ownerId)
       setBuildingsForAssoc(assocData || [])
 
-      // جلب جميع الوحدات لعماير هذا المستخدم فقط
-      if ((data || []).length > 0) {
-        const { data: unitsData, error: unitsError } = await supabase
-          .from('units')
-          .select('*')
-          .in('building_id', (data || []).map(b => b.id))
-
-        if (unitsError) throw unitsError
-        setUnits(unitsData || [])
+      const buildingIds = (data || []).map(b => b.id)
+      if (buildingIds.length > 0) {
+        const [unitsRes, resRes] = await Promise.all([
+          supabase.from('units').select('*').in('building_id', buildingIds),
+          supabase.from('reservations').select('id, unit_id, building_id, created_at, created_by_name, customer_name, status, expiry_date').in('building_id', buildingIds).order('created_at', { ascending: false })
+        ])
+        if (unitsRes.error) throw unitsRes.error
+        setUnits(unitsRes.data || [])
+        setReservations(Array.isArray(resRes.data) ? resRes.data : [])
       } else {
         setUnits([])
+        setReservations([])
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -351,16 +352,18 @@ export default function DashboardPage() {
       buildingName: buildings.find(b => b.id === u.building_id)?.name || '—'
     }))
 
-  // تنبيهات الحجز — وحدات محجوزة منذ 3 أيام فأكثر (تذكير بمتابعة حالة الحجز)
-  const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000
-  const reservationReminders = units
-    .filter(u => u.status === 'reserved')
-    .map(u => ({
-      unit: u,
-      buildingName: buildings.find(b => b.id === u.building_id)?.name || '—',
-      reservedAt: u.updated_at || u.created_at
-    }))
-    .filter(({ reservedAt }) => reservedAt && (Date.now() - new Date(reservedAt).getTime() >= THREE_DAYS_MS))
+  // تنبيهات الحجز المنتهي — عند تجاوز تاريخ انتهاء الحجز مع بقاء الحالة قيد الحجز
+  const reservationReminders = reservations
+    .filter((r) => ['active', 'pending', 'confirmed', 'reserved'].includes(r.status))
+    .filter((r) => r.expiry_date && new Date(r.expiry_date).getTime() < Date.now())
+    .map((r) => {
+      const unit = units.find((u) => u.id === r.unit_id)
+      return {
+        reservation: r,
+        unit,
+        buildingName: buildings.find((b) => b.id === r.building_id)?.name || '—'
+      }
+    })
 
   // تنبيهات انتهاء مدة اتحاد الملاك — قبل 10، 5، 3 أيام وعند الانتهاء
   const ASSOC_ALERT_DAYS = [10, 5, 3, 0]
@@ -397,8 +400,9 @@ export default function DashboardPage() {
   }, [buildingsForAssoc])
 
   // تنبيهات معروضة حسب الصلاحيات (خاصة بلوحة الموظف حسب عمله)
+  // تنبيهات الحجز والإلغاء والبيع تظهر للمالك فقط وليس للموظف
   const filteredAssociationEndReminders = can('details_association') ? associationEndReminders : []
-  const filteredReservationReminders = can('reservations') ? reservationReminders : []
+  const filteredReservationReminders = employeePermissions === null && can('reservations') ? reservationReminders : []
   const filteredElectricityReminders = can('details_electricity') ? electricityReminders : []
 
   const notificationsCount = filteredElectricityReminders.length + filteredReservationReminders.length + filteredAssociationEndReminders.length
@@ -407,7 +411,7 @@ export default function DashboardPage() {
   const currentNotificationIds = useMemo(() => {
     const ids: string[] = []
     filteredAssociationEndReminders.forEach(({ buildingId, daysLeft }) => ids.push(`assoc-${buildingId}-${daysLeft}`))
-    filteredReservationReminders.forEach(({ unit }) => ids.push(`res-${unit.id}`))
+    filteredReservationReminders.forEach(({ reservation }) => ids.push(`res-expired-${reservation.id}`))
     filteredElectricityReminders.forEach(({ unit }) => ids.push(`elec-${unit.id}`))
     return ids
   }, [filteredAssociationEndReminders, filteredReservationReminders, filteredElectricityReminders])
@@ -442,18 +446,39 @@ export default function DashboardPage() {
           timestamp: u.updated_at || u.created_at,
           details: `تم بيع الوحدة ${u.unit_number} (الدور ${u.floor})`
         })
-      } else if (u.status === 'reserved') {
-        fromUnits.push({
-          id: u.id + '-reserved',
-          type: 'reserved',
-          building_name: bName,
-          building_id: u.building_id,
-          user_name: (u as Unit & { owner_name?: string }).owner_name || '—',
-          timestamp: u.updated_at || u.created_at,
-          details: `تم حجز الوحدة ${u.unit_number} (الدور ${u.floor})`
-        })
       }
     }
+    const fromReservations: Activity[] = reservations.map(r => {
+      const bName = buildings.find(b => b.id === r.building_id)?.name || '—'
+      const u = units.find(ux => ux.id === r.unit_id)
+      const unitLabel = u ? `الوحدة ${u.unit_number} (الدور ${u.floor})` : 'وحدة محجوزة'
+      return {
+        id: r.id + '-reserved',
+        type: 'reserved' as const,
+        building_name: bName,
+        building_id: r.building_id,
+        user_name: (r.created_by_name && String(r.created_by_name).trim()) || 'صاحب الحساب',
+        timestamp: r.created_at,
+        details: `تم حجز ${unitLabel} — عميل: ${r.customer_name || '—'}`
+      }
+    })
+    const fromExpiredReservations: Activity[] = reservations
+      .filter((r) => ['active', 'pending', 'confirmed', 'reserved'].includes(r.status))
+      .filter((r) => r.expiry_date && new Date(r.expiry_date).getTime() < Date.now())
+      .map((r) => {
+        const bName = buildings.find(b => b.id === r.building_id)?.name || '—'
+        const u = units.find(ux => ux.id === r.unit_id)
+        const unitLabel = u ? `الوحدة ${u.unit_number} (الدور ${u.floor})` : 'وحدة محجوزة'
+        return {
+          id: r.id + '-expired-review',
+          type: 'reserved' as const,
+          building_name: bName,
+          building_id: r.building_id,
+          user_name: 'النظام',
+          timestamp: r.expiry_date || r.created_at,
+          details: `انتهت مدة الحجز — يرجى مراجعة وإلغاء حجز ${unitLabel}`
+        }
+      })
     const fromBuildings: Activity[] = buildings.map(b => ({
       id: b.id + '-add',
       type: 'add',
@@ -484,10 +509,10 @@ export default function DashboardPage() {
         endDate: r.endDate
       }
     })
-    return [...fromUnits, ...fromBuildings, ...fromAssoc]
+    return [...fromUnits, ...fromReservations, ...fromExpiredReservations, ...fromBuildings, ...fromAssoc]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 7)
-  }, [units, buildings, associationEndReminders])
+  }, [units, buildings, reservations, associationEndReminders])
 
   // عرض النشاطات حسب الصلاحيات (خاص بلوحة الموظف)
   const filteredActivities = useMemo(() => {
@@ -603,7 +628,8 @@ export default function DashboardPage() {
     { icon: Plus, label: 'إضافة عمارة', href: '/dashboard/buildings/new', color: 'blue', gradient: 'from-blue-500 to-cyan-500', permission: 'buildings_create' as const, noPermissionMessage: 'ليس لديك صلاحية إضافة عمارة جديدة. تواصل مع المالك لتفعيل الصلاحية.' },
     { icon: Eye, label: 'عرض العماير', href: '/dashboard/buildings', color: 'green', gradient: 'from-emerald-500 to-green-500', permission: 'buildings' as const, noPermissionMessage: 'ليس لديك صلاحية عرض العماير.' },
     { icon: Home, label: 'الوحدات', href: '/dashboard/units', color: 'purple', gradient: 'from-purple-500 to-pink-500', permission: 'units' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول للوحدات.' },
-    { icon: BarChart3, label: 'الإحصائيات', href: '/dashboard/statistics', color: 'indigo', gradient: 'from-indigo-500 to-purple-500', permission: 'statistics' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول للإحصائيات.' }
+    { icon: BarChart3, label: 'الإحصائيات', href: '/dashboard/statistics', color: 'indigo', gradient: 'from-indigo-500 to-purple-500', permission: 'statistics' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول للإحصائيات.' },
+    { icon: User2, label: 'إدارة التسويق', href: '/dashboard/marketing', color: 'sky', gradient: 'from-sky-500 to-teal-600', permission: 'reservations' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول لإدارة التسويق.' }
   ]
 
   const recentBuildings = buildings.slice(0, 3)
@@ -638,84 +664,72 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100" dir="rtl">
-      {/* الشريط العلوي */}
-      <div className="bg-white/80 shadow-sm border-b border-gray-200 sticky top-0 z-20 backdrop-blur-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 lg:py-0">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:h-20">
+      {/* وحدة الهيدر + شريط التنقل (ديسكتوب) */}
+      <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-gradient-to-b from-white/95 to-white/85 backdrop-blur-xl shadow-[0_4px_20px_rgba(15,23,42,0.06)]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-2 md:pt-4 md:pb-3">
+          <div className="flex flex-col gap-3 rounded-2xl border border-white/80 bg-white/70 px-3 sm:px-4 lg:px-5 py-3 md:flex-row md:items-center md:justify-between md:min-h-[80px] shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
             {/* القسم الأيمن */}
-            <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0">
+            <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0 md:flex-1">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="lg:hidden p-2 hover:bg-gray-100 rounded-xl transition-colors"
+                className="md:hidden p-2 text-gray-600 hover:bg-white/80 rounded-xl border border-white/70 transition-colors"
               >
                 <Menu className="w-6 h-6 text-gray-600" />
               </button>
               
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0">
+                <div className="w-11 h-11 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 ring-1 ring-white/70 flex-shrink-0">
                   <Building2 className="w-5 h-5 text-white" />
                 </div>
                 <div className="min-w-0">
                   <h1 className="text-lg sm:text-xl font-bold text-gray-800 leading-tight">لوحة التحكم الرئيسية</h1>
-                  <p className="text-xs text-gray-500">ادارة العماير</p>
+                  <p className="text-xs text-gray-500/90">ادارة العماير</p>
                   {!subscriptionLoading && planName && (
-                    <p className="text-xs text-indigo-600 font-medium mt-1 flex flex-wrap items-center gap-2">
-                      خطة {planName}: {buildingsLimitLabel}
-                      {!canAddBuilding && (
-                        <Link href="/subscriptions" className="inline-flex items-center gap-1 text-amber-600 hover:text-amber-700">
-                          <Crown className="w-3.5 h-3.5" />
-                          ترقية
-                        </Link>
+                    <p className="text-xs text-indigo-700 font-medium mt-1 flex flex-wrap items-center gap-2">
+                      {planName === 'مفتوح' ? (
+                        'حساب مدير النظام — العمل جاري على التطوير'
+                      ) : (
+                        <>
+                          خطة {planName}: {buildingsLimitLabel}
+                          {!canAddBuilding && (
+                            <Link href="/subscriptions" className="inline-flex items-center gap-1 text-amber-700 hover:text-amber-800 bg-amber-50/90 border border-amber-200/70 px-2 py-0.5 rounded-lg">
+                              <Crown className="w-3.5 h-3.5" />
+                              ترقية
+                            </Link>
+                          )}
+                        </>
                       )}
                     </p>
                   )}
-                  <div className="hidden sm:flex gap-2 mt-2 flex-wrap">
+                  <div className="mt-2 flex md:hidden items-center gap-2 flex-wrap">
                     {can('reservations') && (
-                      <a href="/dashboard/reservations" className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-200 transition cursor-pointer">سجل الحجوزات</a>
+                      <Link href="/dashboard/reservations" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-200/70 bg-blue-50/90 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition">
+                        <Calendar className="w-3.5 h-3.5" />
+                        سجل الحجوزات
+                      </Link>
                     )}
                     {can('sales') && (
-                      <a href="/dashboard/sales" className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-semibold hover:bg-green-200 transition cursor-pointer">سجل المبيعات</a>
+                      <Link href="/dashboard/sales" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-green-200/70 bg-green-50/90 text-green-700 text-xs font-semibold hover:bg-green-100 transition">
+                        <DollarSign className="w-3.5 h-3.5" />
+                        سجل المبيعات
+                      </Link>
                     )}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* القسم الأوسط - مخفي على الشاشات الصغيرة */}
-            <div className="hidden md:flex items-center gap-2 order-3 lg:order-none">
-              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
-                <button className="px-4 py-2 bg-white text-gray-700 rounded-lg shadow-sm text-sm font-medium">
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="w-4 h-4" />
-                    <span>نظرة عامة</span>
-                  </div>
-                </button>
-                <button className="px-4 py-2 text-gray-600 hover:text-gray-800 rounded-lg text-sm font-medium transition">
-                  <div className="flex items-center gap-2">
-                    <Activity className="w-4 h-4" />
-                    <span>نشاطات</span>
-                  </div>
-                </button>
-                <button className="px-4 py-2 text-gray-600 hover:text-gray-800 rounded-lg text-sm font-medium transition">
-                  <div className="flex items-center gap-2">
-                    <PieChart className="w-4 h-4" />
-                    <span>تحليلات</span>
-                  </div>
-                </button>
-              </div>
-            </div>
-
             {/* القسم الأيسر */}
-            <div className="flex items-center justify-between sm:justify-start gap-3 order-2 lg:order-none">
+            <div className="flex items-center justify-between sm:justify-start gap-3 md:flex-shrink-0">
               {/* الإشعارات */}
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setNotificationsOpen(v => !v)}
-                  className={`relative flex items-center justify-center w-11 h-11 rounded-xl border transition-all duration-200 overflow-visible ${
+                  className={`relative flex items-center justify-center w-11 h-11 rounded-2xl border transition-all duration-200 overflow-visible shadow-sm ${
                     notificationsOpen
-                      ? 'border-amber-200 bg-amber-50/80 text-amber-600'
-                      : 'border-gray-200 bg-white/60 text-gray-600 hover:bg-gray-50 hover:border-gray-300'
+                      ? 'border-amber-200 bg-amber-50/90 text-amber-600'
+                      : 'border-white/80 bg-white/70 text-gray-600 hover:bg-white hover:border-slate-200'
                   }`}
                   aria-expanded={notificationsOpen}
                   aria-haspopup="true"
@@ -789,10 +803,10 @@ export default function DashboardPage() {
                                 </div>
                               </Link>
                             ))}
-                            {filteredReservationReminders.map(({ unit, buildingName }) => (
+                            {filteredReservationReminders.map(({ reservation, unit, buildingName }) => (
                               <Link
-                                key={`res-${unit.id}`}
-                                href={`/dashboard/buildings/details?buildingId=${unit.building_id}`}
+                                key={`res-expired-${reservation.id}`}
+                                href={`/dashboard/buildings/details?buildingId=${reservation.building_id}`}
                                 onClick={() => setNotificationsOpen(false)}
                                 className="flex items-start gap-3 px-4 py-3.5 hover:bg-amber-50/70 transition cursor-pointer"
                               >
@@ -800,9 +814,9 @@ export default function DashboardPage() {
                                   <Calendar className="w-5 h-5" />
                                 </span>
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-gray-800">تذكير بمتابعة الحجز</p>
+                                  <p className="text-sm font-semibold text-gray-800">انتهت مدة الحجز — راجع وألغِ الحجز</p>
                                   <p className="text-xs text-gray-600 mt-0.5">
-                                    الوحدة {unit.unit_number} (د{unit.floor}) — {buildingName}
+                                    {unit ? `الوحدة ${unit.unit_number} (د${unit.floor})` : 'وحدة محجوزة'} — {buildingName}
                                   </p>
                                 </div>
                               </Link>
@@ -833,7 +847,7 @@ export default function DashboardPage() {
               </div>
 
               {/* الوقت والتاريخ */}
-              <div className="hidden md:block px-4 py-2 bg-gray-100 rounded-xl">
+              <div className="hidden md:block px-4 py-2 bg-white/70 border border-white/80 rounded-2xl shadow-sm">
                 <div className="text-xs text-gray-500">{greeting}</div>
                 <div className="text-sm font-medium text-gray-700">
                   {currentTime.toLocaleDateString('ar-SA', { 
@@ -847,12 +861,12 @@ export default function DashboardPage() {
 
               {/* صورة المستخدم */}
               <div className="relative group">
-                <button className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                <button className="w-11 h-11 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg ring-1 ring-white/80">
                   {user?.email?.charAt(0).toUpperCase()}
                 </button>
                 
                 {/* القائمة المنسدلة */}
-                <div className="absolute left-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <div className="absolute left-0 mt-2 w-48 bg-white/95 backdrop-blur rounded-2xl shadow-xl border border-white/80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                   <div className="p-3 border-b border-gray-100">
                     <p className="text-sm font-semibold text-gray-800">{user?.email}</p>
                     {employeePermissions === null && (
@@ -882,12 +896,30 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* شريط التنقل - نظرة عامة / الحجز / المبيعات */}
+          <div className="hidden md:flex justify-center mt-3 md:mt-4">
+            <div className="w-full max-w-xl inline-flex items-center justify-center gap-2 bg-white/75 border border-slate-200/60 px-3 py-2 rounded-2xl shadow-[0_4px_14px_rgba(15,23,42,0.06)]">
+              <button className="inline-flex items-center justify-center gap-2 h-9 flex-1 min-w-0 max-w-[10rem] px-4 bg-gradient-to-b from-white to-slate-50/90 text-gray-700 rounded-xl shadow-sm border border-slate-200/60 text-sm font-medium">
+                <BarChart3 className="w-4 h-4 flex-shrink-0" />
+                <span className="truncate">نظرة عامة</span>
+              </button>
+              <Link href="/dashboard/reservations" className="inline-flex items-center justify-center gap-2 h-9 flex-1 min-w-0 max-w-[10rem] px-4 text-gray-600 hover:text-gray-800 hover:bg-white hover:border-slate-200/60 rounded-xl text-sm font-medium transition bg-white/50 border border-transparent">
+                <Calendar className="w-4 h-4 flex-shrink-0" />
+                <span className="truncate">الحجز</span>
+              </Link>
+              <Link href="/dashboard/sales" className="inline-flex items-center justify-center gap-2 h-9 flex-1 min-w-0 max-w-[10rem] px-4 text-gray-600 hover:text-gray-800 hover:bg-white hover:border-slate-200/60 rounded-xl text-sm font-medium transition bg-white/50 border border-transparent">
+                <DollarSign className="w-4 h-4 flex-shrink-0" />
+                <span className="truncate">المبيعات</span>
+              </Link>
+            </div>
+          </div>
         </div>
-      </div>
+      </header>
 
       {/* القائمة الجانبية للجوال */}
       {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden cursor-pointer" onClick={() => setSidebarOpen(false)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 md:hidden cursor-pointer" onClick={() => setSidebarOpen(false)}>
           <div className="fixed right-0 top-0 bottom-0 w-64 bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-gray-100">
               <div className="flex items-center justify-between">

@@ -26,6 +26,9 @@ export type PermissionKey =
   | 'reports'
   | 'reservations'
   | 'sales'
+  | 'marketing_cancel_reservation'
+  | 'marketing_complete_sale'
+  | 'marketing_building_details'
   | 'security'
   | 'settings'
 

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { use, useState, useEffect, useRef } from "react";
 // قائمة الكاردات المتاحة
 const cardOptions = [
   { id: 1, label: "معلومات أساسية" },
@@ -11,7 +11,7 @@ const cardOptions = [
   { id: 7, label: "معلومات المكتب الهندسي" },
   { id: 8, label: "معلومات المشترين" },
 ];
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import BuildingCard from "@/components/BuildingCard";
 import {
@@ -73,9 +73,11 @@ function renderRows(step: { key: string; label: string }[], building: any) {
   );
 }
 
-export default function BuildingPage() {
+type PageParams = Promise<{ id?: string }>;
+
+export default function BuildingPage({ params }: { params: PageParams }) {
   const router = useRouter();
-  const params = useParams();
+  const { id: buildingId } = use(params);
   const [building, setBuilding] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [openCard, setOpenCard] = useState<number>(0); // 0 = الكل مغلق
@@ -87,37 +89,34 @@ export default function BuildingPage() {
 
   useEffect(() => {
     const fetchBuildingAndUnits = async () => {
+      if (!buildingId) return;
       setLoading(true);
-      // جلب بيانات المبنى
-      const { data: buildingData, error: buildingError } = await supabase
+      const { data: buildingData } = await supabase
         .from("buildings")
         .select("*")
-        .eq("id", params.id)
+        .eq("id", buildingId)
         .single();
       setBuilding(buildingData);
-      // جلب بيانات الوحدات المرتبطة بالمبنى
-      if (params.id) {
-        const { data: unitsData, error: unitsError } = await supabase
-          .from("units")
-          .select("*")
-          .eq("building_id", params.id)
-          .order("floor", { ascending: true })
-          .order("unit_number", { ascending: true });
-        const raw = unitsData || [];
-        const sorted = [...raw].sort((a, b) => {
-          const fA = Number(a.floor) ?? 0;
-          const fB = Number(b.floor) ?? 0;
-          if (fA !== fB) return fA - fB;
-          const uA = Number(a.unit_number) || 0;
-          const uB = Number(b.unit_number) || 0;
-          return uA - uB;
-        });
-        setUnits(sorted);
-      }
+      const { data: unitsData } = await supabase
+        .from("units")
+        .select("*")
+        .eq("building_id", buildingId)
+        .order("floor", { ascending: true })
+        .order("unit_number", { ascending: true });
+      const raw = unitsData || [];
+      const sorted = [...raw].sort((a, b) => {
+        const fA = Number(a.floor) ?? 0;
+        const fB = Number(b.floor) ?? 0;
+        if (fA !== fB) return fA - fB;
+        const uA = Number(a.unit_number) || 0;
+        const uB = Number(b.unit_number) || 0;
+        return uA - uB;
+      });
+      setUnits(sorted);
       setLoading(false);
     };
-    if (params.id) fetchBuildingAndUnits();
-  }, [params.id]);
+    fetchBuildingAndUnits();
+  }, [buildingId, supabase]);
 
   // عند اختيار كارد من القائمة المنسدلة
   const handleCardSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {

@@ -39,6 +39,15 @@ const DEFAULT_LIMITS: SubscriptionPlanLimits = {
   max_units_per_building: 18,
 }
 
+/**
+ * تعطيل نظام الاشتراكات مؤقتاً — الأكواد تبقى كما هي، عند true يُفعّل النظام.
+ * ضع false لتعطيل الحدود وعدم عرض خطة/ترقية في الواجهة.
+ */
+const SUBSCRIPTIONS_ENABLED = false
+
+/** الحساب الرئيسي — اشتراك مفتوح بدون حدود */
+const OPEN_ACCOUNT_EMAIL = 'albeladi220@gmail.com'
+
 export function useSubscription(): UseSubscriptionResult {
   const { user, effectiveOwnerId, isOwner } = useDashboardAuth()
   const [planName, setPlanName] = useState<string | null>(null)
@@ -56,6 +65,63 @@ export function useSubscription(): UseSubscriptionResult {
     setLoading(true)
     setError(null)
     try {
+      // عند تعطيل الاشتراكات: لا حدود، ولا عرض خطة — الأكواد تبقى للتفعيل لاحقاً
+      if (!SUBSCRIPTIONS_ENABLED) {
+        setPlanName(null)
+        setLimits({ max_buildings: null, max_units_per_building: null })
+        const { data: buildingsData } = await supabase
+          .from('buildings')
+          .select('id')
+          .eq('owner_id', effectiveOwnerId)
+        const buildingIds = (buildingsData || []).map((b: { id: string }) => b.id)
+        let unitsByBuildingId: Record<string, number> = {}
+        if (buildingIds.length > 0) {
+          const { data: unitsData } = await supabase
+            .from('units')
+            .select('building_id')
+            .in('building_id', buildingIds)
+          const rows = unitsData || []
+          rows.forEach((r: { building_id: string }) => {
+            unitsByBuildingId[r.building_id] = (unitsByBuildingId[r.building_id] || 0) + 1
+          })
+        }
+        setUsage({ buildingsCount: buildingIds.length, unitsByBuildingId })
+        setLoading(false)
+        return
+      }
+
+      const isOpenAccount =
+        (user?.email as string | undefined) === OPEN_ACCOUNT_EMAIL &&
+        effectiveOwnerId === user?.id
+      if (isOpenAccount) {
+        setPlanName('مفتوح')
+        setLimits({ max_buildings: null, max_units_per_building: null })
+        const { data: buildingsData, error: bError } = await supabase
+          .from('buildings')
+          .select('id')
+          .eq('owner_id', effectiveOwnerId)
+        if (bError) {
+          setUsage({ buildingsCount: 0, unitsByBuildingId: {} })
+          setLoading(false)
+          return
+        }
+        const buildingIds = (buildingsData || []).map((b) => b.id)
+        let unitsByBuildingId: Record<string, number> = {}
+        if (buildingIds.length > 0) {
+          const { data: unitsData } = await supabase
+            .from('units')
+            .select('building_id')
+            .in('building_id', buildingIds)
+          const rows = unitsData || []
+          rows.forEach((r: { building_id: string }) => {
+            unitsByBuildingId[r.building_id] = (unitsByBuildingId[r.building_id] || 0) + 1
+          })
+        }
+        setUsage({ buildingsCount: buildingIds.length, unitsByBuildingId })
+        setLoading(false)
+        return
+      }
+
       // 1) جلب اشتراك المستخدم مع تفاصيل الخطة
       const { data: subRows, error: subError } = await supabase
         .from('user_subscriptions')
@@ -154,7 +220,7 @@ export function useSubscription(): UseSubscriptionResult {
     } finally {
       setLoading(false)
     }
-  }, [effectiveOwnerId, isOwner, user?.id])
+  }, [effectiveOwnerId, isOwner, user?.id, user?.email])
 
   useEffect(() => {
     fetchSubscriptionAndUsage()

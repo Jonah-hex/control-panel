@@ -26,6 +26,9 @@ export type PermissionKey =
   | 'reports'
   | 'reservations'
   | 'sales'
+  | 'marketing_cancel_reservation'
+  | 'marketing_complete_sale'
+  | 'marketing_building_details'
   | 'security'
   | 'settings'
 
@@ -87,7 +90,11 @@ export function useDashboardAuth(): UseDashboardAuthResult {
   const can = useCallback(
     (key: PermissionKey) => {
       if (employeePermissions === null) return true
-      return Boolean(employeePermissions[key])
+      const value = (employeePermissions as Partial<Record<PermissionKey, boolean>>)[key]
+      if (typeof value === 'boolean') return value
+      // الصلاحيات الجديدة تُعامل كـ true افتراضياً للسجلات القديمة التي لا تحتوي المفتاح بعد.
+      if (key === 'marketing_cancel_reservation' || key === 'marketing_complete_sale' || key === 'marketing_building_details') return true
+      return false
     },
     [employeePermissions]
   )
