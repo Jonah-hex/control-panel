@@ -38,7 +38,7 @@ function BuildingDeedsContent() {
           <h1 className="text-3xl font-bold text-teal-800">إدارة الصكوك ومحاضر الفرز</h1>
           {buildingId && (
             <Link
-              href={`/dashboard/buildings/details?buildingId=${buildingId}`}
+              href={`/dashboard/buildings/details?buildingId=${buildingId}#card-engineering`}
               className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-teal-200 text-teal-700 hover:bg-teal-50 hover:border-teal-300 transition text-sm font-semibold shadow-sm"
             >
               <ArrowRight className="w-4 h-4 rotate-180" />

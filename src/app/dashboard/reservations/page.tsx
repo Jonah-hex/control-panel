@@ -213,7 +213,14 @@ export default function ReservationsPage() {
       .select(`${baseCols}, unit(unit_number, floor), building(name)`)
       .order("created_at", { ascending: false });
     if (!errRels && dataWithRels != null) {
-      setReservations((dataWithRels as Reservation[]) || []);
+      const normalized = (Array.isArray(dataWithRels) ? dataWithRels : []).map((r: Record<string, unknown>) => {
+        const unit = r.unit;
+        const building = r.building;
+        const unitRow = Array.isArray(unit) ? unit[0] : unit;
+        const buildingRow = Array.isArray(building) ? building[0] : building;
+        return { ...r, unit: unitRow ?? null, building: buildingRow ?? null } as Reservation;
+      });
+      setReservations(normalized);
       setLoading(false);
       return;
     }

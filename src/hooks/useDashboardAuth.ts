@@ -18,6 +18,9 @@ export type PermissionKey =
   | 'details_association'
   | 'details_engineering'
   | 'details_electricity'
+  | 'documents_upload'
+  | 'documents_create_folder'
+  | 'documents_delete'
   | 'units'
   | 'units_edit'
   | 'deeds'
@@ -94,6 +97,7 @@ export function useDashboardAuth(): UseDashboardAuthResult {
       if (typeof value === 'boolean') return value
       // الصلاحيات الجديدة تُعامل كـ true افتراضياً للسجلات القديمة التي لا تحتوي المفتاح بعد.
       if (key === 'marketing_cancel_reservation' || key === 'marketing_complete_sale' || key === 'marketing_building_details') return true
+      if (key === 'documents_upload' || key === 'documents_create_folder' || key === 'documents_delete') return true
       return false
     },
     [employeePermissions]

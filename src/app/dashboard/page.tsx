@@ -77,7 +77,7 @@ interface Unit {
 
 interface Activity {
   id: string
-  type: 'add' | 'edit' | 'delete' | 'booking' | 'sold' | 'reserved' | 'association_end'
+  type: 'add' | 'edit' | 'delete' | 'booking' | 'sold' | 'reserved' | 'association_end' | 'meter_added'
   building_name: string
   building_id?: string
   user_name: string
@@ -146,6 +146,7 @@ export default function DashboardPage() {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [greeting, setGreeting] = useState('')
   const [animateStats, setAnimateStats] = useState(false)
+  const [meterAddedLogs, setMeterAddedLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
 
   const router = useRouter()
   const supabase = createClient()
@@ -315,6 +316,20 @@ export default function DashboardPage() {
     }
   }
 
+  useEffect(() => {
+    if (!user) return
+    const loadMeterAddedLogs = async () => {
+      const { data } = await supabase
+        .from('activity_logs')
+        .select('id, action_description, metadata, created_at')
+        .eq('action_type', 'meter_added')
+        .order('created_at', { ascending: false })
+        .limit(20)
+      setMeterAddedLogs((data || []) as Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>)
+    }
+    loadMeterAddedLogs()
+  }, [user?.id])
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -351,6 +366,34 @@ export default function DashboardPage() {
       unit: u,
       buildingName: buildings.find(b => b.id === u.building_id)?.name || '—'
     }))
+
+  // تنبيهات عمارة بدون عدادات كاملة — تنبيه واحد لكل عمارة (بالاسم فقط)
+  const buildingsMissingMeters = useMemo(() => {
+    const byBuilding = new Map<string, { missing: number; hasAny: boolean; buildingName: string }>()
+    for (const u of units) {
+      const bid = u.building_id
+      if (!bid) continue
+      const hasMeter = !!(u.electricity_meter_number && String(u.electricity_meter_number).trim())
+      const buildingName = buildings.find(b => b.id === bid)?.name || '—'
+      if (!byBuilding.has(bid)) {
+        byBuilding.set(bid, { missing: 0, hasAny: false, buildingName })
+      }
+      const cur = byBuilding.get(bid)!
+      if (!hasMeter) cur.missing += 1
+      else cur.hasAny = true
+    }
+    const out: { buildingId: string; buildingName: string; needsComplete: boolean }[] = []
+    byBuilding.forEach((val, buildingId) => {
+      if (val.missing > 0) {
+        out.push({
+          buildingId,
+          buildingName: val.buildingName,
+          needsComplete: val.hasAny
+        })
+      }
+    })
+    return out
+  }, [units, buildings])
 
   // تنبيهات الحجز المنتهي — عند تجاوز تاريخ انتهاء الحجز مع بقاء الحالة قيد الحجز
   const reservationReminders = reservations
@@ -404,8 +447,9 @@ export default function DashboardPage() {
   const filteredAssociationEndReminders = can('details_association') ? associationEndReminders : []
   const filteredReservationReminders = employeePermissions === null && can('reservations') ? reservationReminders : []
   const filteredElectricityReminders = can('details_electricity') ? electricityReminders : []
+  const filteredMissingMeterReminders = can('details_electricity') ? buildingsMissingMeters : []
 
-  const notificationsCount = filteredElectricityReminders.length + filteredReservationReminders.length + filteredAssociationEndReminders.length
+  const notificationsCount = filteredElectricityReminders.length + filteredReservationReminders.length + filteredAssociationEndReminders.length + filteredMissingMeterReminders.length
 
   // قائمة معرفات الإشعارات الحالية (لحساب غير المقروءة)
   const currentNotificationIds = useMemo(() => {
@@ -413,8 +457,9 @@ export default function DashboardPage() {
     filteredAssociationEndReminders.forEach(({ buildingId, daysLeft }) => ids.push(`assoc-${buildingId}-${daysLeft}`))
     filteredReservationReminders.forEach(({ reservation }) => ids.push(`res-expired-${reservation.id}`))
     filteredElectricityReminders.forEach(({ unit }) => ids.push(`elec-${unit.id}`))
+    filteredMissingMeterReminders.forEach(({ buildingId }) => ids.push(`meter-missing-${buildingId}`))
     return ids
-  }, [filteredAssociationEndReminders, filteredReservationReminders, filteredElectricityReminders])
+  }, [filteredAssociationEndReminders, filteredReservationReminders, filteredElectricityReminders, filteredMissingMeterReminders])
 
   const unreadCount = useMemo(() => {
     return currentNotificationIds.filter((id) => !readNotificationIds.has(id)).length
@@ -509,10 +554,19 @@ export default function DashboardPage() {
         endDate: r.endDate
       }
     })
-    return [...fromUnits, ...fromReservations, ...fromExpiredReservations, ...fromBuildings, ...fromAssoc]
+    const fromMeterAdded: Activity[] = meterAddedLogs.map(log => ({
+      id: `meter-${log.id}`,
+      type: 'meter_added' as const,
+      building_name: (log.metadata?.building_name as string) || '—',
+      building_id: (log.metadata?.building_id as string) || undefined,
+      user_name: (log.metadata?.created_by_name as string) || 'النظام',
+      timestamp: log.created_at,
+      details: log.action_description || 'تم إضافة عداد'
+    }))
+    return [...fromUnits, ...fromReservations, ...fromExpiredReservations, ...fromBuildings, ...fromAssoc, ...fromMeterAdded]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 7)
-  }, [units, buildings, reservations, associationEndReminders])
+  }, [units, buildings, reservations, associationEndReminders, meterAddedLogs])
 
   // عرض النشاطات حسب الصلاحيات (خاص بلوحة الموظف)
   const filteredActivities = useMemo(() => {
@@ -521,6 +575,7 @@ export default function DashboardPage() {
       if (a.type === 'reserved') return can('reservations')
       if (a.type === 'add') return can('building_details') || can('buildings')
       if (a.type === 'association_end') return can('details_association')
+      if (a.type === 'meter_added') return can('details_electricity')
       return true
     })
   }, [activities, employeePermissions])
@@ -643,6 +698,7 @@ export default function DashboardPage() {
       case 'sold': return <ShoppingCart className="w-4 h-4 text-purple-600" />
       case 'reserved': return <Calendar className="w-4 h-4 text-amber-600" />
       case 'association_end': return <Users className="w-4 h-4 text-emerald-600" />
+      case 'meter_added': return <Zap className="w-4 h-4 text-amber-600" />
       default: return <Activity className="w-4 h-4 text-gray-600" />
     }
   }
@@ -835,6 +891,24 @@ export default function DashboardPage() {
                                   <p className="text-sm font-semibold text-gray-800">فاتورة كهرباء</p>
                                   <p className="text-xs text-gray-600 mt-0.5 font-mono text-amber-700">{unit.electricity_meter_number}</p>
                                   <p className="text-xs text-gray-400 mt-0.5">{buildingName} — وحدة {unit.unit_number}</p>
+                                </div>
+                              </Link>
+                            ))}
+                            {filteredMissingMeterReminders.map(({ buildingId, buildingName, needsComplete }) => (
+                              <Link
+                                key={`meter-missing-${buildingId}`}
+                                href={`/dashboard/buildings/details?buildingId=${buildingId}#card-electricity`}
+                                onClick={() => setNotificationsOpen(false)}
+                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-amber-50/70 transition cursor-pointer"
+                              >
+                                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
+                                  <AlertCircle className="w-5 h-5" />
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-gray-800">
+                                    {needsComplete ? 'الرجاء إكمال إضافة عدادات عمارة' : 'الرجاء إضافة عدادات عمارة'}
+                                  </p>
+                                  <p className="text-xs text-gray-600 mt-0.5">{buildingName}</p>
                                 </div>
                               </Link>
                             ))}
@@ -1089,6 +1163,7 @@ export default function DashboardPage() {
                       activity.type === 'booking' || activity.type === 'sold' ? 'from-purple-100 to-pink-200' :
                       activity.type === 'reserved' ? 'from-amber-100 to-orange-200' :
                       activity.type === 'association_end' ? 'from-emerald-100 to-teal-200' :
+                      activity.type === 'meter_added' ? 'from-amber-100 to-yellow-200' :
                       'from-gray-100 to-slate-200'
                     } rounded-xl flex items-center justify-center shadow-sm`}>
                       {getActivityIcon(activity.type)}

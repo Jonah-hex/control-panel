@@ -17,7 +17,8 @@ import {
   Calendar,
   Users,
   Clock,
-  Filter
+  Filter,
+  Zap
 } from 'lucide-react'
 
 interface Building {
@@ -42,7 +43,7 @@ interface Unit {
 
 interface ActivityItem {
   id: string
-  type: 'add' | 'edit' | 'delete' | 'booking' | 'sold' | 'reserved' | 'association_end'
+  type: 'add' | 'edit' | 'delete' | 'booking' | 'sold' | 'reserved' | 'association_end' | 'meter_added'
   building_name: string
   building_id?: string
   user_name: string
@@ -60,6 +61,7 @@ export default function ActivitiesPage() {
   const [buildings, setBuildings] = useState<Building[]>([])
   const [units, setUnits] = useState<Unit[]>([])
   const [reservations, setReservations] = useState<ReservationRow[]>([])
+  const [meterAddedLogs, setMeterAddedLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
   const [filter, setFilter] = useState<FilterType>('all')
   const router = useRouter()
   const supabase = createClient()
@@ -110,6 +112,14 @@ export default function ActivitiesPage() {
           setUnits([])
           setReservations([])
         }
+
+        const { data: meterLogs } = await supabase
+          .from('activity_logs')
+          .select('id, action_description, metadata, created_at')
+          .eq('action_type', 'meter_added')
+          .order('created_at', { ascending: false })
+          .limit(50)
+        setMeterAddedLogs((meterLogs || []) as Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>)
       } catch (err) {
         console.error('Error fetching activities:', err)
       } finally {
@@ -219,14 +229,23 @@ export default function ActivitiesPage() {
         endDate: r.endDate
       }
     })
-    let all = [...fromUnits, ...fromReservations, ...fromExpiredReservations, ...fromBuildings, ...fromAssoc]
+    const fromMeterAdded: ActivityItem[] = meterAddedLogs.map(log => ({
+      id: `meter-${log.id}`,
+      type: 'meter_added' as const,
+      building_name: (log.metadata?.building_name as string) || '—',
+      building_id: (log.metadata?.building_id as string) || undefined,
+      user_name: (log.metadata?.created_by_name as string) || 'النظام',
+      timestamp: log.created_at,
+      details: log.action_description || 'تم إضافة عداد'
+    }))
+    let all = [...fromUnits, ...fromReservations, ...fromExpiredReservations, ...fromBuildings, ...fromAssoc, ...fromMeterAdded]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
     if (filter !== 'all') {
       all = all.filter(a => a.type === filter)
     }
     return all
-  }, [units, buildings, reservations, associationEndReminders, filter])
+  }, [units, buildings, reservations, associationEndReminders, meterAddedLogs, filter])
 
   // عرض النشاطات حسب الصلاحيات (خاص بلوحة الموظف)
   const filteredActivities = useMemo(() => {
@@ -235,6 +254,7 @@ export default function ActivitiesPage() {
       if (a.type === 'reserved') return can('reservations')
       if (a.type === 'add') return can('building_details') || can('buildings')
       if (a.type === 'association_end') return can('details_association')
+      if (a.type === 'meter_added') return can('details_electricity')
       return true
     })
   }, [activities, can])
@@ -263,6 +283,7 @@ export default function ActivitiesPage() {
       case 'sold': return <ShoppingCart className="w-4 h-4 text-purple-600" />
       case 'reserved': return <Calendar className="w-4 h-4 text-amber-600" />
       case 'association_end': return <Users className="w-4 h-4 text-emerald-600" />
+      case 'meter_added': return <Zap className="w-4 h-4 text-amber-600" />
       default: return <Activity className="w-4 h-4 text-gray-600" />
     }
   }
@@ -350,7 +371,7 @@ export default function ActivitiesPage() {
                 <Link
                   key={activity.id}
                   href={activity.building_id
-                    ? `/dashboard/buildings/details?buildingId=${activity.building_id}${activity.type === 'association_end' ? '#card-association' : ''}`
+                    ? `/dashboard/buildings/details?buildingId=${activity.building_id}${activity.type === 'association_end' ? '#card-association' : activity.type === 'meter_added' ? '#card-electricity' : ''}`
                     : '#'}
                   className="flex items-start gap-4 p-5 hover:bg-gray-50/80 transition-colors group cursor-pointer block"
                 >
@@ -361,6 +382,7 @@ export default function ActivitiesPage() {
                     activity.type === 'sold' ? 'bg-purple-100' :
                     activity.type === 'reserved' ? 'bg-amber-100' :
                     activity.type === 'association_end' ? 'bg-emerald-100' :
+                    activity.type === 'meter_added' ? 'bg-amber-100' :
                     'bg-gray-100'
                   }`}>
                     {getActivityIcon(activity.type)}

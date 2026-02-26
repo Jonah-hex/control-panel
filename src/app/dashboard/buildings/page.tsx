@@ -149,55 +149,53 @@ export default function BuildingsPage() {
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
 
+  const totalAvailableUnits = Object.values(unitStatsByBuilding).reduce((sum, s) => sum + s.available, 0)
+  const totalReservedUnits = Object.values(unitStatsByBuilding).reduce((sum, s) => sum + s.reserved, 0)
+  const totalSoldUnits = Object.values(unitStatsByBuilding).reduce((sum, s) => sum + s.sold, 0)
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100" dir="rtl">
-      {/* Header - refined elegant style */}
-      <div className="sticky top-0 z-20">
-        <div className="backdrop-blur bg-gradient-to-r from-white/70 to-white/60 border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-20">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center shadow-xl text-white">
-                  <Building2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-extrabold text-slate-900">العماير</h1>
-                  <p className="text-sm text-slate-500">قائمة العماير المسجلة في النظام</p>
-                </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100" dir="rtl">
+      {/* Header */}
+      <div className="sticky top-0 z-20 border-b border-slate-200/70 bg-gradient-to-b from-white/95 to-white/85 backdrop-blur-xl shadow-[0_4px_20px_rgba(15,23,42,0.06)]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-3">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-2xl border border-white/80 bg-white/70 px-3 sm:px-4 lg:px-5 py-3 shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-sky-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/30 ring-1 ring-white/70 text-white flex-shrink-0">
+                <Building2 className="w-5 h-5" />
               </div>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-bold text-slate-800 leading-tight">إدارة العماير</h1>
+                <p className="text-xs text-slate-500/90">قائمة العماير المسجلة في النظام</p>
+              </div>
+            </div>
 
-              <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/90 border border-slate-200 text-slate-700 text-sm font-medium shadow-sm hover:bg-white hover:border-sky-200 hover:text-sky-700 transition-all"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                لوحة التحكم
+              </Link>
+
+              {ready && can('buildings_create') && canAddBuilding && (
                 <Link
-                  href="/dashboard"
-                  className="inline-flex items-center gap-3 px-4 py-2 bg-white/80 border-2 border-slate-200 text-slate-700 rounded-full hover:border-purple-300 hover:bg-slate-50 shadow-sm hover:shadow-md transform transition hover:-translate-y-0.5"
+                  href="/dashboard/buildings/new"
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 text-white text-sm font-semibold shadow-lg shadow-sky-500/25 hover:shadow-xl transition-all hover:-translate-y-0.5"
                 >
-                  <span className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center">
-                    <ArrowLeft className="w-4 h-4 text-slate-700" />
-                  </span>
-                  <span className="text-sm font-semibold">لوحة التحكم</span>
+                  <Plus className="w-4 h-4" />
+                  إضافة عمارة جديدة
                 </Link>
-
-                {ready && can('buildings_create') && canAddBuilding && (
-                  <Link
-                    href="/dashboard/buildings/new"
-                    className="inline-flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-slate-800/90 via-purple-800/90 to-slate-800/90 backdrop-blur-sm text-white rounded-full shadow-xl hover:shadow-2xl transform transition hover:-translate-y-0.5"
-                  >
-                    <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
-                      <Plus className="w-4 h-4 text-white" />
-                    </span>
-                    <span className="text-sm font-semibold">إضافة عمارة جديدة</span>
-                  </Link>
-                )}
-                {ready && can('buildings_create') && !subscriptionLoading && !canAddBuilding && (
-                  <Link
-                    href="/subscriptions"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/90 text-white rounded-full shadow-lg hover:bg-amber-600 transition text-sm font-semibold"
-                  >
-                    <Crown className="w-4 h-4" />
-                    ترقية الخطة لإضافة المزيد
-                  </Link>
-                )}
-              </div>
+              )}
+              {ready && can('buildings_create') && !subscriptionLoading && !canAddBuilding && (
+                <Link
+                  href="/subscriptions"
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500 text-white text-sm font-semibold shadow-lg hover:bg-amber-600 transition"
+                >
+                  <Crown className="w-4 h-4" />
+                  ترقية الخطة لإضافة المزيد
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -205,11 +203,11 @@ export default function BuildingsPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search Bar */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold text-slate-600">
-              إجمالي العماير: <span className="text-slate-600 font-bold">{buildings.length}</span>
+        {/* Search + stats */}
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-white/80 backdrop-blur p-4 sm:p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <p className="text-sm font-semibold text-slate-700">
+              إجمالي العماير: <span className="text-slate-900 font-bold">{buildings.length}</span>
               {searchTerm && (
                 <span className="mr-2 text-slate-500">
                   (ظاهر: {filteredBuildings.length})
@@ -221,15 +219,27 @@ export default function BuildingsPage() {
                 </span>
               )}
             </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-violet-100 text-violet-700">
+                متاحة: {totalAvailableUnits}
+              </span>
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700">
+                محجوزة: {totalReservedUnits}
+              </span>
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700">
+                مباعة: {totalSoldUnits}
+              </span>
+            </div>
           </div>
+
           <div className="relative">
-            <Search className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
               type="text"
               placeholder="ابحث بالاسم، الحي، حالة البناء..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pr-12 pl-4 py-3 bg-white border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none"
+              className="w-full pr-12 pl-4 py-3 rounded-xl bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-sky-300 focus:ring-2 focus:ring-sky-100 outline-none transition"
             />
           </div>
         </div>
@@ -269,11 +279,11 @@ export default function BuildingsPage() {
             )}
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                    <tr className="bg-gradient-to-r from-slate-50 to-white text-slate-700 border-b border-gray-200">
+                    <tr className="bg-gradient-to-r from-slate-50 to-white text-slate-700 border-b border-slate-200">
                       <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">اسم العمارة</th>
                       <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">الحي</th>
                       <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">حالة البناء</th>
@@ -285,10 +295,10 @@ export default function BuildingsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {displayedBuildings.map((b) => (
-                    <tr key={b.id} className="hover:bg-slate-50 transition-colors duration-150">
+                    <tr key={b.id} className="hover:bg-sky-50/40 transition-colors duration-150">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+                          <div className="w-12 h-12 bg-gradient-to-br from-sky-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                             <Building2 className="w-6 h-6 text-white" />
                           </div>
                           <div className="text-right min-w-0 flex-1">

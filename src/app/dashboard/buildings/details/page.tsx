@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { showToast } from "./toast";
 import { FaInfoCircle, FaBuilding, FaShieldAlt, FaMapMarkerAlt, FaUsers, FaTools, FaBolt, FaPhoneAlt, FaChevronDown, FaChevronUp } from "react-icons/fa";
-import { FaDoorOpen, FaDoorClosed, FaLayerGroup, FaBuilding as FaBldg, FaUserShield } from "react-icons/fa";
+import { FaDoorOpen, FaLayerGroup, FaUserShield, FaImages } from "react-icons/fa";
 import BuildingCard from "@/components/BuildingCard";
 
 import { createClient } from "@/lib/supabase/client";
@@ -213,7 +213,7 @@ function DetailsContent() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const buildingId = searchParams.get("buildingId");
+      const buildingId = searchParams.get("buildingId") || searchParams.get("id");
       if (!buildingId) return;
       const { data, error } = await supabase
         .from("buildings")
@@ -277,6 +277,24 @@ function DetailsContent() {
       setTimeout(() => document.getElementById('card-association')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
     }
   }, [building?.id]);
+
+  // التوجيه التلقائي لكارد الموقع والصور عند الرجوع من المعرض (#card-location)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !building?.id) return;
+    if (window.location.hash === '#card-location' || searchParams.get('scroll') === 'location') {
+      setOpenCard('location');
+      setTimeout(() => document.getElementById('card-location')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
+    }
+  }, [building?.id, searchParams]);
+
+  // التوجيه التلقائي لكارد المكتب الهندسي عند الرجوع من الصكوك (#card-engineering)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !building?.id) return;
+    if (window.location.hash === '#card-engineering' || searchParams.get('scroll') === 'engineering') {
+      setOpenCard('engineering');
+      setTimeout(() => document.getElementById('card-engineering')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
+    }
+  }, [building?.id, searchParams]);
 
   // جلب وحدات المبنى عند فتح كارد عدادات الكهرباء
   useEffect(() => {
@@ -356,6 +374,28 @@ function DetailsContent() {
       setEditingMeter(null);
       setMeterDraft("");
       showToast("تم حفظ رقم العداد بنجاح");
+      if (v && building) {
+        const unit = units.find((u) => u.id === unitId);
+        if (unit) {
+          const { data: { user } } = await supabase.auth.getUser();
+          const createdByName = (user?.user_metadata?.full_name as string) || user?.email || "النظام";
+          const details = `تم إضافة عداد عمارة ${building.name} دور ${unit.floor} وحدة ${unit.unit_number}`;
+          const metadata = {
+            building_id: building.id,
+            building_name: building.name,
+            unit_id: unitId,
+            unit_number: unit.unit_number,
+            floor: unit.floor,
+            created_by_name: createdByName,
+          };
+          await supabase.from("activity_logs").insert({
+            user_id: user?.id,
+            action_type: "meter_added",
+            action_description: details,
+            metadata,
+          });
+        }
+      }
     } else showToast("فشل حفظ رقم العداد");
   };
 
@@ -394,86 +434,93 @@ function DetailsContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100" dir="rtl">
-      {/* شريط علوي */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-3 w-full sm:w-auto order-2 sm:order-1">
-            <Link
-              href="/dashboard/buildings"
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition text-sm font-medium"
-            >
-              <ArrowRight className="w-4 h-4 rotate-180" />
-              رجوع
-            </Link>
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-teal-50 border border-teal-100 min-w-0 flex-1 sm:flex-initial">
-              <Building2 className="w-5 h-5 text-teal-600 flex-shrink-0" />
-              <span className="font-bold text-teal-800 truncate">
-                {building?.name || "تفاصيل المبنى"}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto order-1 sm:order-2 justify-between sm:justify-end">
-            <div className="relative">
-              <button
-                onClick={() => setQuickAccessOpen((v) => !v)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition text-sm font-semibold"
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-sky-50/40 p-4 sm:p-6 lg:p-8" dir="rtl">
+      <div className="max-w-6xl mx-auto relative">
+        {/* هيدر بتنسيق أزرق مميز (متناسق مع كارد معلومات المبنى) */}
+        <header className="relative rounded-2xl overflow-visible mb-6 shadow-xl border border-blue-200/80 bg-gradient-to-br from-white via-blue-50/40 to-blue-100/30">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 to-blue-600/10 rounded-2xl" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_70%_0%,rgba(59,130,246,0.12),transparent)] rounded-2xl" />
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 sm:p-6">
+            <div className="flex items-center gap-3 min-w-0">
+              <Link
+                href="/dashboard/buildings"
+                className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white/90 border border-blue-200/70 text-blue-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-800 transition shadow-sm"
+                title="رجوع للعماير"
               >
-                الوصول السريع
-                <ChevronDown className={`w-4 h-4 transition-transform ${quickAccessOpen ? "rotate-180" : ""}`} />
-              </button>
-              {quickAccessOpen && (
-                <>
-                  <div className="fixed inset-0 z-40 cursor-pointer" onClick={() => setQuickAccessOpen(false)} aria-hidden="true" />
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-50" dir="rtl">
-                    {[
-                      { id: "card-basic", key: "basic", label: "معلومات أساسية", icon: FaInfoCircle },
-                      { id: "card-building", key: "building", label: "معلومات المبنى", icon: FaBuilding },
-                      { id: "card-facilities", key: "facilities", label: "المرافق والتأمين", icon: FaShieldAlt },
-                      { id: "card-guard", key: "guard", label: "بيانات الحارس", icon: FaUserShield },
-                      { id: "card-location", key: "location", label: "الموقع والصور", icon: FaMapMarkerAlt },
-                      { id: "card-association", key: "association", label: "اتحاد الملاك", icon: FaUsers },
-                      { id: "card-engineering", key: "engineering", label: "المكتب الهندسي", icon: FaTools },
-                      { id: "card-electricity", key: "electricity", label: "عدادات الكهرباء", icon: FaBolt },
-                    ]
-                      .filter(({ key }) => allowedCardKeys.includes(key as (typeof allowedCardKeys)[number]))
-                      .map(({ id, key, label, icon: Icon }) => (
-                      <button
-                        key={key}
-                        type="button"
-                        className="flex items-center gap-2 px-4 py-2.5 text-slate-700 hover:bg-slate-50 transition text-sm w-full text-right"
-                        onClick={() => {
-                          setOpenCard(key);
-                          setQuickAccessOpen(false);
-                          // تأخير التمرير بعد توسيع الكارد
-                          setTimeout(() => {
-                            document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-                          }, 120);
-                        }}
-                      >
-                        <Icon className="w-4 h-4 text-teal-500" />
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/25 ring-2 ring-blue-100 flex-shrink-0">
+                <Building2 className="w-5 h-5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-800 tracking-tight truncate">
+                  {building?.name || "تفاصيل المبنى"}
+                </h1>
+                <p className="text-xs sm:text-sm text-blue-700/80 mt-0.5">إدارة أقسام العمارة — بيانات وتشغيل وتحديثات</p>
+              </div>
             </div>
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 text-white hover:bg-teal-700 transition text-sm font-semibold shadow-sm"
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              لوحة التحكم
-            </Link>
-          </div>
-        </div>
-      </header>
 
-      <div className="max-w-3xl mx-auto px-4 py-8">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              <div className="relative">
+                <button
+                  onClick={() => setQuickAccessOpen((v) => !v)}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/90 border border-blue-200/70 text-blue-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-800 transition text-sm font-semibold shadow-sm"
+                >
+                  الوصول السريع
+                  <ChevronDown className={`w-4 h-4 transition-transform ${quickAccessOpen ? "rotate-180" : ""}`} />
+                </button>
+                {quickAccessOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40 cursor-pointer" onClick={() => setQuickAccessOpen(false)} aria-hidden="true" />
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg border border-blue-200/80 py-2 z-50" dir="rtl">
+                      {[
+                        { id: "card-basic", key: "basic", label: "معلومات أساسية", icon: FaInfoCircle },
+                        { id: "card-building", key: "building", label: "معلومات المبنى", icon: FaBuilding },
+                        { id: "card-facilities", key: "facilities", label: "المرافق والتأمين", icon: FaShieldAlt },
+                        { id: "card-guard", key: "guard", label: "بيانات الحارس", icon: FaUserShield },
+                        { id: "card-location", key: "location", label: "الموقع والصور", icon: FaMapMarkerAlt },
+                        { id: "card-association", key: "association", label: "اتحاد الملاك", icon: FaUsers },
+                        { id: "card-engineering", key: "engineering", label: "المكتب الهندسي", icon: FaTools },
+                        { id: "card-electricity", key: "electricity", label: "عدادات الكهرباء", icon: FaBolt },
+                      ]
+                        .filter(({ key }) => allowedCardKeys.includes(key as (typeof allowedCardKeys)[number]))
+                        .map(({ id, key, label, icon: Icon }) => (
+                        <button
+                          key={key}
+                          type="button"
+                          className="flex items-center gap-2 px-4 py-2.5 text-slate-700 hover:bg-blue-50 transition text-sm w-full text-right"
+                          onClick={() => {
+                            setOpenCard(key);
+                            setQuickAccessOpen(false);
+                            // انتظار توسيع الكارد ثم التمرير إليه (واحد لكل الكروت: basic, building, facilities, guard, location, association, engineering, electricity)
+                            setTimeout(() => {
+                              document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }, 220);
+                          }}
+                        >
+                          <Icon className="w-4 h-4 text-blue-500" />
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 transition text-sm font-semibold shadow-lg shadow-blue-500/25"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                لوحة التحكم
+              </Link>
+            </div>
+          </div>
+        </header>
+
+        <div className="max-w-6xl mx-auto px-0 py-2">
         {/* كارد معلومات أساسية قابل للطي */}
         {can('details_basic') && (
-        <div id="card-basic" className="rounded-2xl mb-8 overflow-hidden border border-indigo-200/60 shadow-xl shadow-indigo-900/5 bg-gradient-to-b from-white to-indigo-50/30">
+        <div id="card-basic" className="rounded-2xl mb-8 overflow-hidden border border-blue-200/60 shadow-xl shadow-blue-900/5 bg-gradient-to-b from-white to-blue-50/30">
           <div className="relative flex items-center justify-between">
             <button
               type="button"
@@ -481,15 +528,15 @@ function DetailsContent() {
               onClick={() => setOpenCard(openCard === 'basic' ? null : 'basic')}
               aria-expanded={openCard === 'basic'}
             >
-              <span className="flex items-center justify-center rounded-full h-16 w-16 bg-gradient-to-br from-indigo-400 to-indigo-600 shadow-lg shadow-indigo-500/25 mb-2 ring-4 ring-indigo-100">
+              <span className="flex items-center justify-center rounded-full h-16 w-16 bg-gradient-to-br from-blue-400 to-blue-600 shadow-lg shadow-blue-500/25 mb-2 ring-4 ring-blue-100">
                 <FaInfoCircle className="text-white text-3xl" />
               </span>
-              <span className="text-xl font-bold bg-gradient-to-l from-indigo-700 to-indigo-600 bg-clip-text text-transparent">معلومات أساسية</span>
-              <span className="mt-2 text-indigo-500">{openCard === 'basic' ? <FaChevronUp className="text-indigo-500" /> : <FaChevronDown className="text-indigo-500" />}</span>
+              <span className="text-xl font-bold bg-gradient-to-l from-blue-700 to-blue-600 bg-clip-text text-transparent">معلومات أساسية</span>
+              <span className="mt-2 text-blue-500">{openCard === 'basic' ? <FaChevronUp className="text-blue-500" /> : <FaChevronDown className="text-blue-500" />}</span>
             </button>
             {openCard === 'basic' && canEditBuilding && (
               <button
-                className="absolute left-4 top-4 text-indigo-500 hover:text-indigo-700 bg-indigo-50 rounded-full p-2 shadow"
+                className="absolute left-4 top-4 text-blue-500 hover:text-blue-700 bg-blue-50 rounded-full p-2 shadow"
                 title={isEditingBasicCard ? "إلغاء" : "تعديل"}
                 onClick={() => {
                   if (!isEditingBasicCard && building) {
@@ -513,11 +560,11 @@ function DetailsContent() {
           {openCard === 'basic' && building && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 px-5 pb-5">
               {/* اسم المبنى */}
-              <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">اسم المبنى</p>
+              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">اسم المبنى</p>
                 {isEditingBasicCard ? (
                   <input
-                    className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none"
+                    className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none"
                     type="text"
                     value={basicEdit.name ?? ''}
                     onChange={e => setBasicEdit({ ...basicEdit, name: e.target.value })}
@@ -527,11 +574,11 @@ function DetailsContent() {
                 )}
               </div>
               {/* اسم المالك */}
-              <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">اسم المالك</p>
+              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">اسم المالك</p>
                 {isEditingBasicCard ? (
                   <input
-                    className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none"
+                    className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none"
                     type="text"
                     value={basicEdit.owner_name ?? ''}
                     onChange={e => setBasicEdit({ ...basicEdit, owner_name: e.target.value })}
@@ -541,11 +588,11 @@ function DetailsContent() {
                 )}
               </div>
               {/* رقم القطعة */}
-              <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">رقم القطعة</p>
+              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">رقم القطعة</p>
                 {isEditingBasicCard ? (
                   <input
-                    className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none"
+                    className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none"
                     type="text"
                     value={basicEdit.plot_number ?? ''}
                     onChange={e => setBasicEdit({ ...basicEdit, plot_number: e.target.value })}
@@ -555,11 +602,11 @@ function DetailsContent() {
                 )}
               </div>
               {/* رقم رخصة البناء */}
-              <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">رقم رخصة البناء</p>
+              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">رقم رخصة البناء</p>
                 {isEditingBasicCard ? (
                   <input
-                    className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none"
+                    className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none"
                     type="text"
                     value={basicEdit.building_license_number ?? ''}
                     onChange={e => setBasicEdit({ ...basicEdit, building_license_number: e.target.value })}
@@ -569,11 +616,11 @@ function DetailsContent() {
                 )}
               </div>
               {/* رقم الصك */}
-              <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">رقم الصك</p>
+              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">رقم الصك</p>
                 {isEditingBasicCard ? (
                   <input
-                    className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none"
+                    className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none"
                     type="text"
                     value={basicEdit.deed_number}
                     onChange={e => setBasicEdit({ ...basicEdit, deed_number: e.target.value })}
@@ -583,11 +630,11 @@ function DetailsContent() {
                 )}
               </div>
               {/* الحي */}
-              <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">الحي</p>
+              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">الحي</p>
                 {isEditingBasicCard ? (
                   <input
-                    className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none"
+                    className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none"
                     type="text"
                     value={basicEdit.neighborhood ?? ''}
                     onChange={e => setBasicEdit({ ...basicEdit, neighborhood: e.target.value })}
@@ -597,11 +644,11 @@ function DetailsContent() {
                 )}
               </div>
               {/* مساحة الأرض */}
-              <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">مساحة الأرض (م²)</p>
+              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">مساحة الأرض (م²)</p>
                 {isEditingBasicCard ? (
                   <input
-                    className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none"
+                    className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none"
                     type="text"
                     value={basicEdit.land_area ?? ''}
                     onChange={e => setBasicEdit({ ...basicEdit, land_area: e.target.value })}
@@ -614,7 +661,7 @@ function DetailsContent() {
               {isEditingBasicCard && (
                 <div className="col-span-2 flex gap-4 mt-2">
                   <button
-                    className="px-5 py-2 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white rounded-full shadow-lg hover:from-indigo-600 hover:to-indigo-800 transition text-sm font-bold border-0"
+                    className="px-5 py-2 bg-gradient-to-br from-blue-500 to-blue-700 text-white rounded-xl shadow-lg hover:from-blue-600 hover:to-blue-800 transition text-sm font-bold border-0"
                     onClick={async () => {
                       const { error } = await supabase
                         .from('buildings')
@@ -638,7 +685,7 @@ function DetailsContent() {
                     }}
                   >حفظ</button>
                   <button
-                    className="px-5 py-2 bg-gray-200 text-gray-700 rounded-full border border-gray-300 hover:bg-gray-300 transition text-sm font-bold"
+                    className="px-5 py-2 bg-slate-100 text-slate-700 rounded-xl border border-slate-200 hover:bg-slate-200 transition text-sm font-bold"
                     onClick={() => setIsEditingBasicCard(false)}
                   >إلغاء</button>
                 </div>
@@ -650,7 +697,7 @@ function DetailsContent() {
 
         {/* كارد معلومات المبنى قابل للطي */}
         {can('details_building') && (
-        <div id="card-building" className="rounded-2xl mb-8 overflow-hidden border border-blue-200/60 shadow-xl shadow-blue-900/5 bg-gradient-to-b from-white to-blue-50/30">
+        <div id="card-building" className="rounded-2xl mb-8 overflow-hidden border border-sky-200/60 shadow-xl shadow-sky-900/5 bg-gradient-to-b from-white to-sky-50/30">
           <div className="relative">
             <button
               type="button"
@@ -658,15 +705,15 @@ function DetailsContent() {
               onClick={() => setOpenCard(openCard === 'building' ? null : 'building')}
               aria-expanded={openCard === 'building'}
             >
-              <span className="flex items-center justify-center rounded-full h-16 w-16 bg-gradient-to-br from-blue-400 to-blue-600 shadow-lg shadow-blue-500/25 mb-2 ring-4 ring-blue-100">
+              <span className="flex items-center justify-center rounded-full h-16 w-16 bg-gradient-to-br from-sky-400 to-teal-600 shadow-lg shadow-sky-500/25 mb-2 ring-4 ring-sky-100">
                 <FaBuilding className="text-white text-3xl" />
               </span>
-              <span className="text-xl font-bold bg-gradient-to-l from-blue-700 to-blue-600 bg-clip-text text-transparent">معلومات المبنى</span>
-              <span className="mt-2 text-blue-500">{openCard === 'building' ? <FaChevronUp className="text-blue-500" /> : <FaChevronDown className="text-blue-500" />}</span>
+              <span className="text-xl font-bold bg-gradient-to-l from-sky-700 to-teal-600 bg-clip-text text-transparent">معلومات المبنى</span>
+              <span className="mt-2 text-sky-500">{openCard === 'building' ? <FaChevronUp className="text-sky-500" /> : <FaChevronDown className="text-sky-500" />}</span>
             </button>
             {openCard === 'building' && canEditBuilding && (
               <button
-                className="absolute top-4 left-4 bg-blue-100 text-blue-700 rounded-full p-2 border border-blue-300 hover:bg-blue-200 transition"
+                className="absolute top-4 left-4 bg-sky-100 text-sky-700 rounded-full p-2 border border-sky-300 hover:bg-sky-200 transition"
                 onClick={() => setIsEditingBuildingCard(v => !v)}
                 title={isEditingBuildingCard ? 'إغلاق التعديل' : 'تعديل معلومات المبنى'}
               >
@@ -676,26 +723,26 @@ function DetailsContent() {
           </div>
           {openCard === 'building' && building && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 px-5 pb-5">
-              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">عدد الأدوار</p>
+              <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">عدد الأدوار</p>
                 {isEditingBuildingCard ? (
-                  <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none" type="number" value={buildingEdit.total_floors ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, total_floors: e.target.value })} />
+                  <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" type="number" value={buildingEdit.total_floors ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, total_floors: e.target.value })} />
                 ) : (
                   <p className="text-gray-800 font-medium">{building.total_floors ?? '—'}</p>
                 )}
               </div>
-              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">عدد الوحدات</p>
+              <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">عدد الوحدات</p>
                 {isEditingBuildingCard ? (
-                  <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none" type="number" value={buildingEdit.total_units ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, total_units: e.target.value })} />
+                  <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" type="number" value={buildingEdit.total_units ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, total_units: e.target.value })} />
                 ) : (
                   <p className="text-gray-800 font-medium">{building.total_units ?? '—'}</p>
                 )}
               </div>
-              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">حالة البناء</p>
+              <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">حالة البناء</p>
                 {isEditingBuildingCard ? (
-                  <select className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none" value={buildingEdit.build_status ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, build_status: e.target.value })}>
+                  <select className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" value={buildingEdit.build_status ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, build_status: e.target.value })}>
                     <option value="">اختر حالة البناء</option>
                     <option value="ready">جاهز</option>
                     <option value="under_construction">تحت الإنشاء</option>
@@ -718,34 +765,34 @@ function DetailsContent() {
                   </p>
                 )}
               </div>
-              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">عدد الشقق بالدور</p>
+              <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">عدد الشقق بالدور</p>
                 {isEditingBuildingCard ? (
-                  <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none" type="number" value={buildingEdit.unitsperfloor ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, unitsperfloor: e.target.value })} />
+                  <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" type="number" value={buildingEdit.unitsperfloor ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, unitsperfloor: e.target.value })} />
                 ) : (
                   <p className="text-gray-800 font-medium">{building.unitsperfloor ?? '—'}</p>
                 )}
               </div>
-              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">عدد المواقف</p>
+              <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">عدد المواقف</p>
                 {isEditingBuildingCard ? (
-                  <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none" type="number" value={buildingEdit.parking_slots ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, parking_slots: e.target.value })} />
+                  <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" type="number" value={buildingEdit.parking_slots ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, parking_slots: e.target.value })} />
                 ) : (
                   <p className="text-gray-800 font-medium">{building.parking_slots ?? '—'}</p>
                 )}
               </div>
-              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">عدد غرف السائقين</p>
+              <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">عدد غرف السائقين</p>
                 {isEditingBuildingCard ? (
-                  <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none" type="number" value={buildingEdit.driver_rooms ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, driver_rooms: e.target.value })} />
+                  <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" type="number" value={buildingEdit.driver_rooms ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, driver_rooms: e.target.value })} />
                 ) : (
                   <p className="text-gray-800 font-medium">{building.driver_rooms ?? '—'}</p>
                 )}
               </div>
-              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">واجهة العمارة</p>
+              <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">واجهة العمارة</p>
                 {isEditingBuildingCard ? (
-                  <select className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none" value={buildingEdit.street_type ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, street_type: e.target.value })}>
+                  <select className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" value={buildingEdit.street_type ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, street_type: e.target.value })}>
                     <option value="">اختر واجهة العمارة</option>
                     <option value="one">شارع واحد</option>
                     <option value="two">شارعين</option>
@@ -754,10 +801,10 @@ function DetailsContent() {
                   <p className="text-gray-800 font-medium">{building.street_type === 'one' ? 'شارع واحد' : building.street_type === 'two' ? 'شارعين' : building.street_type || '—'}</p>
                 )}
               </div>
-              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">اتجاه العمارة</p>
+              <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">اتجاه العمارة</p>
                 {isEditingBuildingCard ? (
-                  <select className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none" value={buildingEdit.building_facing ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, building_facing: e.target.value })}>
+                  <select className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" value={buildingEdit.building_facing ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, building_facing: e.target.value })}>
                     <option value="">اختر اتجاه العمارة</option>
                     <option value="north">شمال</option>
                     <option value="south">جنوب</option>
@@ -774,26 +821,26 @@ function DetailsContent() {
                   </p>
                 )}
               </div>
-              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">عدد المصاعد</p>
+              <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">عدد المصاعد</p>
                 {isEditingBuildingCard ? (
-                  <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none" type="number" value={buildingEdit.elevators ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, elevators: e.target.value })} />
+                  <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" type="number" value={buildingEdit.elevators ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, elevators: e.target.value })} />
                 ) : (
                   <p className="text-gray-800 font-medium">{building.elevators ?? '—'}</p>
                 )}
               </div>
-              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">سنة البناء</p>
+              <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">سنة البناء</p>
                 {isEditingBuildingCard ? (
-                  <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none" type="number" value={buildingEdit.year_built ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, year_built: e.target.value })} />
+                  <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" type="number" value={buildingEdit.year_built ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, year_built: e.target.value })} />
                 ) : (
                   <p className="text-gray-800 font-medium">{building.year_built ?? '—'}</p>
                 )}
               </div>
-              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">الوصف</p>
+              <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">الوصف</p>
                 {isEditingBuildingCard ? (
-                  <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none" type="text" value={buildingEdit.description ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, description: e.target.value })} />
+                  <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" type="text" value={buildingEdit.description ?? ''} onChange={e => setBuildingEdit({ ...buildingEdit, description: e.target.value })} />
                 ) : (
                   <p className="text-gray-800 font-medium">{building.description ?? '—'}</p>
                 )}
@@ -801,7 +848,7 @@ function DetailsContent() {
               {isEditingBuildingCard && (
                 <div className="col-span-2 flex gap-4 mt-2">
                   <button
-                    className="px-5 py-2 bg-gradient-to-br from-blue-500 to-blue-700 text-white rounded-full shadow-lg hover:from-blue-600 hover:to-blue-800 transition text-sm font-bold border-0"
+                    className="px-5 py-2 bg-gradient-to-br from-sky-500 to-teal-600 text-white rounded-xl shadow-lg hover:from-sky-600 hover:to-teal-700 transition text-sm font-bold border-0"
                     onClick={async () => {
                       // حفظ التعديلات في قاعدة البيانات
                       const { error } = await supabase
@@ -843,7 +890,7 @@ function DetailsContent() {
                     }}
                   >حفظ</button>
                   <button
-                    className="px-5 py-2 bg-gray-200 text-gray-700 rounded-full border border-gray-300 hover:bg-gray-300 transition text-sm font-bold"
+                    className="px-5 py-2 bg-gray-200 text-gray-700 rounded-xl border border-gray-300 hover:bg-gray-300 transition text-sm font-bold"
                     onClick={() => setIsEditingBuildingCard(false)}
                   >إلغاء</button>
                 </div>
@@ -928,7 +975,7 @@ function DetailsContent() {
               {isEditingFacilitiesCard && (
                 <div className="col-span-2 flex gap-4 mt-2">
                   <button
-                    className="px-5 py-2 bg-gradient-to-br from-green-500 to-green-700 text-white rounded-full shadow-lg hover:from-green-600 hover:to-green-800 transition text-sm font-bold border-0"
+                    className="px-5 py-2 bg-gradient-to-br from-green-500 to-green-700 text-white rounded-xl shadow-lg hover:from-green-600 hover:to-green-800 transition text-sm font-bold border-0"
                     onClick={async () => {
                       const { error } = await supabase
                         .from('buildings')
@@ -955,7 +1002,7 @@ function DetailsContent() {
                     }}
                   >حفظ</button>
                   <button
-                    className="px-5 py-2 bg-gray-200 text-gray-700 rounded-full border border-gray-300 hover:bg-gray-300 transition text-sm font-bold"
+                    className="px-5 py-2 bg-gray-200 text-gray-700 rounded-xl border border-gray-300 hover:bg-gray-300 transition text-sm font-bold"
                     onClick={() => setIsEditingFacilitiesCard(false)}
                   >إلغاء</button>
                 </div>
@@ -975,7 +1022,7 @@ function DetailsContent() {
               onClick={() => setOpenCard(openCard === 'guard' ? null : 'guard')}
               aria-expanded={openCard === 'guard'}
             >
-              <span className="flex items-center justify-center rounded-full h-16 w-16 bg-gradient-to-br from-amber-400 via-amber-500 to-orange-600 shadow-lg shadow-amber-500/25 mb-2 ring-4 ring-amber-100">
+              <span className="flex items-center justify-center rounded-full h-16 w-16 bg-gradient-to-br from-amber-500 via-amber-600 to-orange-700 shadow-lg shadow-amber-600/30 mb-2 ring-4 ring-amber-200">
                 <FaUserShield className="text-white text-3xl" />
               </span>
               <span className="text-xl font-bold bg-gradient-to-l from-amber-700 to-orange-700 bg-clip-text text-transparent">بيانات الحارس</span>
@@ -1175,7 +1222,7 @@ function DetailsContent() {
 
         {/* كارد الموقع والصور قابل للطي */}
         {can('details_location') && (
-        <div id="card-location" className="rounded-2xl mb-8 overflow-hidden border border-pink-200/60 shadow-xl shadow-pink-900/5 bg-gradient-to-b from-white to-pink-50/30">
+        <div id="card-location" className="rounded-2xl mb-8 overflow-hidden border border-red-200/60 shadow-xl shadow-red-900/5 bg-gradient-to-b from-white to-red-50/30">
           <div className="relative">
             <button
               type="button"
@@ -1183,21 +1230,21 @@ function DetailsContent() {
               onClick={() => setOpenCard(openCard === 'location' ? null : 'location')}
               aria-expanded={openCard === 'location'}
             >
-              <span className="flex items-center justify-center rounded-full h-16 w-16 bg-gradient-to-br from-pink-400 to-pink-600 shadow-lg shadow-pink-500/25 mb-2 ring-4 ring-pink-100">
+              <span className="flex items-center justify-center rounded-full h-16 w-16 bg-red-500 shadow-lg shadow-red-500/30 mb-2 ring-4 ring-red-100">
                 <FaMapMarkerAlt className="text-white text-3xl" />
               </span>
-              <span className="text-xl font-bold bg-gradient-to-l from-pink-700 to-pink-600 bg-clip-text text-transparent">الموقع والصور</span>
-              <span className="mt-2 text-pink-500">{openCard === 'location' ? <FaChevronUp className="text-pink-500" /> : <FaChevronDown className="text-pink-500" />}</span>
+              <span className="text-xl font-bold text-red-600">الموقع والصور</span>
+              <span className="mt-2 text-red-500">{openCard === 'location' ? <FaChevronUp className="text-red-500" /> : <FaChevronDown className="text-red-500" />}</span>
             </button>
           </div>
           {openCard === 'location' && building && (
             <div className="px-5 pb-5 space-y-4">
-              <div className="rounded-xl bg-white/90 border border-pink-100 px-4 py-3 shadow-sm">
-                <p className="text-xs font-semibold text-pink-600 uppercase tracking-wide mb-2">الموقع على الخريطة</p>
+              <div className="rounded-xl bg-white/90 border border-red-100 px-4 py-3 shadow-sm">
+                <p className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-2">الموقع على الخريطة</p>
                 {!isEditingMapLink ? (
                   <div className="flex items-center gap-2 flex-wrap">
                     {building.google_maps_link ? (
-                      <a href={building.google_maps_link} target="_blank" rel="noopener" className="inline-flex items-center gap-2 w-fit px-4 py-2 bg-gradient-to-br from-pink-500 to-pink-700 text-white rounded-full shadow hover:from-pink-600 hover:to-pink-800 transition text-sm font-bold">
+                      <a href={building.google_maps_link} target="_blank" rel="noopener" className="inline-flex items-center gap-2 w-fit px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl shadow transition text-sm font-bold">
                         <FaMapMarkerAlt className="text-white text-lg" />
                         فتح الخريطة
                       </a>
@@ -1206,7 +1253,7 @@ function DetailsContent() {
                     )}
                     <button
                       type="button"
-                      className="flex-shrink-0 w-10 h-10 rounded-full bg-pink-500 hover:bg-pink-600 text-white flex items-center justify-center transition"
+                      className="flex-shrink-0 w-10 h-10 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition"
                       title={building.google_maps_link ? "تحديث الرابط" : "إضافة الموقع"}
                       onClick={() => setIsEditingMapLink(true)}
                     >
@@ -1217,7 +1264,7 @@ function DetailsContent() {
                   <div className="flex items-center gap-2">
                     <input
                       type="url"
-                      className="flex-1 min-w-0 rounded-full border border-pink-200 bg-pink-50/50 px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400 transition"
+                      className="flex-1 min-w-0 rounded-full border border-red-200 bg-red-50/50 px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 transition"
                       placeholder="أدخل رابط Google Maps..."
                       value={newMapLink ?? ''}
                       onChange={e => setNewMapLink(e.target.value)}
@@ -1235,7 +1282,7 @@ function DetailsContent() {
                     </button>
                     <button
                       type="button"
-                      className="flex-shrink-0 w-10 h-10 rounded-full bg-pink-500 hover:bg-pink-600 text-white flex items-center justify-center transition disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="flex-shrink-0 w-10 h-10 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition disabled:opacity-60 disabled:cursor-not-allowed"
                       title="حفظ الرابط"
                       onClick={async () => {
                         const link = newMapLink.trim() || null;
@@ -1263,29 +1310,17 @@ function DetailsContent() {
                   </div>
                 )}
               </div>
-              <div className="rounded-xl bg-white/90 border border-pink-100 px-4 py-3 shadow-sm">
-                <p className="text-xs font-semibold text-pink-600 uppercase tracking-wide mb-3">معرض صور العقار</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 w-full">
-                  <button
-                    className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-white/90 border border-pink-100 text-pink-700 font-bold hover:bg-pink-50 shadow-sm transition group"
-                    onClick={() => router.push(`/dashboard/buildings/gallery?buildingId=${building.id}&type=front`)}
-                    >
-                      <FaDoorClosed className="text-4xl text-pink-400 group-hover:text-pink-600 transition" />
-                      <span className="mt-2">الشقة الأمامية</span>
-                    </button>
-                  <button className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-white/90 border border-pink-100 text-pink-700 font-bold hover:bg-pink-50 shadow-sm transition group" onClick={() => router.push(`/dashboard/buildings/gallery?buildingId=${building.id}&type=back`)}>
-                    <FaDoorClosed className="text-4xl text-pink-400 group-hover:text-pink-600 transition" />
-                    <span className="mt-2">الشقة الخلفية</span>
-                  </button>
-                  <button className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-white/90 border border-pink-100 text-pink-700 font-bold hover:bg-pink-50 shadow-sm transition group" onClick={() => router.push(`/dashboard/buildings/gallery?buildingId=${building.id}&type=annex`)}>
-                    <FaDoorClosed className="text-4xl text-pink-400 group-hover:text-pink-600 transition" />
-                    <span className="mt-2">الملحق</span>
-                  </button>
-                  <button className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-white/90 border border-pink-100 text-pink-700 font-bold hover:bg-pink-50 shadow-sm transition group" onClick={() => router.push(`/dashboard/buildings/gallery?buildingId=${building.id}&type=building`)}>
-                    <FaBldg className="text-4xl text-pink-400 group-hover:text-pink-600 transition" />
-                    <span className="mt-2">العمارة</span>
-                  </button>
-                </div>
+              <div className="rounded-xl border-0 bg-transparent px-0 py-1">
+                <button
+                  type="button"
+                  onClick={() => router.push(`/dashboard/buildings/gallery?buildingId=${building.id}&type=front`)}
+                  className="w-full flex items-center justify-center gap-4 p-4 rounded-xl bg-gradient-to-l from-red-50 to-white border-2 border-red-200/80 text-red-800 font-bold hover:from-red-100 hover:to-red-50/80 hover:border-red-300 transition shadow-sm group"
+                >
+                  <span className="flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-red-400 to-red-600 text-white shadow-lg shadow-red-500/25 group-hover:scale-105 transition-transform">
+                    <FaImages className="text-2xl" />
+                  </span>
+                  <span>معرض الصور</span>
+                </button>
               </div>
             </div>
           )}
@@ -1422,7 +1457,7 @@ function DetailsContent() {
                 {isEditingAssociationCard && (
                   <div className="col-span-2 flex gap-4 mt-2">
                   <button
-                    className="px-5 py-2 bg-gradient-to-br from-green-500 to-green-700 text-white rounded-full shadow-lg hover:from-green-600 hover:to-green-800 transition text-sm font-bold border-0"
+                    className="px-5 py-2 bg-gradient-to-br from-emerald-500 to-emerald-700 text-white rounded-xl shadow-lg hover:from-emerald-600 hover:to-emerald-800 transition text-sm font-bold border-0"
                     onClick={async () => {
                       const { error } = await supabase
                         .from('buildings')
@@ -1438,7 +1473,7 @@ function DetailsContent() {
                     }}
                   >حفظ</button>
                   <button
-                    className="px-5 py-2 bg-gray-200 text-gray-700 rounded-full border border-gray-300 hover:bg-gray-300 transition text-sm font-bold"
+                    className="px-5 py-2 bg-gray-200 text-gray-700 rounded-xl border border-gray-300 hover:bg-gray-300 transition text-sm font-bold"
                     onClick={() => setIsEditingAssociationCard(false)}
                   >إلغاء</button>
                 </div>
@@ -1475,11 +1510,12 @@ function DetailsContent() {
                     الصكوك ومحاضر الفرز
                   </button>
                   )}
-                  <button className="px-4 py-2 bg-white border border-teal-200 text-teal-700 rounded-xl hover:bg-teal-50 transition text-sm font-bold">
-                    الخرائط الهندسيه
-                  </button>
-                  <button className="px-4 py-2 bg-white border border-teal-200 text-teal-700 rounded-xl hover:bg-teal-50 transition text-sm font-bold">
-                    مستندات المبنى
+                  <button
+                    type="button"
+                    className="px-4 py-2 bg-white border border-teal-200 text-teal-700 rounded-xl hover:bg-teal-50 transition text-sm font-bold"
+                    onClick={() => router.push(`/dashboard/buildings/documents?buildingId=${building.id}`)}
+                  >
+                    الخرائط الهندسيه ومستندات المبنى
                   </button>
                 </div>
               </div>
@@ -1518,7 +1554,7 @@ function DetailsContent() {
                   <div className="overflow-x-auto rounded-lg border border-amber-100">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-gradient-to-r from-yellow-50 to-amber-50 text-slate-700 border-b border-slate-200">
+                      <tr className="bg-gradient-to-r from-amber-50 to-yellow-50 text-slate-700 border-b border-slate-200">
                         <th className="px-4 py-3 text-right font-semibold">رقم الوحدة</th>
                         <th className="px-4 py-3 text-right font-semibold">الدور</th>
                         <th className="px-4 py-3 text-right font-semibold">رقم عداد الكهرباء</th>
@@ -1540,13 +1576,13 @@ function DetailsContent() {
                                     if (e.key === "Enter") saveUnitMeter(unit.id, meterDraft);
                                     if (e.key === "Escape") { setEditingMeter(null); setMeterDraft(""); }
                                   }}
-                                  className="flex-1 min-w-0 rounded-lg border border-yellow-300 px-3 py-1.5 text-sm focus:ring-2 focus:ring-yellow-400"
+                                  className="flex-1 min-w-0 rounded-lg border border-amber-300 px-3 py-1.5 text-sm focus:ring-2 focus:ring-amber-400"
                                   autoFocus
                                 />
                                 <button
                                   type="button"
                                   onClick={() => saveUnitMeter(unit.id, meterDraft)}
-                                  className="px-3 py-1.5 rounded-lg bg-yellow-500 text-white text-xs font-semibold hover:bg-yellow-600"
+                                  className="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600"
                                 >
                                   حفظ
                                 </button>
@@ -1565,7 +1601,7 @@ function DetailsContent() {
                                   setEditingMeter(unit.id);
                                   setMeterDraft(unit.electricity_meter_number || "");
                                 }}
-                                className="text-right w-full px-3 py-2 rounded-lg border border-dashed border-slate-200 text-slate-600 hover:border-yellow-400 hover:bg-yellow-50/50 hover:text-slate-800 transition text-sm font-mono"
+                                className="text-right w-full px-3 py-2 rounded-lg border border-dashed border-slate-200 text-slate-600 hover:border-amber-400 hover:bg-amber-50/50 hover:text-slate-800 transition text-sm font-mono"
                               >
                                 {unit.electricity_meter_number || "إضافة رقم العداد"}
                               </button>
@@ -1586,6 +1622,7 @@ function DetailsContent() {
         {/* كارد وحدات المبنى */}
       </div>
     </div>
+  </div>
   );
 }
 
