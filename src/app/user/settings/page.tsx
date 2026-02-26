@@ -15,6 +15,7 @@ import {
   Check,
   ChevronLeft,
   RefreshCw,
+  LayoutDashboard,
 } from 'lucide-react'
 
 /** يولد كلمة مرور مؤقتة عشوائية (12 حرفاً: حروف كبيرة/صغيرة وأرقام) وفق سياسة النظام (6 أحرف على الأقل) */
@@ -39,13 +40,21 @@ export type PermissionKey =
   | 'building_details'
   | 'buildings_delete'
   | 'details_basic'
+  | 'details_basic_edit'
   | 'details_building'
+  | 'details_building_edit'
   | 'details_facilities'
+  | 'details_facilities_edit'
   | 'details_guard'
+  | 'details_guard_edit'
   | 'details_location'
+  | 'details_location_edit'
   | 'details_association'
+  | 'details_association_edit'
   | 'details_engineering'
+  | 'details_engineering_edit'
   | 'details_electricity'
+  | 'details_electricity_edit'
   | 'units'
   | 'units_edit'
   | 'deeds'
@@ -67,14 +76,22 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   buildings_edit: 'تعديل بيانات العماير (أزرار التعديل داخل التفاصيل)',
   building_details: 'عرض صفحة تفاصيل المبنى',
   buildings_delete: 'حذف العمارة',
-  details_basic: 'كارد: معلومات أساسية',
-  details_building: 'كارد: معلومات المبنى',
-  details_facilities: 'كارد: المرافق والتأمين',
-  details_guard: 'كارد: بيانات الحارس',
-  details_location: 'كارد: الموقع والصور',
-  details_association: 'كارد: اتحاد الملاك',
-  details_engineering: 'كارد: المكتب الهندسي',
-  details_electricity: 'كارد: عدادات الكهرباء',
+  details_basic: 'معلومات أساسية',
+  details_basic_edit: 'تعديل',
+  details_building: 'معلومات المبنى',
+  details_building_edit: 'تعديل',
+  details_facilities: 'المرافق والتأمين',
+  details_facilities_edit: 'تعديل',
+  details_guard: 'بيانات الحارس',
+  details_guard_edit: 'تعديل',
+  details_location: 'الموقع والصور',
+  details_location_edit: 'تعديل',
+  details_association: 'اتحاد الملاك',
+  details_association_edit: 'تعديل',
+  details_engineering: 'المكتب الهندسي',
+  details_engineering_edit: 'تعديل',
+  details_electricity: 'عدادات الكهرباء',
+  details_electricity_edit: 'تعديل',
   units: 'معاينة الوحدات',
   units_edit: 'تعديل الوحدات',
   deeds: 'الصكوك ومحاضر الفرز',
@@ -94,10 +111,21 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
 const PERMISSION_GROUPS: { title: string; keys: PermissionKey[] }[] = [
   { title: 'عام', keys: ['dashboard'] },
   { title: 'العماير', keys: ['buildings', 'building_details', 'buildings_create', 'buildings_edit', 'buildings_delete'] },
-  { title: 'تفاصيل المبنى (الكاردات)', keys: ['details_basic', 'details_building', 'details_facilities', 'details_guard', 'details_location', 'details_association', 'details_engineering', 'details_electricity'] },
   { title: 'الوحدات', keys: ['units', 'units_edit'] },
   { title: 'إدارة التسويق', keys: ['reservations', 'sales', 'marketing_cancel_reservation', 'marketing_complete_sale', 'marketing_building_details'] },
   { title: 'أخرى', keys: ['deeds', 'statistics', 'activities', 'reports', 'security', 'settings'] },
+]
+
+// تفاصيل المبنى (الكاردات): صف واحد لكل كارد مع سوتش معاينة + سوتش تعديل
+const CARD_PERMISSION_ROWS: { label: string; viewKey: PermissionKey; editKey: PermissionKey }[] = [
+  { label: 'كارد: معلومات أساسية', viewKey: 'details_basic', editKey: 'details_basic_edit' },
+  { label: 'كارد: معلومات المبنى', viewKey: 'details_building', editKey: 'details_building_edit' },
+  { label: 'كارد: المرافق والتأمين', viewKey: 'details_facilities', editKey: 'details_facilities_edit' },
+  { label: 'كارد: بيانات الحارس', viewKey: 'details_guard', editKey: 'details_guard_edit' },
+  { label: 'كارد: الموقع والصور', viewKey: 'details_location', editKey: 'details_location_edit' },
+  { label: 'كارد: اتحاد الملاك', viewKey: 'details_association', editKey: 'details_association_edit' },
+  { label: 'كارد: المكتب الهندسي', viewKey: 'details_engineering', editKey: 'details_engineering_edit' },
+  { label: 'كارد: عدادات الكهرباء', viewKey: 'details_electricity', editKey: 'details_electricity_edit' },
 ]
 
 const DEFAULT_PERMISSIONS: Record<PermissionKey, boolean> = {
@@ -108,13 +136,21 @@ const DEFAULT_PERMISSIONS: Record<PermissionKey, boolean> = {
   building_details: true,
   buildings_delete: true,
   details_basic: true,
+  details_basic_edit: true,
   details_building: true,
+  details_building_edit: true,
   details_facilities: true,
+  details_facilities_edit: true,
   details_guard: true,
+  details_guard_edit: true,
   details_location: true,
+  details_location_edit: true,
   details_association: true,
+  details_association_edit: true,
   details_engineering: true,
+  details_engineering_edit: true,
   details_electricity: true,
+  details_electricity_edit: true,
   units: true,
   units_edit: true,
   deeds: true,
@@ -348,9 +384,9 @@ export default function AdvancedSettingsPage() {
             <div className="flex items-center gap-3">
               <Link
                 href="/dashboard"
-                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition text-sm font-medium"
+                className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <LayoutDashboard className="w-4 h-4" />
                 لوحة التحكم
               </Link>
               <div className="flex items-center gap-2">
@@ -601,6 +637,52 @@ export default function AdvancedSettingsPage() {
                         </div>
                       </div>
                     ))}
+                    {/* تفاصيل المبنى (الكاردات): معاينة + تعديل لكل كارد */}
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">تفاصيل المبنى (الكاردات)</p>
+                      <p className="text-xs text-slate-400 mb-2">معاينة = إظهار الكارد فقط — تعديل = إمكانية تعديل محتواه</p>
+                      <div className="space-y-2">
+                        {CARD_PERMISSION_ROWS.map(({ label, viewKey, editKey }) => {
+                          const viewChecked = form.permissions[viewKey] ?? false
+                          const editChecked = form.permissions[editKey] ?? false
+                          const Switch = ({ keyName, checked }: { keyName: PermissionKey; checked: boolean }) => (
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={checked}
+                              onClick={() => setPermission(keyName, !checked)}
+                              className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-teal-400 focus:ring-offset-2 ${
+                                checked ? 'bg-teal-500' : 'bg-slate-300'
+                              }`}
+                            >
+                              <span
+                                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm ring-0 transition-all duration-200 ${
+                                  checked ? 'right-0.5 left-auto rtl:right-auto rtl:left-0.5' : 'left-0.5 right-auto rtl:left-auto rtl:right-0.5'
+                                }`}
+                              />
+                            </button>
+                          )
+                          return (
+                            <div
+                              key={viewKey}
+                              className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50/50 transition"
+                            >
+                              <span className="text-sm text-slate-700 min-w-0">{label}</span>
+                              <div className="flex items-center gap-4 flex-shrink-0">
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <span className="text-[10px] text-slate-400">معاينة</span>
+                                  <Switch keyName={viewKey} checked={viewChecked} />
+                                </div>
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <span className="text-[10px] text-slate-400">تعديل</span>
+                                  <Switch keyName={editKey} checked={editChecked} />
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

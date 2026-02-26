@@ -13,7 +13,7 @@ import Link from "next/link";
 import { ChevronDown, LayoutDashboard, ArrowRight, Building2, Pencil, X, Check } from "lucide-react";
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
 
-// مفتاح الكارد -> صلاحية العرض
+// مفتاح الكارد -> صلاحية العرض (معاينة)
 const CARD_PERMISSION_MAP: Record<string, 'details_basic' | 'details_building' | 'details_facilities' | 'details_guard' | 'details_location' | 'details_association' | 'details_engineering' | 'details_electricity'> = {
   basic: 'details_basic',
   building: 'details_building',
@@ -23,6 +23,18 @@ const CARD_PERMISSION_MAP: Record<string, 'details_basic' | 'details_building' |
   association: 'details_association',
   engineering: 'details_engineering',
   electricity: 'details_electricity',
+};
+
+// مفتاح الكارد -> صلاحية التعديل
+const CARD_EDIT_PERMISSION_MAP: Record<string, 'details_basic_edit' | 'details_building_edit' | 'details_facilities_edit' | 'details_guard_edit' | 'details_location_edit' | 'details_association_edit' | 'details_engineering_edit' | 'details_electricity_edit'> = {
+  basic: 'details_basic_edit',
+  building: 'details_building_edit',
+  facilities: 'details_facilities_edit',
+  guard: 'details_guard_edit',
+  location: 'details_location_edit',
+  association: 'details_association_edit',
+  engineering: 'details_engineering_edit',
+  electricity: 'details_electricity_edit',
 };
 
 // تعريف أنواع البيانات
@@ -43,6 +55,7 @@ interface Building {
   google_maps_link?: string;
   insurance_available?: boolean;
   insurance_policy_number?: string;
+  insurance_policy_path?: string | null;
   building_license_number?: string;
   land_area?: string;
   owner_association?: string;
@@ -168,6 +181,7 @@ function DetailsContent() {
   }, [ready, can, router]);
 
   const canEditBuilding = can('buildings_edit');
+  const canEditCard = (cardKey: string) => (CARD_EDIT_PERMISSION_MAP[cardKey] ? can(CARD_EDIT_PERMISSION_MAP[cardKey]) : false);
   const allowedCardKeys = (['basic', 'building', 'facilities', 'guard', 'location', 'association', 'engineering', 'electricity'] as const).filter(
     (key) => can(CARD_PERMISSION_MAP[key])
   );
@@ -180,6 +194,8 @@ function DetailsContent() {
   const [meterDraft, setMeterDraft] = useState("");
   const [guardIdPreview, setGuardIdPreview] = useState<string | null>(null);
   const [savingGuardPhoto, setSavingGuardPhoto] = useState(false);
+  const [uploadingInsurance, setUploadingInsurance] = useState(false);
+  const insuranceFileInputRef = React.useRef<HTMLInputElement>(null);
   const [guardEdit, setGuardEdit] = useState({
     guard_name: '',
     guard_phone: '',
@@ -293,6 +309,15 @@ function DetailsContent() {
     if (window.location.hash === '#card-engineering' || searchParams.get('scroll') === 'engineering') {
       setOpenCard('engineering');
       setTimeout(() => document.getElementById('card-engineering')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
+    }
+  }, [building?.id, searchParams]);
+
+  // التوجيه التلقائي لكارد عدادات الكهرباء عند القدوم من تنبيهات اللوحة (#card-electricity)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !building?.id) return;
+    if (window.location.hash === '#card-electricity' || searchParams.get('scroll') === 'electricity') {
+      setOpenCard('electricity');
+      setTimeout(() => document.getElementById('card-electricity')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
     }
   }, [building?.id, searchParams]);
 
@@ -508,7 +533,7 @@ function DetailsContent() {
               </div>
               <Link
                 href="/dashboard"
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 transition text-sm font-semibold shadow-lg shadow-blue-500/25"
+                className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
               >
                 <LayoutDashboard className="w-4 h-4" />
                 لوحة التحكم
@@ -534,7 +559,7 @@ function DetailsContent() {
               <span className="text-xl font-bold bg-gradient-to-l from-blue-700 to-blue-600 bg-clip-text text-transparent">معلومات أساسية</span>
               <span className="mt-2 text-blue-500">{openCard === 'basic' ? <FaChevronUp className="text-blue-500" /> : <FaChevronDown className="text-blue-500" />}</span>
             </button>
-            {openCard === 'basic' && canEditBuilding && (
+            {openCard === 'basic' && canEditCard('basic') && (
               <button
                 className="absolute left-4 top-4 text-blue-500 hover:text-blue-700 bg-blue-50 rounded-full p-2 shadow"
                 title={isEditingBasicCard ? "إلغاء" : "تعديل"}
@@ -711,7 +736,7 @@ function DetailsContent() {
               <span className="text-xl font-bold bg-gradient-to-l from-sky-700 to-teal-600 bg-clip-text text-transparent">معلومات المبنى</span>
               <span className="mt-2 text-sky-500">{openCard === 'building' ? <FaChevronUp className="text-sky-500" /> : <FaChevronDown className="text-sky-500" />}</span>
             </button>
-            {openCard === 'building' && canEditBuilding && (
+            {openCard === 'building' && canEditCard('building') && (
               <button
                 className="absolute top-4 left-4 bg-sky-100 text-sky-700 rounded-full p-2 border border-sky-300 hover:bg-sky-200 transition"
                 onClick={() => setIsEditingBuildingCard(v => !v)}
@@ -916,7 +941,7 @@ function DetailsContent() {
               <span className="text-xl font-bold bg-gradient-to-l from-green-700 to-green-600 bg-clip-text text-transparent">المرافق والتأمين</span>
               <span className="mt-2 text-green-500">{openCard === 'facilities' ? <FaChevronUp className="text-green-500" /> : <FaChevronDown className="text-green-500" />}</span>
             </button>
-            {openCard === 'facilities' && canEditBuilding && (
+            {openCard === 'facilities' && canEditCard('facilities') && (
               <button
                 className="absolute top-4 left-4 bg-green-100 text-green-700 rounded-full p-2 border border-green-300 hover:bg-green-200 transition"
                 onClick={() => setIsEditingFacilitiesCard(v => !v)}
@@ -966,10 +991,61 @@ function DetailsContent() {
                 )}
               </div>
               {(building.insurance_available || facilitiesEdit.insurance_available === 'true') && (
-                <div className="md:col-span-2">
-                  <button type="button" className="w-full px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-semibold text-sm shadow-md hover:from-green-600 hover:to-green-700 transition" onClick={() => showToast('لا توجد صورة بوليصة التأمين غير متوفرة حالياً.')}>
-                    معاينة صورة بوليصة التأمين
-                  </button>
+                <div className="md:col-span-2 flex flex-wrap items-center gap-2">
+                  {building.insurance_policy_path && (
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-semibold text-sm shadow-md hover:from-green-600 hover:to-green-700 transition"
+                      onClick={async () => {
+                        const { data } = await supabase.storage.from('building-documents').createSignedUrl(building.insurance_policy_path!, 3600);
+                        if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+                        else showToast('تعذر فتح ملف البوليصة.', 'error');
+                      }}
+                    >
+                      معاينة البوليصة
+                    </button>
+                  )}
+                  {isEditingFacilitiesCard && (
+                    <>
+                      <input
+                        ref={insuranceFileInputRef}
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file || !building?.id) return;
+                          e.target.value = '';
+                          setUploadingInsurance(true);
+                          const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf';
+                          const path = `insurance/${building.id}/policy.${ext}`;
+                          const { error: uploadError } = await supabase.storage.from('building-documents').upload(path, file, { contentType: file.type, upsert: true });
+                          if (uploadError) {
+                            setUploadingInsurance(false);
+                            showToast('تعذر رفع الملف: ' + (uploadError.message || 'تحقق من الصلاحيات.'), 'error');
+                            return;
+                          }
+                          const { error: updateError } = await supabase.from('buildings').update({ insurance_policy_path: path, updated_at: new Date().toISOString() }).eq('id', building.id);
+                          if (updateError) {
+                            setUploadingInsurance(false);
+                            showToast('تم الرفع لكن تعذر حفظ المسار في قاعدة البيانات.');
+                            return;
+                          }
+                          setBuilding({ ...building, insurance_policy_path: path });
+                          setUploadingInsurance(false);
+                          showToast(building.insurance_policy_path ? 'تم استبدال بوليصة التأمين' : 'تم إضافة بوليصة التأمين بنجاح');
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={uploadingInsurance}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-green-300 text-green-700 rounded-xl font-semibold text-sm shadow-sm hover:bg-green-50 hover:border-green-400 transition disabled:opacity-70"
+                        onClick={() => insuranceFileInputRef.current?.click()}
+                      >
+                        {uploadingInsurance ? 'جاري الرفع...' : building.insurance_policy_path ? 'استبدال بوليصة التأمين' : 'إضافة بوليصة التأمين'}
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
               {isEditingFacilitiesCard && (
@@ -1028,7 +1104,7 @@ function DetailsContent() {
               <span className="text-xl font-bold bg-gradient-to-l from-amber-700 to-orange-700 bg-clip-text text-transparent">بيانات الحارس</span>
               <span className="mt-2 text-amber-500">{openCard === 'guard' ? <FaChevronUp className="text-amber-500" /> : <FaChevronDown className="text-amber-500" />}</span>
             </button>
-            {openCard === 'guard' && canEditBuilding && (
+            {openCard === 'guard' && canEditCard('guard') && (
               <button
                 className="absolute top-4 left-4 bg-amber-100 text-amber-700 rounded-full p-2 border border-amber-300 hover:bg-amber-200 transition"
                 onClick={() => setIsEditingGuardCard(v => !v)}
@@ -1251,6 +1327,7 @@ function DetailsContent() {
                     ) : (
                       <span className="text-gray-500 text-sm font-medium">لا يوجد رابط للموقع</span>
                     )}
+                    {canEditCard('location') && (
                     <button
                       type="button"
                       className="flex-shrink-0 w-10 h-10 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition"
@@ -1259,6 +1336,7 @@ function DetailsContent() {
                     >
                       <Pencil className="w-5 h-5" />
                     </button>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
@@ -1343,7 +1421,7 @@ function DetailsContent() {
               <span className="text-xl font-bold bg-gradient-to-l from-emerald-700 to-emerald-600 bg-clip-text text-transparent">اتحاد الملاك</span>
               <span className="mt-2 text-emerald-500">{openCard === 'association' ? <FaChevronUp className="text-emerald-500" /> : <FaChevronDown className="text-emerald-500" />}</span>
             </button>
-            {openCard === 'association' && canEditBuilding && (
+            {openCard === 'association' && canEditCard('association') && (
               <button
                 className="absolute top-4 left-4 bg-emerald-100 text-emerald-700 rounded-full p-2 border border-emerald-300 hover:bg-emerald-200 transition"
                 onClick={() => setIsEditingAssociationCard(v => !v)}
@@ -1566,7 +1644,7 @@ function DetailsContent() {
                           <td className="px-4 py-3 text-slate-800 font-medium">{unit.unit_number}</td>
                           <td className="px-4 py-3 text-slate-700">{unit.floor}</td>
                           <td className="px-4 py-3">
-                            {editingMeter === unit.id ? (
+                            {editingMeter === unit.id && canEditCard('electricity') ? (
                               <div className="flex items-center gap-2">
                                 <input
                                   type="text"
@@ -1594,7 +1672,7 @@ function DetailsContent() {
                                   إلغاء
                                 </button>
                               </div>
-                            ) : (
+                            ) : canEditCard('electricity') ? (
                               <button
                                 type="button"
                                 onClick={() => {
@@ -1605,6 +1683,8 @@ function DetailsContent() {
                               >
                                 {unit.electricity_meter_number || "إضافة رقم العداد"}
                               </button>
+                            ) : (
+                              <span className="text-slate-600 font-mono text-sm">{unit.electricity_meter_number || "—"}</span>
                             )}
                           </td>
                         </tr>

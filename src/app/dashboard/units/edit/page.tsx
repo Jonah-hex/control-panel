@@ -47,7 +47,6 @@ function EditUnitPageContent() {
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState("");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-  const [showSoldConfirm, setShowSoldConfirm] = useState(false);
 
   useEffect(() => {
     if (!unitId) {
@@ -139,7 +138,6 @@ function EditUnitPageContent() {
 
     const supabase = createClient();
     const updateData: Record<string, unknown> = {
-      status: form.status || "available",
       type: form.type || "apartment",
       facing: form.facing || "front",
       area: toNum(form.area) ?? 0,
@@ -163,7 +161,6 @@ function EditUnitPageContent() {
     if (updateError) {
       setToast({ message: "تعذر حفظ التعديلات: " + (updateError.message || "خطأ غير معروف"), type: "error" });
       setLoading(false);
-      setShowSoldConfirm(false);
       return;
     }
 
@@ -180,14 +177,7 @@ function EditUnitPageContent() {
 
     setToast({ message: "تم حفظ التعديلات بنجاح", type: "success" });
     setLoading(false);
-    setShowSoldConfirm(false);
     setTimeout(() => router.push(`/dashboard/units?buildingId=${form.building_id}`), 1500);
-  };
-
-  const goToTransferOwnership = () => {
-    setShowSoldConfirm(false);
-    setForm((prev) => ({ ...prev, status: "available" }));
-    router.push(`/building-deeds?buildingId=${form.building_id}&unitId=${unitId}`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -196,12 +186,6 @@ function EditUnitPageContent() {
       setError("بيانات غير كاملة للتحديث");
       return;
     }
-
-    if (unit?.status !== "sold" && form.status === "sold") {
-      setShowSoldConfirm(true);
-      return;
-    }
-
     await performSave();
   };
 
@@ -235,40 +219,6 @@ function EditUnitPageContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8 px-4">
-      {/* نافذة تأكيد عند اختيار حالة مباعة */}
-      {showSoldConfirm && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 border border-gray-200">
-            <h3 className="text-lg font-bold text-gray-900 mb-3">إتمام نقل الملكية</h3>
-            <p className="text-gray-600 mb-2">
-              يجب التوجّه إلى صفحة إدارة صكوك المبنى لإتمام نقل الملكية. أضِف اسم المشتري الجديد واضغط حفظ لإتمام النقل.
-            </p>
-            <p className="text-sm text-amber-700 mb-6 font-medium">
-              في حال عدم الحفظ، تبقى حالة الشقة متاحة.
-            </p>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={goToTransferOwnership}
-                className="flex-1 px-4 py-3 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-xl font-bold hover:from-emerald-600 hover:to-emerald-700 transition"
-              >
-                نعم، التوجّه الآن
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowSoldConfirm(false);
-                  setForm((prev) => ({ ...prev, status: "available" }));
-                }}
-                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition"
-              >
-                لا، إلغاء
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* تنبيه يظهر بعد الحفظ */}
       {toast && (
         <div
@@ -318,27 +268,6 @@ function EditUnitPageContent() {
               <label className="block text-gray-700 font-bold mb-1">الدور</label>
               <input name="floor" value={form.floor} readOnly className="w-full border border-gray-200 rounded-xl px-4 py-2 bg-gray-50" />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-gray-700 font-bold mb-1">الحالة</label>
-            <select
-              name="status"
-              value={form.status}
-              onChange={handleChange}
-              disabled={form.status === "sold"}
-              className={`w-full border border-gray-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-emerald-400 ${form.status === "sold" ? "bg-gray-100 cursor-not-allowed" : ""}`}
-              required
-            >
-              <option value="available">متاحة</option>
-              <option value="reserved">محجوزة</option>
-              <option value="sold">مباعة</option>
-            </select>
-            <p className="text-xs text-gray-500 mt-1">
-              {form.status === "sold"
-                ? "الوحدة مباعة وتم نقل الملكية — لا يمكن تغيير الحالة مرة أخرى"
-                : "تعديل الحالة يحدّث قاعدة البيانات وإحصائيات المبنى تلقائياً"}
-            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

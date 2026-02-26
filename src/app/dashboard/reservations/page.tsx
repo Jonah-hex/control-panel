@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
 import { showToast } from "@/app/dashboard/buildings/details/toast";
@@ -190,6 +190,8 @@ export default function ReservationsPage() {
 
   const supabase = createClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const buildingIdFromUrl = searchParams.get("buildingId") || "";
   const { can, ready, effectiveOwnerId } = useDashboardAuth();
   const handleBack = () => {
     if (typeof window !== "undefined" && window.history.length > 1) {
@@ -309,37 +311,44 @@ export default function ReservationsPage() {
   const filteredReservations = useMemo(() => {
     const textQuery = normalizeSearchText(searchQuery);
     const dateQuery = normalizeSearchText(dateSearchQuery);
-    return reservations.filter((r) => {
-      if (statusFilter === "all") return true;
-      if (statusFilter === "active") return isActive(r);
-      return r.status === statusFilter;
-    }).filter((r) => {
-      if (!textQuery) return true;
-      const searchPool = [
-        getUnit(r)?.unit_number ?? "",
-        String(getUnit(r)?.floor ?? ""),
-        getBuilding(r)?.name ?? "",
-        r.customer_name ?? "",
-        r.customer_phone ?? "",
-        r.customer_email ?? "",
-        r.marketer_name ?? "",
-        r.marketer_phone ?? "",
-        r.receipt_number ?? "",
-      ];
-      const normalizedPool = normalizeSearchText(searchPool.join(" "));
-      return normalizedPool.includes(textQuery);
-    }).filter((r) => {
-      if (!dateQuery) return true;
-      const datePool = [
-        ...dateSearchTokens(r.reservation_date),
-        ...dateSearchTokens(r.expiry_date),
-        ...dateSearchTokens(r.cancelled_at),
-        ...dateSearchTokens(r.completed_at),
-      ];
-      const normalizedDatePool = normalizeSearchText(datePool.join(" "));
-      return normalizedDatePool.includes(dateQuery);
-    });
-  }, [reservations, statusFilter, searchQuery, dateSearchQuery]);
+    return reservations
+      .filter((r) => {
+        if (buildingIdFromUrl && r.building_id !== buildingIdFromUrl) return false;
+        return true;
+      })
+      .filter((r) => {
+        if (statusFilter === "all") return true;
+        if (statusFilter === "active") return isActive(r);
+        return r.status === statusFilter;
+      })
+      .filter((r) => {
+        if (!textQuery) return true;
+        const searchPool = [
+          getUnit(r)?.unit_number ?? "",
+          String(getUnit(r)?.floor ?? ""),
+          getBuilding(r)?.name ?? "",
+          r.customer_name ?? "",
+          r.customer_phone ?? "",
+          r.customer_email ?? "",
+          r.marketer_name ?? "",
+          r.marketer_phone ?? "",
+          r.receipt_number ?? "",
+        ];
+        const normalizedPool = normalizeSearchText(searchPool.join(" "));
+        return normalizedPool.includes(textQuery);
+      })
+      .filter((r) => {
+        if (!dateQuery) return true;
+        const datePool = [
+          ...dateSearchTokens(r.reservation_date),
+          ...dateSearchTokens(r.expiry_date),
+          ...dateSearchTokens(r.cancelled_at),
+          ...dateSearchTokens(r.completed_at),
+        ];
+        const normalizedDatePool = normalizeSearchText(datePool.join(" "));
+        return normalizedDatePool.includes(dateQuery);
+      });
+  }, [reservations, statusFilter, searchQuery, dateSearchQuery, buildingIdFromUrl]);
 
   const expiringSoon = useMemo(() => {
     const now = new Date();

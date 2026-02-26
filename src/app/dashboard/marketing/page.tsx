@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, DollarSign, User2, UserPlus, LayoutDashboard, FileText, LineChart, BellRing, Clock3, NotebookPen } from "lucide-react";
+import { Calendar, DollarSign, User2, UserPlus, LayoutDashboard, FileText, LineChart } from "lucide-react";
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
 
 /** لوجو إدارة التسويق — نفس شكل بطاقة لوحة التحكم (User2) بلون تسويقي */
@@ -61,7 +61,7 @@ export default function MarketingPage() {
             <MarketingLogo />
             <Link
               href="/dashboard"
-              className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/90 border border-gray-200/90 text-gray-700 font-medium text-sm shadow-sm hover:bg-white hover:border-sky-200 hover:text-sky-700 transition-all duration-200"
+              className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
             >
               <LayoutDashboard className="w-4 h-4" />
               لوحة التحكم
@@ -149,59 +149,6 @@ export default function MarketingPage() {
           </div>
         </div>
 
-        {/* لمسة احترافية: مستجدات + مواعيد + ملاحظات فريق العمل */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="relative rounded-2xl border border-gray-200 bg-white/90 shadow-lg overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-sky-500 to-teal-600 opacity-10" />
-            <div className="relative p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-teal-600 flex items-center justify-center">
-                  <BellRing className="w-5 h-5 text-white" />
-                </div>
-                <h3 className="font-bold text-gray-800">مستجدات القسم</h3>
-              </div>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li className="rounded-xl bg-white/80 border border-gray-100 px-3 py-2">تم إنشاء حجز جديد ويتطلب متابعة المسوق.</li>
-                <li className="rounded-xl bg-white/80 border border-gray-100 px-3 py-2">تمت إضافة عملية بيع جديدة ضمن حملات هذا الأسبوع.</li>
-                <li className="rounded-xl bg-white/80 border border-gray-100 px-3 py-2">تم تحديث حالة عميل مهتم إلى "متابعة نهائية".</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="relative rounded-2xl border border-gray-200 bg-white/90 shadow-lg overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-sky-500 to-teal-600 opacity-10" />
-            <div className="relative p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-teal-600 flex items-center justify-center">
-                  <Clock3 className="w-5 h-5 text-white" />
-                </div>
-                <h3 className="font-bold text-gray-800">مواعيد اليوم</h3>
-              </div>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li className="rounded-xl bg-white/80 border border-gray-100 px-3 py-2">10:30 ص — متابعة عميل مشروع الهنا.</li>
-                <li className="rounded-xl bg-white/80 border border-gray-100 px-3 py-2">1:00 م — مراجعة حالة العربون مع فريق المبيعات.</li>
-                <li className="rounded-xl bg-white/80 border border-gray-100 px-3 py-2">4:30 م — اجتماع تقييم أداء الحملات التسويقية.</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="relative rounded-2xl border border-gray-200 bg-white/90 shadow-lg overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-sky-500 to-teal-600 opacity-10" />
-            <div className="relative p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-teal-600 flex items-center justify-center">
-                  <NotebookPen className="w-5 h-5 text-white" />
-                </div>
-                <h3 className="font-bold text-gray-800">ملاحظات فريق العمل</h3>
-              </div>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li className="rounded-xl bg-white/80 border border-gray-100 px-3 py-2">تأكيد جودة بيانات العملاء قبل رفع التقرير الأسبوعي.</li>
-                <li className="rounded-xl bg-white/80 border border-gray-100 px-3 py-2">رفع نسبة التحويل من الاستفسار إلى الحجز بنسبة 12%.</li>
-                <li className="rounded-xl bg-white/80 border border-gray-100 px-3 py-2">تحديث قوالب الرسائل التسويقية بما يتوافق مع الخطة الجديدة.</li>
-              </ul>
-            </div>
-          </div>
-        </section>
       </div>
     </main>
   );

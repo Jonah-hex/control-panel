@@ -18,7 +18,8 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Percent
+  Percent,
+  LayoutDashboard
 } from 'lucide-react'
 
 interface Building {
@@ -228,11 +229,10 @@ export default function ReportsPage() {
             <div className="flex items-center gap-5">
               <Link
                 href="/dashboard"
-                className="inline-flex items-center justify-center p-2.5 rounded-2xl hover:bg-indigo-50 transition-all duration-300 group"
+                className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
               >
-                <span className="w-11 h-11 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
-                  <ArrowLeft className="w-5 h-5 text-white" />
-                </span>
+                <LayoutDashboard className="w-4 h-4" />
+                لوحة التحكم
               </Link>
 
               <div className="flex items-center gap-4">

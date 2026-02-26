@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Plus, ArrowLeft, Building2, MapPin, Home, Search, Trash2, Eye, Crown } from 'lucide-react'
+import { Plus, ArrowLeft, Building2, LayoutDashboard, MapPin, Home, Search, Trash2, Eye, Crown } from 'lucide-react'
 import { useDashboardAuth } from '@/hooks/useDashboardAuth'
 import { useSubscription } from '@/hooks/useSubscription'
 
@@ -172,30 +172,11 @@ export default function BuildingsPage() {
             <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
               <Link
                 href="/dashboard"
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/90 border border-slate-200 text-slate-700 text-sm font-medium shadow-sm hover:bg-white hover:border-sky-200 hover:text-sky-700 transition-all"
+                className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <LayoutDashboard className="w-4 h-4" />
                 لوحة التحكم
               </Link>
-
-              {ready && can('buildings_create') && canAddBuilding && (
-                <Link
-                  href="/dashboard/buildings/new"
-                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 text-white text-sm font-semibold shadow-lg shadow-sky-500/25 hover:shadow-xl transition-all hover:-translate-y-0.5"
-                >
-                  <Plus className="w-4 h-4" />
-                  إضافة عمارة جديدة
-                </Link>
-              )}
-              {ready && can('buildings_create') && !subscriptionLoading && !canAddBuilding && (
-                <Link
-                  href="/subscriptions"
-                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500 text-white text-sm font-semibold shadow-lg hover:bg-amber-600 transition"
-                >
-                  <Crown className="w-4 h-4" />
-                  ترقية الخطة لإضافة المزيد
-                </Link>
-              )}
             </div>
           </div>
         </div>
@@ -220,27 +201,54 @@ export default function BuildingsPage() {
               )}
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-violet-100 text-violet-700">
-                متاحة: {totalAvailableUnits}
-              </span>
-              <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700">
-                محجوزة: {totalReservedUnits}
-              </span>
-              <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700">
-                مباعة: {totalSoldUnits}
-              </span>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200/90 bg-white/90 shadow-sm min-w-0">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">متاحة</span>
+                <span className="text-base font-bold tabular-nums text-violet-600">{totalAvailableUnits}</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200/90 bg-white/90 shadow-sm min-w-0">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">محجوزة</span>
+                <span className="text-base font-bold tabular-nums text-amber-600">{totalReservedUnits}</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200/90 bg-white/90 shadow-sm min-w-0">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">مباعة</span>
+                <span className="text-base font-bold tabular-nums text-rose-600">{totalSoldUnits}</span>
+              </div>
             </div>
           </div>
 
-          <div className="relative">
-            <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="ابحث بالاسم، الحي، حالة البناء..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pr-12 pl-4 py-3 rounded-xl bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-sky-300 focus:ring-2 focus:ring-sky-100 outline-none transition"
-            />
+          {/* شريط إضافة + بحث — زر وبحث في صف واحد بمحاذاة الارتفاع */}
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-stretch">
+            {(ready && can('buildings_create') && (canAddBuilding || (!subscriptionLoading && !canAddBuilding))) ? (
+              <div className="flex-shrink-0 flex gap-2">
+                {canAddBuilding ? (
+                  <Link
+                    href="/dashboard/buildings/new"
+                    className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 text-white text-sm font-semibold shadow-md shadow-sky-500/20 hover:shadow-lg hover:shadow-sky-500/30 transition-all hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2 min-h-[48px] border border-sky-500/20"
+                  >
+                    <Plus className="w-5 h-5" />
+                    إضافة عمارة جديدة
+                  </Link>
+                ) : (
+                  <Link
+                    href="/subscriptions"
+                    className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-amber-500 text-white text-sm font-semibold shadow-md hover:bg-amber-600 transition-all min-h-[48px] border border-amber-400/30 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2"
+                  >
+                    <Crown className="w-5 h-5" />
+                    ترقية الخطة لإضافة المزيد
+                  </Link>
+                )}
+              </div>
+            ) : null}
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="ابحث بالاسم، الحي، حالة البناء..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pr-12 pl-4 py-3 rounded-xl bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-sky-300 focus:ring-2 focus:ring-sky-100 outline-none transition min-h-[48px]"
+              />
+            </div>
           </div>
         </div>
 

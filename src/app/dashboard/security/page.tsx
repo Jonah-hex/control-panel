@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Shield, LogOut, Smartphone, MapPin, Clock, AlertTriangle, Trash2, Check } from 'lucide-react'
+import { Shield, LogOut, Smartphone, MapPin, Clock, AlertTriangle, Trash2, Check, LayoutDashboard } from 'lucide-react'
 
 interface Session {
   id: string
@@ -112,9 +112,10 @@ export default function SecurityDashboard() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center gap-4">
           <Link
             href="/dashboard"
-            className="flex items-center gap-2 text-slate-400 hover:text-white transition"
+            className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
           >
-            <span>←</span> لوحة التحكم
+            <LayoutDashboard className="w-4 h-4" />
+            لوحة التحكم
           </Link>
           <div className="flex-1"></div>
           <div className="flex items-center gap-2 text-blue-400">

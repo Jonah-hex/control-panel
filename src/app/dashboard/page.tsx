@@ -862,7 +862,7 @@ export default function DashboardPage() {
                             {filteredReservationReminders.map(({ reservation, unit, buildingName }) => (
                               <Link
                                 key={`res-expired-${reservation.id}`}
-                                href={`/dashboard/buildings/details?buildingId=${reservation.building_id}`}
+                                href={`/dashboard/reservations?buildingId=${reservation.building_id}`}
                                 onClick={() => setNotificationsOpen(false)}
                                 className="flex items-start gap-3 px-4 py-3.5 hover:bg-amber-50/70 transition cursor-pointer"
                               >

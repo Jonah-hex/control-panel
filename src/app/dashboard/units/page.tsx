@@ -30,7 +30,8 @@ import {
   BadgeCheck,
   FileText,
   Zap,
-  DoorOpen
+  DoorOpen,
+  LayoutDashboard
 } from 'lucide-react'
 
 interface Building {
@@ -368,8 +369,9 @@ function UnitsFilterContent() {
             </button>
             <Link
               href="/dashboard"
-              className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold"
+              className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
             >
+              <LayoutDashboard className="w-4 h-4" />
               العودة للوحة التحكم
             </Link>
           </div>
@@ -404,18 +406,18 @@ function UnitsFilterContent() {
             <div className="flex items-center gap-3">
                 <Link
                   href="/dashboard/buildings"
-                  className="flex items-center gap-2 px-6 py-3 bg-white text-emerald-700 rounded-xl hover:shadow-lg transition-all font-semibold border-2 border-emerald-200"
+                  className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-emerald-200/90 text-emerald-700 font-medium text-sm shadow-sm hover:bg-emerald-50/50 hover:border-emerald-300 transition-all duration-200"
                 >
                   <Building2 className="w-4 h-4" />
                   قائمة العماير
                 </Link>
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="flex items-center gap-2 px-6 py-3 bg-white text-emerald-700 rounded-xl hover:shadow-lg transition-all font-semibold border-2 border-emerald-200"
+              <Link
+                href="/dashboard"
+                className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-emerald-200/90 text-emerald-700 font-medium text-sm shadow-sm hover:bg-emerald-50/50 hover:border-emerald-300 transition-all duration-200"
               >
-                <ArrowRight className="w-5 h-5" />
-                رجوع للوحة التحكم
-              </button>
+                <LayoutDashboard className="w-4 h-4" />
+                لوحة التحكم
+              </Link>
             </div>
           </div>
         </div>
