@@ -625,8 +625,8 @@ export default function DashboardPage() {
   ]
 
   const quickActions = [
+    { icon: Eye, label: 'إدارة العماير', href: '/dashboard/buildings', color: 'green', gradient: 'from-emerald-500 to-green-500', permission: 'buildings' as const, noPermissionMessage: 'ليس لديك صلاحية إدارة العماير.' },
     { icon: Plus, label: 'إضافة عمارة', href: '/dashboard/buildings/new', color: 'blue', gradient: 'from-blue-500 to-cyan-500', permission: 'buildings_create' as const, noPermissionMessage: 'ليس لديك صلاحية إضافة عمارة جديدة. تواصل مع المالك لتفعيل الصلاحية.' },
-    { icon: Eye, label: 'عرض العماير', href: '/dashboard/buildings', color: 'green', gradient: 'from-emerald-500 to-green-500', permission: 'buildings' as const, noPermissionMessage: 'ليس لديك صلاحية عرض العماير.' },
     { icon: Home, label: 'الوحدات', href: '/dashboard/units', color: 'purple', gradient: 'from-purple-500 to-pink-500', permission: 'units' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول للوحدات.' },
     { icon: BarChart3, label: 'الإحصائيات', href: '/dashboard/statistics', color: 'indigo', gradient: 'from-indigo-500 to-purple-500', permission: 'statistics' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول للإحصائيات.' },
     { icon: User2, label: 'إدارة التسويق', href: '/dashboard/marketing', color: 'sky', gradient: 'from-sky-500 to-teal-600', permission: 'reservations' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول لإدارة التسويق.' }
