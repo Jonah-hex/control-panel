@@ -588,11 +588,11 @@ export default function TransferOwnershipForm({
         )}
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={!!form.electricity_meter_transferred} onChange={(e) => setForm((p) => ({ ...p, electricity_meter_transferred: e.target.checked }))} className="rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
-          <span className="text-sm font-medium text-slate-700">تم نقل عداد الكهرباء مع الوحدة</span>
+          <span className="text-sm font-medium text-slate-700">نقل عداد الكهرباء مع الوحدة</span>
         </label>
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={!!form.driver_room_transferred} onChange={(e) => setForm((p) => ({ ...p, driver_room_transferred: e.target.checked }))} className="rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
-          <span className="text-sm font-medium text-slate-700">تم نقل غرفة السائق مع الوحدة</span>
+          <span className="text-sm font-medium text-slate-700">نقل غرفة السائق مع الوحدة</span>
         </label>
         {unit.driver_room_number && String(unit.driver_room_number).trim() ? (
           <p className="text-sm text-teal-700">الوحدة مسجلة بغرفة سائق في النظام.</p>

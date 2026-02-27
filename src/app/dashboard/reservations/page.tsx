@@ -660,7 +660,7 @@ export default function ReservationsPage() {
           <ul className="text-xs text-amber-900/90 space-y-1 list-disc list-inside">
             <li>الحجز يُلزم الوحدة حتى تاريخ الانتهاء أو إلغاء الحجز أو إتمام البيع.</li>
             <li>سند العربون يُصدر تلقائياً عند إنشاء الحجز ويرتبط برقم فريد.</li>
-            <li>إلغاء الحجز يحرّر الوحدة فوراً. إتمام البيع يتم من <strong>إدارة المبيعات</strong> (الوحدات المحجوزة تظهر هناك لإكمال البيع).</li>
+            <li>إلغاء الحجز يحرّر الوحدة فوراً.</li>
           </ul>
         </div>
 
@@ -1005,15 +1005,20 @@ export default function ReservationsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">أقصى صلاحية حجز (أيام)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">صلاحية الحجز</label>
                   <input
                     type="number"
                     min="1"
+                    max="7"
                     value={createForm.expiry_days}
-                    onChange={(e) => setCreateForm((f) => ({ ...f, expiry_days: e.target.value }))}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      const n = parseInt(v, 10);
+                      const clamped = Number.isNaN(n) ? "7" : String(Math.min(7, Math.max(1, n)));
+                      setCreateForm((f) => ({ ...f, expiry_days: v === "" ? "7" : clamped }));
+                    }}
                     className="w-full border border-gray-200 rounded-xl px-3 py-2"
                   />
-                  <p className="text-xs text-gray-500 mt-1">بعد انتهاء المدة يتم إلغاء الحجز من النظام تلقائياً.</p>
                 </div>
                 <div className="flex items-center">
                   <label className="flex items-center gap-2 cursor-pointer">
