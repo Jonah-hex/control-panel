@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { FileText, Zap, Building2, Pencil, X, FileUp, ExternalLink, User, ArrowRightLeft, Eye, Phone } from "lucide-react";
+import { FileText, Building2, Pencil, X, FileUp, ExternalLink, User, Eye } from "lucide-react";
 
 interface Unit {
   id: string;
@@ -16,6 +17,19 @@ interface Unit {
   owner_phone?: string | null;
   tax_exemption_status?: boolean | null;
   tax_exemption_file_url?: string | null;
+  transfer_check_image_url?: string | null;
+  transfer_check_amount?: number | null;
+  transfer_payment_method?: string | null;
+  transfer_cash_amount?: number | null;
+  transfer_bank_name?: string | null;
+  transfer_amount?: number | null;
+  transfer_real_estate_request_no?: string | null;
+  transfer_id_image_url?: string | null;
+  electricity_meter_transferred_with_sale?: boolean | null;
+  driver_room_transferred_with_sale?: boolean | null;
+  driver_room?: boolean | null;
+  driver_room_number?: string | null;
+  owner_association_registered?: boolean | null;
   deed_number?: string | null;
   sorting_minutes_ref?: string | null;
   sorting_minutes_pdf_url?: string | null;
@@ -39,9 +53,9 @@ interface BuildingDeedsPanelProps {
 const DEEDS_BUCKET = "building-images";
 const DEEDS_PATH_PREFIX = "deeds";
 const SORTING_MINUTES_PATH_PREFIX = "sorting-minutes";
-const TAX_EXEMPTION_PATH_PREFIX = "tax-exemption";
 
 export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: BuildingDeedsPanelProps) {
+  const router = useRouter();
   const [building, setBuilding] = useState<Building | null>(null);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(!!buildingId);
@@ -52,20 +66,13 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
     deed_number: "",
     sorting_minutes_ref: "",
     electricity_meter_number: "",
+    driver_room_number: "",
   });
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [sortingMinutesPdfFile, setSortingMinutesPdfFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [transferUnit, setTransferUnit] = useState<Unit | null>(null);
-  const [transferForm, setTransferForm] = useState({
-    buyer_name: "",
-    buyer_phone: "",
-    tax_exemption: false,
-  });
-  const [taxExemptionFile, setTaxExemptionFile] = useState<File | null>(null);
   const [viewOwnerUnit, setViewOwnerUnit] = useState<Unit | null>(null);
-  const openedTransferForUnitIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!buildingId) {
@@ -122,17 +129,9 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
   }, [buildingId]);
 
   useEffect(() => {
-    if (!openTransferUnitId || units.length === 0) return;
-    if (openedTransferForUnitIdRef.current === openTransferUnitId) return;
-    const unit = units.find((u) => u.id === openTransferUnitId);
-    if (unit && unit.status !== "sold") {
-      openedTransferForUnitIdRef.current = openTransferUnitId;
-      setTransferUnit(unit);
-      setTransferForm({ buyer_name: "", buyer_phone: "", tax_exemption: false });
-      setTaxExemptionFile(null);
-      setSaveError(null);
-    }
-  }, [openTransferUnitId, units]);
+    if (!openTransferUnitId || !buildingId) return;
+    router.replace(`/dashboard/sales?action=transfer&buildingId=${buildingId}&unitId=${openTransferUnitId}`);
+  }, [openTransferUnitId, buildingId, router]);
 
   const statusLabel = (s?: string) => {
     if (!s) return "-";
@@ -149,6 +148,7 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
       deed_number: unit.deed_number || "",
       sorting_minutes_ref: unit.sorting_minutes_ref || "",
       electricity_meter_number: unit.electricity_meter_number || "",
+      driver_room_number: unit.driver_room_number ?? "",
     });
     setPdfFile(null);
     setSortingMinutesPdfFile(null);
@@ -160,99 +160,6 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
     setPdfFile(null);
     setSortingMinutesPdfFile(null);
     setSaveError(null);
-  };
-
-  const openTransferModal = (unit: Unit, forNewTransfer = false) => {
-    setTransferUnit(unit);
-    setTransferForm({
-      buyer_name: forNewTransfer ? "" : (unit.owner_name || ""),
-      buyer_phone: forNewTransfer ? "" : (unit.owner_phone || ""),
-      tax_exemption: !!unit.tax_exemption_status,
-    });
-    setTaxExemptionFile(null);
-    setSaveError(null);
-  };
-
-  const closeTransferModal = () => {
-    setTransferUnit(null);
-    setTransferForm({ buyer_name: "", buyer_phone: "", tax_exemption: false });
-    setTaxExemptionFile(null);
-    setSaveError(null);
-  };
-
-  const handleSaveTransfer = async () => {
-    if (!transferUnit || !buildingId || !transferForm.buyer_name.trim()) return;
-    const supabase = createClient();
-    setSaving(true);
-    setSaveError(null);
-
-    try {
-      let taxExemptionFileUrl: string | null = transferUnit.tax_exemption_file_url || null;
-      if (taxExemptionFile) {
-        const fileExt = taxExemptionFile.name.split(".").pop()?.toLowerCase() || "pdf";
-        const allowed = ["pdf", "jpg", "jpeg", "png", "webp"];
-        if (!allowed.includes(fileExt)) {
-          setSaveError("نوع الملف غير مدعوم. استخدم PDF أو صورة (jpg, png, webp).");
-          setSaving(false);
-          return;
-        }
-        const fileName = `${TAX_EXEMPTION_PATH_PREFIX}/${buildingId}/${transferUnit.id}/${Date.now()}.${fileExt}`;
-        const contentType = fileExt === "pdf" ? "application/pdf" : `image/${fileExt === "jpg" ? "jpeg" : fileExt}`;
-
-        const { error: uploadError } = await supabase.storage.from(DEEDS_BUCKET).upload(fileName, taxExemptionFile, {
-          contentType,
-          upsert: true,
-        });
-
-        if (uploadError) {
-          setSaveError("تعذر رفع ملف الإعفاء: " + (uploadError.message || "تأكد من صلاحيات الرفع."));
-          setSaving(false);
-          return;
-        }
-        const { data: urlData } = supabase.storage.from(DEEDS_BUCKET).getPublicUrl(fileName);
-        taxExemptionFileUrl = urlData.publicUrl;
-      }
-
-      const updateData: Record<string, unknown> = {
-        status: "sold",
-        previous_owner_name: transferUnit.owner_name || null,
-        owner_name: transferForm.buyer_name.trim(),
-        owner_phone: transferForm.buyer_phone.trim() || null,
-        tax_exemption_status: transferForm.tax_exemption,
-        tax_exemption_file_url: transferForm.tax_exemption ? taxExemptionFileUrl : null,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { error: updateError } = await supabase.from("units").update(updateData).eq("id", transferUnit.id);
-
-      if (updateError) {
-        setSaveError("تعذر حفظ نقل الملكية: " + (updateError.message || "خطأ غير معروف"));
-        setSaving(false);
-        return;
-      }
-
-      setUnits((prev) =>
-        prev.map((u) =>
-          u.id === transferUnit.id
-            ? {
-                ...u,
-                status: "sold",
-                previous_owner_name: transferUnit.owner_name || null,
-                owner_name: transferForm.buyer_name.trim(),
-                owner_phone: transferForm.buyer_phone.trim() || null,
-                tax_exemption_status: transferForm.tax_exemption,
-                tax_exemption_file_url: transferForm.tax_exemption ? taxExemptionFileUrl : null,
-              }
-            : u
-        )
-      );
-
-      closeTransferModal();
-    } catch (err) {
-      setSaveError("حدث خطأ غير متوقع أثناء الحفظ");
-    } finally {
-      setSaving(false);
-    }
   };
 
   const handleSaveEdit = async () => {
@@ -307,10 +214,8 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
       }
 
       const updateData: Record<string, unknown> = {
-        owner_name: editForm.owner_name || null,
         deed_number: editForm.deed_number || null,
         sorting_minutes_ref: editForm.sorting_minutes_ref || null,
-        electricity_meter_number: editForm.electricity_meter_number || null,
         deed_pdf_url: deedPdfUrl,
         sorting_minutes_pdf_url: sortingMinutesPdfUrl,
       };
@@ -332,10 +237,8 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
           u.id === editUnit.id
             ? {
                 ...u,
-                owner_name: editForm.owner_name || null,
                 deed_number: editForm.deed_number || null,
                 sorting_minutes_ref: editForm.sorting_minutes_ref || null,
-                electricity_meter_number: editForm.electricity_meter_number || null,
                 deed_pdf_url: deedPdfUrl,
                 sorting_minutes_pdf_url: sortingMinutesPdfUrl,
               }
@@ -387,7 +290,7 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
         </div>
         <div>
           <h2 className="text-xl font-bold text-teal-800">{building?.name || "المبنى"}</h2>
-          <p className="text-sm text-slate-500">وحدات المبنى — الصكوك ومحاضر الفرز وعدادات الكهرباء</p>
+          <p className="text-sm text-slate-500">وحدات المبنى</p>
         </div>
       </div>
 
@@ -395,15 +298,14 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
       <div className="w-full min-w-0 rounded-xl border border-teal-100">
         <table className="w-full text-center border-collapse table-fixed">
           <colgroup>
-            <col className="w-[7%]" />
+            <col className="w-[6%]" />
             <col className="w-[5%]" />
+            <col className="w-[12%]" />
+            <col className="w-[8%]" />
+            <col className="w-[16%]" style={{ minWidth: "10ch" }} />
+            <col className="w-[8%]" />
+            <col className="w-[8%]" />
             <col className="w-[14%]" />
-            <col className="w-[9%]" />
-            <col className="w-[15%]" style={{ minWidth: "10ch" }} />
-            <col className="w-[17%]" style={{ minWidth: "12ch" }} />
-            <col className="w-[9%]" />
-            <col className="w-[9%]" />
-            <col className="w-[15%]" />
           </colgroup>
           <thead>
             <tr className="bg-gradient-to-br from-teal-50 to-teal-100/50">
@@ -422,12 +324,6 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
                   رقم الصك
                 </span>
               </th>
-              <th className="p-3 pl-4 pr-2 text-teal-800 font-bold border-b border-teal-200 align-middle">
-                <span className="inline-flex items-center justify-center gap-2">
-                  <Zap className="w-4 h-4" />
-                  عداد الكهرباء
-                </span>
-              </th>
               <th className="p-3 text-teal-800 font-bold border-b border-teal-200 align-middle">الصك</th>
               <th className="p-3 text-teal-800 font-bold border-b border-teal-200 align-middle">محضر الفرز</th>
               <th className="p-3 text-teal-800 font-bold border-b border-teal-200 align-middle">إجراءات</th>
@@ -436,7 +332,7 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
           <tbody>
             {units.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-center py-12 text-slate-500">
+                <td colSpan={8} className="text-center py-12 text-slate-500">
                   <FileText className="w-12 h-12 mx-auto mb-3 text-teal-200" />
                   <p className="font-medium">لا توجد وحدات مسجلة لهذا المبنى</p>
                   <p className="text-sm mt-1">أضف الوحدات من صفحة إنشاء/تعديل المبنى</p>
@@ -464,7 +360,6 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
                     </span>
                   </td>
                   <td className="p-3 pr-4 pl-2 text-slate-600 font-mono align-middle break-all min-w-0">{unit.deed_number || "-"}</td>
-                  <td className="p-3 pl-4 pr-2 text-slate-600 font-mono align-middle break-all min-w-0">{unit.electricity_meter_number || "-"}</td>
                   <td className="p-3 align-middle">
                     {unit.deed_pdf_url ? (
                       <a
@@ -497,15 +392,6 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
                   </td>
                   <td className="p-3 align-middle">
                     <div className="flex flex-nowrap items-center justify-center gap-2">
-                      {unit.status === "sold" && (
-                        <button
-                          onClick={() => setViewOwnerUnit(unit)}
-                          className="inline-flex shrink-0 items-center justify-center gap-1.5 px-3 py-1.5 text-slate-600 hover:text-teal-600 hover:underline text-sm transition whitespace-nowrap"
-                        >
-                          <Eye className="w-4 h-4" />
-                          عرض المالك
-                        </button>
-                      )}
                       <button
                         onClick={() => openEditModal(unit)}
                         className="inline-flex shrink-0 items-center justify-center gap-1.5 px-3 py-1.5 text-slate-600 hover:text-teal-600 hover:underline text-sm font-medium transition whitespace-nowrap"
@@ -513,13 +399,13 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
                         <Pencil className="w-4 h-4" />
                         تعديل
                       </button>
-                      {unit.status !== "sold" && (
+                      {unit.status === "sold" && (
                         <button
-                          onClick={() => openTransferModal(unit)}
-                          className="inline-flex shrink-0 items-center justify-center gap-1.5 px-3 py-1.5 text-slate-600 hover:text-teal-600 hover:underline text-sm font-medium transition whitespace-nowrap"
+                          onClick={() => setViewOwnerUnit(unit)}
+                          className="inline-flex shrink-0 items-center justify-center gap-1.5 px-3 py-1.5 text-slate-600 hover:text-teal-600 hover:underline text-sm transition whitespace-nowrap"
                         >
-                          <ArrowRightLeft className="w-4 h-4" />
-                          نقل ملكية
+                          <Eye className="w-4 h-4" />
+                          عرض المالك
                         </button>
                       )}
                     </div>
@@ -537,7 +423,7 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold text-teal-800">
-                تعديل بيانات الصك — الوحدة {editUnit.unit_number}
+                بيانات الصك — الوحدة {editUnit.unit_number}
               </h3>
               <button
                 onClick={closeEditModal}
@@ -559,16 +445,12 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   <span className="flex items-center gap-2">
                     <User className="w-4 h-4" />
-                    اسم المالك
+                    اسم المالك (المالك الأول للعمارة)
                   </span>
                 </label>
-                <input
-                  type="text"
-                  value={editForm.owner_name ?? ""}
-                  onChange={(e) => setEditForm((p) => ({ ...p, owner_name: e.target.value }))}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                  placeholder="اسم مالك الوحدة"
-                />
+                <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
+                  {building?.owner_name || "—"}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">رقم الصك</label>
@@ -577,18 +459,14 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
                   value={editForm.deed_number ?? ""}
                   onChange={(e) => setEditForm((p) => ({ ...p, deed_number: e.target.value }))}
                   className="w-full border border-slate-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                  placeholder="رقم الصك الرسمي"
+                  placeholder="رقم صك الوحدة"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">عداد الكهرباء</label>
-                <input
-                  type="text"
-                  value={editForm.electricity_meter_number ?? ""}
-                  onChange={(e) => setEditForm((p) => ({ ...p, electricity_meter_number: e.target.value }))}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                  placeholder="رقم العداد"
-                />
+                <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 font-mono uppercase">
+                  {(editUnit.electricity_meter_number || "").trim() || "—"}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -601,7 +479,7 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
                   type="file"
                   accept=".pdf,application/pdf"
                   onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-teal-100 file:text-teal-700 file:cursor-pointer"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm file:mr-3 file:py-1.5 file:px-3 file:text-xs file:rounded-lg file:border file:border-slate-300/60 file:bg-white/40 file:backdrop-blur-sm file:text-slate-700 file:cursor-pointer hover:file:bg-white/60"
                 />
                 {editUnit.deed_pdf_url && !pdfFile && (
                   <p className="mt-1 text-xs text-slate-500">الملف الحالي محفوظ. اختر ملفاً جديداً لاستبداله.</p>
@@ -618,7 +496,7 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
                   type="file"
                   accept=".pdf,application/pdf"
                   onChange={(e) => setSortingMinutesPdfFile(e.target.files?.[0] || null)}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-amber-100 file:text-amber-700 file:cursor-pointer"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm file:mr-3 file:py-1.5 file:px-3 file:text-xs file:rounded-lg file:border file:border-slate-300/60 file:bg-white/40 file:backdrop-blur-sm file:text-slate-700 file:cursor-pointer hover:file:bg-white/60"
                 />
                 {editUnit.sorting_minutes_pdf_url && !sortingMinutesPdfFile && (
                   <p className="mt-1 text-xs text-slate-500">الملف الحالي محفوظ. اختر ملفاً جديداً لاستبداله.</p>
@@ -636,102 +514,6 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
               </button>
               <button
                 onClick={closeEditModal}
-                disabled={saving}
-                className="px-4 py-2.5 bg-slate-200 text-slate-700 rounded-xl font-medium hover:bg-slate-300 disabled:opacity-60 transition"
-              >
-                إلغاء
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* مودال نقل الملكية */}
-      {transferUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-lg font-bold text-teal-800">
-                  <span className="flex items-center gap-2">
-                    <ArrowRightLeft className="w-5 h-5" />
-                    نقل ملكية — الوحدة {transferUnit.unit_number}
-                  </span>
-                </h3>
-                {transferUnit.status !== "sold" && (
-                  <p className="text-sm text-slate-500 mt-1">أضف اسم المشتري واضغط حفظ لإتمام النقل. عند الإلغاء تبقى الوحدة متاحة.</p>
-                )}
-              </div>
-              <button onClick={closeTransferModal} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500" disabled={saving}>
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {saveError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{saveError}</div>
-            )}
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">اسم المشتري الجديد</label>
-                <input
-                  type="text"
-                  value={transferForm.buyer_name ?? ""}
-                  onChange={(e) => setTransferForm((p) => ({ ...p, buyer_name: e.target.value }))}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-teal-500"
-                  placeholder="اسم المشتري"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  <span className="flex items-center gap-2">
-                    <Phone className="w-4 h-4" />
-                    رقم الجوال
-                  </span>
-                </label>
-                <input
-                  type="tel"
-                  value={transferForm.buyer_phone ?? ""}
-                  onChange={(e) => setTransferForm((p) => ({ ...p, buyer_phone: e.target.value }))}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-teal-500"
-                  placeholder="05xxxxxxxx"
-                />
-              </div>
-              <div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!!transferForm.tax_exemption}
-                    onChange={(e) => setTransferForm((p) => ({ ...p, tax_exemption: e.target.checked }))}
-                    className="rounded border-slate-300 text-teal-600 focus:ring-teal-500"
-                  />
-                  <span className="text-sm font-medium text-slate-700">يوجد إعفاء ضريبي</span>
-                </label>
-              </div>
-              {transferForm.tax_exemption && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">إرفاق صورة أو PDF للإعفاء</label>
-                  <input
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
-                    onChange={(e) => setTaxExemptionFile(e.target.files?.[0] || null)}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-amber-100 file:text-amber-700 file:cursor-pointer"
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={handleSaveTransfer}
-                disabled={saving || !transferForm.buyer_name.trim()}
-                className="flex-1 px-4 py-2.5 bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-xl font-medium hover:from-amber-600 hover:to-amber-700 disabled:opacity-60 transition"
-              >
-                {saving ? "جاري الحفظ..." : "حفظ — وتغيير الحالة إلى مباعة"}
-              </button>
-              <button
-                onClick={closeTransferModal}
                 disabled={saving}
                 className="px-4 py-2.5 bg-slate-200 text-slate-700 rounded-xl font-medium hover:bg-slate-300 disabled:opacity-60 transition"
               >
@@ -775,25 +557,55 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
               </div>
               <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
                 <span className="text-slate-600 shrink-0">الإعفاء الضريبي</span>
-                <span className="font-medium text-left">{viewOwnerUnit.tax_exemption_status ? "نعم" : "لا"}</span>
+                <span className="font-medium text-left inline-flex items-center gap-1.5 flex-row-reverse">
+                  {viewOwnerUnit.tax_exemption_status ? "نعم" : "لا"}
+                  {viewOwnerUnit.tax_exemption_file_url && (
+                    <a
+                      href={viewOwnerUnit.tax_exemption_file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1 rounded-lg text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                      title="معاينة ملف الإعفاء"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </a>
+                  )}
+                </span>
               </div>
-              {viewOwnerUnit.tax_exemption_file_url && (
-                <div className="pt-2">
+              {viewOwnerUnit.transfer_real_estate_request_no && (
+                <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
+                  <span className="text-slate-600 shrink-0">رقم طلب التصرفات العقارية</span>
+                  <span className="font-medium text-slate-800 text-left">{viewOwnerUnit.transfer_real_estate_request_no}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
+                <span className="text-slate-600 shrink-0">تم نقل عداد الكهرباء مع الوحدة</span>
+                <span className="font-medium text-left">{viewOwnerUnit.electricity_meter_transferred_with_sale ? "نعم" : "لا"}</span>
+              </div>
+              <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
+                <span className="text-slate-600 shrink-0">تم نقل غرفة السائق مع الوحدة</span>
+                <span className="font-medium text-left">{viewOwnerUnit.driver_room_transferred_with_sale ? "نعم" : "لا"}</span>
+              </div>
+              {viewOwnerUnit.transfer_id_image_url && (
+                <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
+                  <span className="text-slate-600 shrink-0">صورة الهوية</span>
                   <a
-                    href={viewOwnerUnit.tax_exemption_file_url}
+                    href={viewOwnerUnit.transfer_id_image_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-teal-600 hover:text-teal-700 hover:underline text-sm"
+                    className="p-1 rounded-lg text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                    title="معاينة صورة الهوية"
                   >
-                    <ExternalLink className="w-4 h-4" />
-                    عرض ملف الإعفاء
+                    <Eye className="w-4 h-4" />
                   </a>
                 </div>
               )}
+              <div className="pt-3 border-t border-slate-100">
+                <button type="button" disabled className="w-full py-2 rounded-xl border border-dashed border-slate-200 text-slate-400 text-sm font-medium cursor-not-allowed">
+                  معاينة استلام الوحدة (قريباً)
+                </button>
+              </div>
             </div>
-      <p className="mt-4 text-xs text-slate-400 text-center" style={{ boxShadow: "0px 4px 12px 0px rgba(0, 0, 0, 0.15)" }}>
-        «تعديل»: إضافة أو تعديل رقم الصك ومحضر الفرز ورفع ملفات PDF. «نقل ملكية»: تسجيل المشتري الجديد وتغيير حالة الوحدة إلى مباعة.
-      </p>
           </div>
         </div>
       )}

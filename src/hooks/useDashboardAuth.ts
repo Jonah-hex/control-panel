@@ -26,9 +26,14 @@ export type PermissionKey =
   | 'details_engineering_edit'
   | 'details_electricity'
   | 'details_electricity_edit'
+  | 'details_driver_rooms'
+  | 'details_driver_rooms_edit'
+  | 'details_elevators_maintenance'
+  | 'details_elevators_maintenance_edit'
   | 'documents_upload'
   | 'documents_create_folder'
   | 'documents_delete'
+  | 'documents_edit_folders'
   | 'units'
   | 'units_edit'
   | 'deeds'
@@ -77,16 +82,22 @@ export function useDashboardAuth(): UseDashboardAuthResult {
         return
       }
       setUser(u as unknown as { id: string; [k: string]: unknown })
+      // جلب سجل الموظف إن وُجد (نشط أو معطّل) لتمييز المالك عن الموظف المعطّل
       const { data: empRows } = await supabase
         .from('dashboard_employees')
-        .select('owner_id, permissions, full_name')
+        .select('owner_id, permissions, full_name, is_active')
         .eq('auth_user_id', u.id)
-        .eq('is_active', true)
         .limit(1)
-      if (empRows?.[0]) {
-        setEffectiveOwnerId(empRows[0].owner_id)
-        setEmployeePermissions((empRows[0].permissions as Record<PermissionKey, boolean>) || null)
-        setCurrentUserDisplayName((empRows[0].full_name as string)?.trim() || u.email || 'موظف')
+      const emp = empRows?.[0] as { owner_id: string; permissions: unknown; full_name: string; is_active: boolean } | undefined
+      if (emp?.is_active) {
+        setEffectiveOwnerId(emp.owner_id)
+        setEmployeePermissions((emp.permissions as Record<PermissionKey, boolean>) || null)
+        setCurrentUserDisplayName((emp.full_name as string)?.trim() || u.email || 'موظف')
+      } else if (emp && !emp.is_active) {
+        // موظف معطّل: لا صلاحيات (يُمنع من استخدام لوحة التحكم)
+        setEffectiveOwnerId(emp.owner_id)
+        setEmployeePermissions({} as Record<PermissionKey, boolean>)
+        setCurrentUserDisplayName((emp.full_name as string)?.trim() || u.email || 'موظف')
       } else {
         setEffectiveOwnerId(u.id)
         setEmployeePermissions(null)
@@ -101,11 +112,12 @@ export function useDashboardAuth(): UseDashboardAuthResult {
   const can = useCallback(
     (key: PermissionKey) => {
       if (employeePermissions === null) return true
+      if (Object.keys(employeePermissions).length === 0) return false
       const value = (employeePermissions as Partial<Record<PermissionKey, boolean>>)[key]
       if (typeof value === 'boolean') return value
       // الصلاحيات الجديدة تُعامل كـ true افتراضياً للسجلات القديمة التي لا تحتوي المفتاح بعد.
       if (key === 'marketing_cancel_reservation' || key === 'marketing_complete_sale' || key === 'marketing_building_details') return true
-      if (key === 'documents_upload' || key === 'documents_create_folder' || key === 'documents_delete') return true
+      if (key === 'documents_upload' || key === 'documents_create_folder' || key === 'documents_delete' || key === 'documents_edit_folders') return true
       return false
     },
     [employeePermissions]

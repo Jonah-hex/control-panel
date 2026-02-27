@@ -111,6 +111,17 @@ export function validateSaudiPhoneNumber(phone: string): boolean {
   return phoneRegex.test(phone.replace(/[\s-]/g, ''))
 }
 
+/** استخراج الأرقام فقط من حقل الجوال */
+export function phoneDigitsOnly(value: string): string {
+  return value.replace(/\D/g, '').slice(0, 10)
+}
+
+/** التحقق من أن رقم الجوال 10 أرقام بالضبط (إلزامي للنظام) */
+export function isValidPhone10Digits(phone: string): boolean {
+  const digits = phone.replace(/\D/g, '')
+  return digits.length === 10
+}
+
 /**
  * التحقق من صحة رقم الهوية الوطنية
  */

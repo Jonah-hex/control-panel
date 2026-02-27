@@ -35,6 +35,16 @@ CREATE TABLE IF NOT EXISTS buildings (
   guard_has_salary BOOLEAN DEFAULT FALSE,
   guard_salary_amount DECIMAL(15, 2),
   
+  -- المصاعد والصيانة
+  elevator_type VARCHAR(50),
+  maintenance_company VARCHAR(255),
+  maintenance_contract_number VARCHAR(100),
+  last_maintenance_date DATE,
+  elevator_emergency_phone VARCHAR(30),
+  elevator_installation_contact_name VARCHAR(255),
+  maintenance_contract_date DATE,
+  warranty_months INTEGER,
+  
   -- الموقع الجغرافي
   google_maps_link TEXT,
   
@@ -87,6 +97,25 @@ CREATE TABLE IF NOT EXISTS units (
   price DECIMAL(15, 2),
   description TEXT,
   
+  -- نقل الملكية وبيانات المشتري
+  owner_name VARCHAR(255),
+  owner_phone VARCHAR(30),
+  previous_owner_name VARCHAR(255),
+  tax_exemption_status BOOLEAN DEFAULT FALSE,
+  tax_exemption_file_url TEXT,
+  transfer_check_image_url TEXT,        -- رابط صورة الشيك المرفقة (شيك مصدق)
+  transfer_check_amount DECIMAL(15,2), -- مبلغ الشيك (شيك مصدق)
+  transfer_payment_method VARCHAR(50), -- طريقة الشراء: cash | transfer | certified_check
+  transfer_cash_amount DECIMAL(15,2),  -- المبلغ (كاش)
+  transfer_bank_name VARCHAR(255),     -- اسم البنك المحول عليه (تحويل)
+  transfer_amount DECIMAL(15,2),       -- مبلغ الحوالة (تحويل)
+  transfer_real_estate_request_no VARCHAR(100), -- رقم طلب التصرفات العقارية
+  transfer_id_image_url TEXT,          -- رابط صورة هوية المشتري
+  electricity_meter_transferred_with_sale BOOLEAN DEFAULT FALSE, -- تم نقل عداد الكهرباء مع الوحدة (غير قابل للتعديل في جدول العدادات)
+  driver_room_number VARCHAR(50),                                 -- رقم غرفة السائق المرتبطة بالوحدة
+  driver_room_transferred_with_sale BOOLEAN DEFAULT FALSE,        -- تم نقل غرفة السائق مع الوحدة (غير قابل للتعديل في جدول غرف السائق)
+  owner_association_registered BOOLEAN DEFAULT FALSE,            -- مسجل في اتحاد الملاك
+  
   -- التتبع
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -119,6 +148,7 @@ CREATE TABLE IF NOT EXISTS reservations (
   deposit_amount DECIMAL(15, 2),
   deposit_paid BOOLEAN DEFAULT FALSE,
   deposit_paid_date TIMESTAMP WITH TIME ZONE,
+  deposit_settlement_type VARCHAR(50), -- 'included' = مشمول في البيع (تم المخالصة)، 'refund' = استرداد (تم مخالصة الاسترداد)
   
   -- التتبع
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -146,7 +176,8 @@ CREATE TABLE IF NOT EXISTS sales (
   -- بيانات البيع
   sale_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   sale_price DECIMAL(15, 2) NOT NULL,
-  payment_method VARCHAR(100), -- 'cash', 'bank_transfer', 'installment'
+  payment_method VARCHAR(100), -- 'cash', 'transfer', 'certified_check'
+  bank_name VARCHAR(255),       -- اسم البنك (عند التحويل)
   
   -- معلومات الدفع
   down_payment DECIMAL(15, 2),

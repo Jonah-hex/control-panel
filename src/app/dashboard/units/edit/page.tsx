@@ -40,6 +40,7 @@ function EditUnitPageContent() {
     description: "",
     owner_name: "",
     electricity_meter_number: "",
+    driver_room_number: "",
     building_id: "",
     entrances: "1",
   });
@@ -99,6 +100,7 @@ function EditUnitPageContent() {
           description: String(data.description ?? ""),
           owner_name: String(data.owner_name ?? ""),
           electricity_meter_number: String(data.electricity_meter_number ?? ""),
+          driver_room_number: String((data as { driver_room_number?: string }).driver_room_number ?? ""),
           building_id: String(data.building_id ?? ""),
           entrances: data.entrances != null ? String(data.entrances) : "1",
         });
@@ -153,6 +155,7 @@ function EditUnitPageContent() {
       price: toNum(form.price) ?? null,
       description: form.description.trim() || null,
       electricity_meter_number: form.electricity_meter_number.trim() || null,
+      driver_room_number: form.driver_room_number.trim() || null,
       updated_at: new Date().toISOString(),
     };
 
@@ -362,6 +365,19 @@ function EditUnitPageContent() {
               <input name="driver_room" type="checkbox" checked={form.driver_room} onChange={handleChange} disabled={form.status === "sold"} className="rounded" />
               <span className="font-medium text-gray-700">غرفة سائق</span>
             </label>
+          </div>
+
+          <div>
+            <label className="block text-gray-700 font-bold mb-1">رقم غرفة السائق</label>
+            <input
+              name="driver_room_number"
+              type="text"
+              value={form.driver_room_number}
+              onChange={handleChange}
+              placeholder="مثال: ١ أو A"
+              disabled={form.status === "sold"}
+              className={`w-full border border-gray-200 rounded-xl px-4 py-2 ${form.status === "sold" ? "bg-gray-100 cursor-not-allowed" : ""}`}
+            />
           </div>
 
           <div>

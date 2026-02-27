@@ -38,6 +38,7 @@ import {
   TrendingDown,
   ArrowUpRight,
   ArrowDownRight,
+  ArrowRightLeft,
   Sparkles,
   Zap,
   Clock,
@@ -77,7 +78,7 @@ interface Unit {
 
 interface Activity {
   id: string
-  type: 'add' | 'edit' | 'delete' | 'booking' | 'sold' | 'reserved' | 'association_end' | 'meter_added'
+  type: 'add' | 'edit' | 'delete' | 'booking' | 'sold' | 'reserved' | 'association_end' | 'meter_added' | 'ownership_transferred'
   building_name: string
   building_id?: string
   user_name: string
@@ -125,10 +126,14 @@ export default function DashboardPage() {
   const [effectiveOwnerId, setEffectiveOwnerId] = useState<string | null>(null)
   /** صلاحيات الموظف إن كان الدخول كموظف؛ null = مالك كامل الصلاحيات */
   const [employeePermissions, setEmployeePermissions] = useState<Record<PermissionKey, boolean> | null>(null)
+  /** المسمى الوظيفي للموظف (للعرض في الهيدر)؛ null للمالك */
+  const [employeeJobTitle, setEmployeeJobTitle] = useState<string | null>(null)
+  /** اسم الموظف للعرض */
+  const [employeeDisplayName, setEmployeeDisplayName] = useState<string | null>(null)
   const [buildings, setBuildings] = useState<Building[]>([])
   const [buildingsForAssoc, setBuildingsForAssoc] = useState<BuildingAssocRow[]>([])
   const [units, setUnits] = useState<Unit[]>([])
-  const [reservations, setReservations] = useState<Array<{ id: string; unit_id: string; building_id: string; created_at: string; created_by_name?: string | null; customer_name: string; status: string; expiry_date?: string | null }>>([])
+  const [reservations, setReservations] = useState<Array<{ id: string; unit_id: string; building_id: string; created_at: string; created_by_name?: string | null; customer_name: string; status: string; expiry_date?: string | null; marketer_name?: string | null; completed_at?: string | null; sale_id?: string | null }>>([])
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -147,6 +152,9 @@ export default function DashboardPage() {
   const [greeting, setGreeting] = useState('')
   const [animateStats, setAnimateStats] = useState(false)
   const [meterAddedLogs, setMeterAddedLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
+  const [ownershipTransferredLogs, setOwnershipTransferredLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
+  const [reservationCancelledLogs, setReservationCancelledLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
+  const [depositRefundedLogs, setDepositRefundedLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
 
   const router = useRouter()
   const supabase = createClient()
@@ -162,16 +170,25 @@ export default function DashboardPage() {
         setUser(user)
         const { data: empRows } = await supabase
           .from('dashboard_employees')
-          .select('owner_id, permissions')
+          .select('owner_id, permissions, full_name, job_title, is_active')
           .eq('auth_user_id', user.id)
-          .eq('is_active', true)
           .limit(1)
-        if (empRows?.[0]) {
-          setEffectiveOwnerId(empRows[0].owner_id)
-          setEmployeePermissions((empRows[0].permissions as Record<PermissionKey, boolean>) || null)
+        const emp = empRows?.[0] as { owner_id: string; permissions: unknown; full_name: string; job_title: string | null; is_active: boolean } | undefined
+        if (emp?.is_active) {
+          setEffectiveOwnerId(emp.owner_id)
+          setEmployeePermissions((emp.permissions as Record<PermissionKey, boolean>) || null)
+          setEmployeeJobTitle((emp.job_title as string) || null)
+          setEmployeeDisplayName((emp.full_name as string) || null)
+        } else if (emp && !emp.is_active) {
+          setEffectiveOwnerId(emp.owner_id)
+          setEmployeePermissions({} as Record<PermissionKey, boolean>)
+          setEmployeeJobTitle(null)
+          setEmployeeDisplayName(null)
         } else {
           setEffectiveOwnerId(user.id)
           setEmployeePermissions(null)
+          setEmployeeJobTitle(null)
+          setEmployeeDisplayName(null)
         }
       }
     }
@@ -300,7 +317,7 @@ export default function DashboardPage() {
       if (buildingIds.length > 0) {
         const [unitsRes, resRes] = await Promise.all([
           supabase.from('units').select('*').in('building_id', buildingIds),
-          supabase.from('reservations').select('id, unit_id, building_id, created_at, created_by_name, customer_name, status, expiry_date').in('building_id', buildingIds).order('created_at', { ascending: false })
+          supabase.from('reservations').select('id, unit_id, building_id, created_at, created_by_name, customer_name, status, expiry_date, marketer_name, completed_at, sale_id').in('building_id', buildingIds).order('created_at', { ascending: false })
         ])
         if (unitsRes.error) throw unitsRes.error
         setUnits(unitsRes.data || [])
@@ -328,6 +345,33 @@ export default function DashboardPage() {
       setMeterAddedLogs((data || []) as Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>)
     }
     loadMeterAddedLogs()
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!user) return
+    const loadOwnershipTransferredLogs = async () => {
+      const { data } = await supabase
+        .from('activity_logs')
+        .select('id, action_description, metadata, created_at')
+        .eq('action_type', 'ownership_transferred')
+        .order('created_at', { ascending: false })
+        .limit(20)
+      setOwnershipTransferredLogs((data || []) as Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>)
+    }
+    loadOwnershipTransferredLogs()
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!user) return
+    const loadReservationActivityLogs = async () => {
+      const [cancelledRes, refundedRes] = await Promise.all([
+        supabase.from('activity_logs').select('id, action_description, metadata, created_at').eq('action_type', 'reservation_cancelled').order('created_at', { ascending: false }).limit(10),
+        supabase.from('activity_logs').select('id, action_description, metadata, created_at').eq('action_type', 'deposit_refunded').order('created_at', { ascending: false }).limit(10),
+      ])
+      setReservationCancelledLogs((cancelledRes.data || []) as Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>)
+      setDepositRefundedLogs((refundedRes.data || []) as Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>)
+    }
+    loadReservationActivityLogs()
   }, [user?.id])
 
   const handleLogout = async () => {
@@ -449,7 +493,16 @@ export default function DashboardPage() {
   const filteredElectricityReminders = can('details_electricity') ? electricityReminders : []
   const filteredMissingMeterReminders = can('details_electricity') ? buildingsMissingMeters : []
 
-  const notificationsCount = filteredElectricityReminders.length + filteredReservationReminders.length + filteredAssociationEndReminders.length + filteredMissingMeterReminders.length
+  // إجراءات حجوزات (إلغاء حجز / استرداد عربون) تظهر في الجرس لأصحاب صلاحية الحجوزات
+  const reservationActivityForBell = useMemo(() => {
+    if (!can('reservations')) return { cancelled: [], refunded: [] }
+    const cancelled = (reservationCancelledLogs || []).slice(0, 5)
+    const refunded = (depositRefundedLogs || []).slice(0, 5)
+    return { cancelled, refunded }
+  }, [can('reservations'), reservationCancelledLogs, depositRefundedLogs])
+  const reservationActivityCount = reservationActivityForBell.cancelled.length + reservationActivityForBell.refunded.length
+
+  const notificationsCount = filteredElectricityReminders.length + filteredReservationReminders.length + filteredAssociationEndReminders.length + filteredMissingMeterReminders.length + reservationActivityCount
 
   // قائمة معرفات الإشعارات الحالية (لحساب غير المقروءة)
   const currentNotificationIds = useMemo(() => {
@@ -458,8 +511,10 @@ export default function DashboardPage() {
     filteredReservationReminders.forEach(({ reservation }) => ids.push(`res-expired-${reservation.id}`))
     filteredElectricityReminders.forEach(({ unit }) => ids.push(`elec-${unit.id}`))
     filteredMissingMeterReminders.forEach(({ buildingId }) => ids.push(`meter-missing-${buildingId}`))
+    reservationActivityForBell.cancelled.forEach((log: { id: string }) => ids.push(`activity-cancelled-${log.id}`))
+    reservationActivityForBell.refunded.forEach((log: { id: string }) => ids.push(`activity-refund-${log.id}`))
     return ids
-  }, [filteredAssociationEndReminders, filteredReservationReminders, filteredElectricityReminders, filteredMissingMeterReminders])
+  }, [filteredAssociationEndReminders, filteredReservationReminders, filteredElectricityReminders, filteredMissingMeterReminders, reservationActivityForBell])
 
   const unreadCount = useMemo(() => {
     return currentNotificationIds.filter((id) => !readNotificationIds.has(id)).length
@@ -482,12 +537,15 @@ export default function DashboardPage() {
     for (const u of units) {
       const bName = buildings.find(b => b.id === u.building_id)?.name || '—'
       if (u.status === 'sold') {
+        // تم البيع: نعرض اسم المسوق من الحجز المكتمل إن وُجد، وإلا اسم المشتري أو "المسوق"
+        const completedRes = reservations.find(r => r.unit_id === u.id && (r.status === 'completed' || r.sale_id != null || r.completed_at != null))
+        const byName = (completedRes?.marketer_name && String(completedRes.marketer_name).trim()) || (u as Unit & { owner_name?: string }).owner_name || 'المسوق'
         fromUnits.push({
           id: u.id + '-sold',
           type: 'sold',
           building_name: bName,
           building_id: u.building_id,
-          user_name: (u as Unit & { owner_name?: string }).owner_name || 'مشتري',
+          user_name: byName,
           timestamp: u.updated_at || u.created_at,
           details: `تم بيع الوحدة ${u.unit_number} (الدور ${u.floor})`
         })
@@ -502,7 +560,7 @@ export default function DashboardPage() {
         type: 'reserved' as const,
         building_name: bName,
         building_id: r.building_id,
-        user_name: (r.created_by_name && String(r.created_by_name).trim()) || 'صاحب الحساب',
+        user_name: (r.created_by_name && String(r.created_by_name).trim()) || 'مدير الحجوزات',
         timestamp: r.created_at,
         details: `تم حجز ${unitLabel} — عميل: ${r.customer_name || '—'}`
       }
@@ -519,7 +577,7 @@ export default function DashboardPage() {
           type: 'reserved' as const,
           building_name: bName,
           building_id: r.building_id,
-          user_name: 'النظام',
+          user_name: (r.created_by_name && String(r.created_by_name).trim()) || 'مدير الحجوزات',
           timestamp: r.expiry_date || r.created_at,
           details: `انتهت مدة الحجز — يرجى مراجعة وإلغاء حجز ${unitLabel}`
         }
@@ -529,7 +587,7 @@ export default function DashboardPage() {
       type: 'add',
       building_name: b.name || 'عمارة جديدة',
       building_id: b.id,
-      user_name: b.created_by_name?.trim() || b.owner_name?.trim() || 'النظام',
+      user_name: b.created_by_name?.trim() || b.owner_name?.trim() || 'صاحب الحساب',
       timestamp: b.created_at,
       details: 'تم إضافة عمارة جديدة'
     }))
@@ -559,14 +617,23 @@ export default function DashboardPage() {
       type: 'meter_added' as const,
       building_name: (log.metadata?.building_name as string) || '—',
       building_id: (log.metadata?.building_id as string) || undefined,
-      user_name: (log.metadata?.created_by_name as string) || 'النظام',
+      user_name: (log.metadata?.created_by_name as string)?.trim() || 'صاحب الحساب',
       timestamp: log.created_at,
       details: log.action_description || 'تم إضافة عداد'
     }))
-    return [...fromUnits, ...fromReservations, ...fromExpiredReservations, ...fromBuildings, ...fromAssoc, ...fromMeterAdded]
+    const fromOwnershipTransferred: Activity[] = ownershipTransferredLogs.map(log => ({
+      id: `transfer-${log.id}`,
+      type: 'ownership_transferred' as const,
+      building_name: (log.metadata?.building_name as string) || '—',
+      building_id: (log.metadata?.building_id as string) || undefined,
+      user_name: (log.metadata?.created_by_name as string)?.trim() || 'صاحب الحساب',
+      timestamp: log.created_at,
+      details: log.action_description || 'نقل ملكية'
+    }))
+    return [...fromUnits, ...fromReservations, ...fromExpiredReservations, ...fromBuildings, ...fromAssoc, ...fromMeterAdded, ...fromOwnershipTransferred]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 7)
-  }, [units, buildings, reservations, associationEndReminders, meterAddedLogs])
+  }, [units, buildings, reservations, associationEndReminders, meterAddedLogs, ownershipTransferredLogs])
 
   // عرض النشاطات حسب الصلاحيات (خاص بلوحة الموظف)
   const filteredActivities = useMemo(() => {
@@ -576,6 +643,7 @@ export default function DashboardPage() {
       if (a.type === 'add') return can('building_details') || can('buildings')
       if (a.type === 'association_end') return can('details_association')
       if (a.type === 'meter_added') return can('details_electricity')
+      if (a.type === 'ownership_transferred') return can('deeds')
       return true
     })
   }, [activities, employeePermissions])
@@ -699,6 +767,7 @@ export default function DashboardPage() {
       case 'reserved': return <Calendar className="w-4 h-4 text-amber-600" />
       case 'association_end': return <Users className="w-4 h-4 text-emerald-600" />
       case 'meter_added': return <Zap className="w-4 h-4 text-amber-600" />
+      case 'ownership_transferred': return <ArrowRightLeft className="w-4 h-4 text-teal-600" />
       default: return <Activity className="w-4 h-4 text-gray-600" />
     }
   }
@@ -713,6 +782,31 @@ export default function DashboardPage() {
           </div>
           <p className="text-gray-700 text-xl font-medium mb-2">جاري تحميل لوحة التحكم</p>
           <p className="text-gray-400">يرجى الانتظار...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const isDisabledEmployee = user != null && employeePermissions !== null && Object.keys(employeePermissions).length === 0
+  if (isDisabledEmployee) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4" dir="rtl">
+        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 max-w-md text-center">
+          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+            <XCircle className="w-8 h-8 text-red-600" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-800 mb-2">حسابك معطّل</h1>
+          <p className="text-slate-600 mb-6">تم تعطيل هذا الحساب من قبل مدير النظام. لا يمكنك استخدام لوحة التحكم حالياً.</p>
+          <button
+            type="button"
+            onClick={async () => {
+              await supabase.auth.signOut()
+              router.push('/login')
+            }}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-800 text-white rounded-xl font-medium hover:bg-slate-700 transition"
+          >
+            <LogOut className="w-4 h-4" /> تسجيل الخروج
+          </button>
         </div>
       </div>
     )
@@ -739,7 +833,9 @@ export default function DashboardPage() {
                 </div>
                 <div className="min-w-0">
                   <h1 className="text-lg sm:text-xl font-bold text-gray-800 leading-tight">لوحة التحكم الرئيسية</h1>
-                  <p className="text-xs text-gray-500/90">ادارة العماير</p>
+                  <p className="text-xs text-gray-500/90">
+                    {employeePermissions === null ? 'مدير النظام' : (employeeJobTitle ? `حساب موظف — ${employeeJobTitle}` : (employeeDisplayName ? `حساب موظف — ${employeeDisplayName}` : 'حساب موظف'))}
+                  </p>
                   {!subscriptionLoading && planName && (
                     <p className="text-xs text-indigo-700 font-medium mt-1 flex flex-wrap items-center gap-2">
                       {planName === 'مفتوح' ? (
@@ -912,6 +1008,38 @@ export default function DashboardPage() {
                                 </div>
                               </Link>
                             ))}
+                            {reservationActivityForBell.cancelled.map((log) => (
+                              <Link
+                                key={`activity-cancelled-${log.id}`}
+                                href={`/dashboard/reservations${(log.metadata?.building_id as string) ? `?buildingId=${log.metadata.building_id}` : ''}`}
+                                onClick={() => setNotificationsOpen(false)}
+                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-red-50/70 transition cursor-pointer"
+                              >
+                                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-red-600">
+                                  <Trash2 className="w-5 h-5" />
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-gray-800">إلغاء حجز</p>
+                                  <p className="text-xs text-gray-600 mt-0.5">{log.action_description || 'تم إلغاء حجز'}</p>
+                                </div>
+                              </Link>
+                            ))}
+                            {reservationActivityForBell.refunded.map((log) => (
+                              <Link
+                                key={`activity-refund-${log.id}`}
+                                href={`/dashboard/reservations${(log.metadata?.building_id as string) ? `?buildingId=${log.metadata.building_id}` : ''}`}
+                                onClick={() => setNotificationsOpen(false)}
+                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-emerald-50/70 transition cursor-pointer"
+                              >
+                                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                                  <ArrowRightLeft className="w-5 h-5" />
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-gray-800">استرداد عربون</p>
+                                  <p className="text-xs text-gray-600 mt-0.5">{log.action_description || 'تم استرداد العربون'}</p>
+                                </div>
+                              </Link>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -943,8 +1071,10 @@ export default function DashboardPage() {
                 <div className="absolute left-0 mt-2 w-48 bg-white/95 backdrop-blur rounded-2xl shadow-xl border border-white/80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                   <div className="p-3 border-b border-gray-100">
                     <p className="text-sm font-semibold text-gray-800">{user?.email}</p>
-                    {employeePermissions === null && (
+                    {employeePermissions === null ? (
                       <p className="text-xs text-gray-500">مدير النظام</p>
+                    ) : (
+                      <p className="text-xs text-gray-500">{employeeJobTitle || employeeDisplayName || 'موظف'}</p>
                     )}
                   </div>
                   <div className="p-2">
@@ -1164,6 +1294,7 @@ export default function DashboardPage() {
                       activity.type === 'reserved' ? 'from-amber-100 to-orange-200' :
                       activity.type === 'association_end' ? 'from-emerald-100 to-teal-200' :
                       activity.type === 'meter_added' ? 'from-amber-100 to-yellow-200' :
+                      activity.type === 'ownership_transferred' ? 'from-teal-100 to-emerald-200' :
                       'from-gray-100 to-slate-200'
                     } rounded-xl flex items-center justify-center shadow-sm`}>
                       {getActivityIcon(activity.type)}

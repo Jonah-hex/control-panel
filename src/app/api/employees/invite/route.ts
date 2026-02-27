@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { phoneDigitsOnly, isValidPhone10Digits } from '@/lib/validation-utils'
 
 export type PermissionKey =
   | 'dashboard'
@@ -17,7 +18,17 @@ export type PermissionKey =
   | 'details_location'
   | 'details_association'
   | 'details_engineering'
+  | 'details_engineering_edit'
   | 'details_electricity'
+  | 'details_electricity_edit'
+  | 'details_driver_rooms'
+  | 'details_driver_rooms_edit'
+  | 'details_elevators_maintenance'
+  | 'details_elevators_maintenance_edit'
+  | 'documents_upload'
+  | 'documents_create_folder'
+  | 'documents_delete'
+  | 'documents_edit_folders'
   | 'units'
   | 'units_edit'
   | 'deeds'
@@ -53,9 +64,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { full_name, email, temporary_password, permissions } = body as {
+    const { full_name, email, phone, job_title, temporary_password, permissions } = body as {
       full_name: string
       email: string
+      phone?: string
+      job_title?: string
       temporary_password?: string
       permissions: Record<PermissionKey, boolean>
     }
@@ -64,6 +77,13 @@ export async function POST(request: Request) {
     const password = typeof temporary_password === 'string' ? temporary_password.trim() : ''
     if (!trimmedName) {
       return NextResponse.json({ error: 'اسم الموظف مطلوب' }, { status: 400 })
+    }
+    const rawPhone = typeof phone === 'string' ? phone.trim() : ''
+    if (!rawPhone) {
+      return NextResponse.json({ error: 'رقم الجوال مطلوب (10 أرقام)' }, { status: 400 })
+    }
+    if (!isValidPhone10Digits(rawPhone)) {
+      return NextResponse.json({ error: 'رقم الجوال يجب أن يكون 10 أرقام بالضبط' }, { status: 400 })
     }
     if (!trimmedEmail) {
       return NextResponse.json({ error: 'البريد الإلكتروني مطلوب' }, { status: 400 })
@@ -98,11 +118,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'لم يتم إنشاء المستخدم' }, { status: 500 })
     }
 
+    const phoneTrimmed = phoneDigitsOnly(rawPhone)
+    const jobTitleTrimmed = typeof job_title === 'string' ? job_title.trim() || null : null
     const { error: insertError } = await admin.from('dashboard_employees').insert({
       owner_id: user.id,
       auth_user_id: newUser.user.id,
       full_name: trimmedName,
       email: trimmedEmail,
+      phone: phoneTrimmed,
+      job_title: jobTitleTrimmed,
       permissions: allowedPermissions,
       is_active: true,
     })

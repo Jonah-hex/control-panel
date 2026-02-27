@@ -225,8 +225,20 @@ export default function ReportsPage() {
       {/* Header */}
       <div className="bg-white/90 shadow-lg border-b-2 border-indigo-100 sticky top-0 z-20 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-5">
+          <div className="flex flex-wrap items-center justify-between py-4 gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-500/30">
+                <FileText className="w-7 h-7" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                  التقارير
+                </h1>
+                <p className="text-xs text-gray-500">تقرير شامل لجميع العمائر والوحدات</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
               <Link
                 href="/dashboard"
                 className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
@@ -234,21 +246,6 @@ export default function ReportsPage() {
                 <LayoutDashboard className="w-4 h-4" />
                 لوحة التحكم
               </Link>
-
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-500/30">
-                  <FileText className="w-7 h-7" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                    التقارير
-                  </h1>
-                  <p className="text-xs text-gray-500">تقرير شامل لجميع العمائر والوحدات</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
               <button
                 onClick={generatePDF}
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:shadow-lg transition-all duration-300 text-sm font-semibold"

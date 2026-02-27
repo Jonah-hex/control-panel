@@ -35,13 +35,16 @@ function BuildingDeedsContent() {
     <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 lg:p-8">
       <div className="w-full mx-auto px-2 sm:px-4">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
-          <h1 className="text-3xl font-bold text-teal-800">إدارة الصكوك ومحاضر الفرز</h1>
+          <div>
+            <h1 className="text-3xl font-bold text-teal-800">إدارة الصكوك ومحاضر الفرز</h1>
+            <p className="mt-1.5 text-sm text-slate-600">عرض وإدارة صكوك الوحدات ومحاضر الفرز للمباني.</p>
+          </div>
           {buildingId && (
             <Link
               href={`/dashboard/buildings/details?buildingId=${buildingId}#card-engineering`}
-              className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-teal-200 text-teal-700 hover:bg-teal-50 hover:border-teal-300 transition text-sm font-semibold shadow-sm"
+              className="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-white border border-teal-200/80 text-teal-700 font-semibold text-sm shadow-sm hover:shadow-md hover:bg-gradient-to-r hover:from-teal-50 hover:to-emerald-50/80 hover:border-teal-300 transition-all duration-200"
             >
-              <ArrowRight className="w-4 h-4 rotate-180" />
+              <ArrowRight className="w-4 h-4 rotate-180 text-teal-500" />
               رجوع لتفاصيل المبنى
             </Link>
           )}

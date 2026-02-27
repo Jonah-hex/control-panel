@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { showToast } from '../details/toast'
+import { phoneDigitsOnly, isValidPhone10Digits } from '@/lib/validation-utils'
 import { useDashboardAuth } from '@/hooks/useDashboardAuth'
 import { useSubscription } from '@/hooks/useSubscription'
 import { 
@@ -855,6 +856,16 @@ export default function NewBuildingPage() {
         images_count: images.length
       })
 
+      // التحقق من أرقام الجوال (10 أرقام بالضبط عند الإدخال)
+      if (formData.phone && !isValidPhone10Digits(formData.phone)) {
+        showToast('رقم التواصل يجب أن يكون 10 أرقام بالضبط', 'error')
+        return
+      }
+      if (formData.guardPhone && !isValidPhone10Digits(formData.guardPhone)) {
+        showToast('رقم جوال الحارس يجب أن يكون 10 أرقام بالضبط', 'error')
+        return
+      }
+
       // ==========================================
       // 3️⃣ حفظ بيانات العمارة - جميع الحقول
       // Save Building Data - ALL FIELDS from 5 Steps
@@ -874,7 +885,7 @@ export default function NewBuildingPage() {
             neighborhood: formData.neighborhood || null,
             address: [formData.neighborhood, formData.plotNumber ? `قطعة ${formData.plotNumber}` : ''].filter(Boolean).join(' - ') || null,
             description: formData.description || null,
-            phone: formData.phone || null,
+            phone: formData.phone ? phoneDigitsOnly(formData.phone) || null : null,
             
             // 📋 الخطوة 2 - تفاصيل العمارة
             // Step 2 - Building Details
@@ -916,7 +927,7 @@ export default function NewBuildingPage() {
             
             // معلومات الحارس - Guard Information
             guard_name: formData.guardName || null,
-            guard_phone: formData.guardPhone || null,
+            guard_phone: formData.guardPhone ? phoneDigitsOnly(formData.guardPhone) || null : null,
             guard_room_number: formData.guardRoomNumber || null,
             guard_id_photo: formData.guardIdPhoto || null,
             guard_shift: formData.guardShift || null,
@@ -1169,33 +1180,29 @@ export default function NewBuildingPage() {
       {/* الشريط العلوي - تصميم محسّن */}
       <div className="bg-white/90 shadow-lg border-b-2 border-indigo-100 sticky top-0 z-20 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-5">
-              {/* زر الرجوع إلى لوحة التحكم */}
+          <div className="flex flex-wrap items-center justify-between py-4 gap-4">
+            {/* اللوقو والنصوص — يمين */}
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-500/30 animate-pulse">
+                <Building2 className="w-7 h-7" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                  إضافة عمارة جديدة
+                </h1>
+                <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3 text-indigo-400 animate-pulse" />
+                  أدخل جميع تفاصيل العمارة والوحدات السكنية بطريقة سهلة وسريعة
+                </p>
+              </div>
+            </div>
+
+            {/* الأزرار — يسار: لوحة التحكم ثم قائمة العماير */}
+            <div className="flex items-center gap-3">
               <Link href="/dashboard" className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200" title="رجوع إلى لوحة التحكم">
                 <LayoutDashboard className="w-4 h-4" />
                 لوحة التحكم
               </Link>
-
-              {/* اللوقو والنصوص */}
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-500/30 animate-pulse">
-                  <Building2 className="w-7 h-7" />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                    إضافة عمارة جديدة
-                  </h1>
-                  <p className="text-xs text-gray-500 flex items-center gap-1.5">
-                    <Sparkles className="w-3 h-3 text-indigo-400 animate-pulse" />
-                    أدخل جميع تفاصيل العمارة والوحدات السكنية بطريقة سهلة وسريعة
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* الأزرار */}
-            <div className="flex items-center gap-3">
               <Link
                 href="/dashboard/buildings"
                 className="inline-flex items-center gap-2.5 px-4 py-2.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-xl transform transition-all duration-300 hover:-translate-y-0.5 hover:scale-105"
@@ -2307,8 +2314,10 @@ export default function NewBuildingPage() {
                           <Phone className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                           <input
                             type="tel"
+                            inputMode="numeric"
+                            maxLength={10}
                             value={formData.guardPhone}
-                            onChange={(e) => setFormData({...formData, guardPhone: e.target.value})}
+                            onChange={(e) => setFormData({...formData, guardPhone: phoneDigitsOnly(e.target.value)})}
                             className="w-full pr-12 pl-4 py-2.5 bg-white border-2 border-gray-200 rounded-2xl focus:border-blue-500 outline-none"
                             placeholder="05xxxxxxxx"
                             dir="ltr"
@@ -2541,8 +2550,10 @@ export default function NewBuildingPage() {
                           <Phone className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                           <input
                             type="tel"
+                            inputMode="numeric"
+                            maxLength={10}
                             value={ownerAssociation.contactNumber}
-                            onChange={(e) => setOwnerAssociation({ ...ownerAssociation, contactNumber: e.target.value })}
+                            onChange={(e) => setOwnerAssociation({ ...ownerAssociation, contactNumber: phoneDigitsOnly(e.target.value) })}
                             className="w-full pr-12 pl-4 py-2.5 bg-white border-2 border-gray-200 rounded-2xl focus:border-amber-500 outline-none"
                             placeholder="05xxxxxxxx"
                             dir="ltr"

@@ -109,7 +109,11 @@ export default function SecurityDashboard() {
     <main className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950">
       {/* Back Navigation */}
       <nav className="sticky top-0 z-40 border-b border-slate-800 bg-slate-900/80 backdrop-blur-xl">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center gap-4">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-blue-400">
+            <Shield className="w-5 h-5" />
+            <span>إدارة الأمان</span>
+          </div>
           <Link
             href="/dashboard"
             className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
@@ -117,11 +121,6 @@ export default function SecurityDashboard() {
             <LayoutDashboard className="w-4 h-4" />
             لوحة التحكم
           </Link>
-          <div className="flex-1"></div>
-          <div className="flex items-center gap-2 text-blue-400">
-            <Shield className="w-5 h-5" />
-            <span>إدارة الأمان</span>
-          </div>
         </div>
       </nav>
 

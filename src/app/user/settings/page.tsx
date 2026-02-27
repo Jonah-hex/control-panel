@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { showToast } from '@/app/dashboard/buildings/details/toast'
+import { phoneDigitsOnly, isValidPhone10Digits } from '@/lib/validation-utils'
 import {
   Settings,
   UserPlus,
@@ -16,6 +17,7 @@ import {
   ChevronLeft,
   RefreshCw,
   LayoutDashboard,
+  ListChecks,
 } from 'lucide-react'
 
 /** يولد كلمة مرور مؤقتة عشوائية (12 حرفاً: حروف كبيرة/صغيرة وأرقام) وفق سياسة النظام (6 أحرف على الأقل) */
@@ -55,6 +57,10 @@ export type PermissionKey =
   | 'details_engineering_edit'
   | 'details_electricity'
   | 'details_electricity_edit'
+  | 'details_driver_rooms'
+  | 'details_driver_rooms_edit'
+  | 'details_elevators_maintenance'
+  | 'details_elevators_maintenance_edit'
   | 'units'
   | 'units_edit'
   | 'deeds'
@@ -66,6 +72,7 @@ export type PermissionKey =
   | 'marketing_cancel_reservation'
   | 'marketing_complete_sale'
   | 'marketing_building_details'
+  | 'documents_edit_folders'
   | 'security'
   | 'settings'
 
@@ -90,8 +97,13 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   details_association_edit: 'تعديل',
   details_engineering: 'المكتب الهندسي',
   details_engineering_edit: 'تعديل',
+  documents_edit_folders: 'تعديل المجلدات',
   details_electricity: 'عدادات الكهرباء',
   details_electricity_edit: 'تعديل',
+  details_driver_rooms: 'غرف السائق',
+  details_driver_rooms_edit: 'تعديل',
+  details_elevators_maintenance: 'المصاعد والصيانة',
+  details_elevators_maintenance_edit: 'تعديل',
   units: 'معاينة الوحدات',
   units_edit: 'تعديل الوحدات',
   deeds: 'الصكوك ومحاضر الفرز',
@@ -107,25 +119,37 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   settings: 'الإعدادات المتقدمة',
 }
 
-// تجميع الصلاحيات لعرضها في المودال (بدون تكرار منطقي)
+// تجميع الصلاحيات لعرضها في المودال (لوحة التحكم ثابتة دائماً ولا تظهر؛ الصكوك أُلغيت)
 const PERMISSION_GROUPS: { title: string; keys: PermissionKey[] }[] = [
-  { title: 'عام', keys: ['dashboard'] },
   { title: 'العماير', keys: ['buildings', 'building_details', 'buildings_create', 'buildings_edit', 'buildings_delete'] },
   { title: 'الوحدات', keys: ['units', 'units_edit'] },
-  { title: 'إدارة التسويق', keys: ['reservations', 'sales', 'marketing_cancel_reservation', 'marketing_complete_sale', 'marketing_building_details'] },
-  { title: 'أخرى', keys: ['deeds', 'statistics', 'activities', 'reports', 'security', 'settings'] },
+  { title: 'التسويق والحجوزات', keys: ['reservations', 'sales', 'marketing_cancel_reservation', 'marketing_complete_sale', 'marketing_building_details'] },
+  { title: 'التقارير والإحصائيات', keys: ['statistics', 'activities', 'reports'] },
+  { title: 'الأمان والإعدادات', keys: ['security', 'settings'] },
 ]
 
-// تفاصيل المبنى (الكاردات): صف واحد لكل كارد مع سوتش معاينة + سوتش تعديل
-const CARD_PERMISSION_ROWS: { label: string; viewKey: PermissionKey; editKey: PermissionKey }[] = [
-  { label: 'كارد: معلومات أساسية', viewKey: 'details_basic', editKey: 'details_basic_edit' },
-  { label: 'كارد: معلومات المبنى', viewKey: 'details_building', editKey: 'details_building_edit' },
-  { label: 'كارد: المرافق والتأمين', viewKey: 'details_facilities', editKey: 'details_facilities_edit' },
-  { label: 'كارد: بيانات الحارس', viewKey: 'details_guard', editKey: 'details_guard_edit' },
-  { label: 'كارد: الموقع والصور', viewKey: 'details_location', editKey: 'details_location_edit' },
-  { label: 'كارد: اتحاد الملاك', viewKey: 'details_association', editKey: 'details_association_edit' },
-  { label: 'كارد: المكتب الهندسي', viewKey: 'details_engineering', editKey: 'details_engineering_edit' },
-  { label: 'كارد: عدادات الكهرباء', viewKey: 'details_electricity', editKey: 'details_electricity_edit' },
+// تفاصيل المبنى: صف واحد لكل قسم مع سوتش معاينة + سوتش تعديل (+ سوتش إضافي اختياري)
+const CARD_PERMISSION_ROWS: {
+  label: string
+  viewKey: PermissionKey
+  editKey: PermissionKey
+  extraKey?: { key: PermissionKey; label: string }
+}[] = [
+  { label: 'تفاصيل: معلومات أساسية', viewKey: 'details_basic', editKey: 'details_basic_edit' },
+  { label: 'تفاصيل: معلومات المبنى', viewKey: 'details_building', editKey: 'details_building_edit' },
+  { label: 'تفاصيل: المرافق والتأمين', viewKey: 'details_facilities', editKey: 'details_facilities_edit' },
+  { label: 'تفاصيل: بيانات الحارس', viewKey: 'details_guard', editKey: 'details_guard_edit' },
+  { label: 'تفاصيل: الموقع والصور', viewKey: 'details_location', editKey: 'details_location_edit' },
+  { label: 'تفاصيل: اتحاد الملاك', viewKey: 'details_association', editKey: 'details_association_edit' },
+  {
+    label: 'تفاصيل: المكتب الهندسي',
+    viewKey: 'details_engineering',
+    editKey: 'details_engineering_edit',
+    extraKey: { key: 'documents_edit_folders', label: 'تعديل المجلدات' },
+  },
+  { label: 'تفاصيل: عدادات الكهرباء', viewKey: 'details_electricity', editKey: 'details_electricity_edit' },
+  { label: 'تفاصيل: غرف السائق', viewKey: 'details_driver_rooms', editKey: 'details_driver_rooms_edit' },
+  { label: 'تفاصيل: المصاعد والصيانة', viewKey: 'details_elevators_maintenance', editKey: 'details_elevators_maintenance_edit' },
 ]
 
 const DEFAULT_PERMISSIONS: Record<PermissionKey, boolean> = {
@@ -151,6 +175,10 @@ const DEFAULT_PERMISSIONS: Record<PermissionKey, boolean> = {
   details_engineering_edit: true,
   details_electricity: true,
   details_electricity_edit: true,
+  details_driver_rooms: true,
+  details_driver_rooms_edit: true,
+  details_elevators_maintenance: true,
+  details_elevators_maintenance_edit: true,
   units: true,
   units_edit: true,
   deeds: true,
@@ -162,6 +190,7 @@ const DEFAULT_PERMISSIONS: Record<PermissionKey, boolean> = {
   marketing_cancel_reservation: true,
   marketing_complete_sale: true,
   marketing_building_details: true,
+  documents_edit_folders: true,
   security: false,
   settings: false,
 }
@@ -171,6 +200,8 @@ interface Employee {
   owner_id: string
   full_name: string
   email: string | null
+  phone: string | null
+  job_title: string | null
   permissions: Record<PermissionKey, boolean>
   is_active: boolean
   created_at: string
@@ -191,10 +222,13 @@ export default function AdvancedSettingsPage() {
   const [form, setForm] = useState({
     full_name: '',
     email: '',
+    phone: '',
+    job_title: '',
     temporary_password: '',
     permissions: { ...DEFAULT_PERMISSIONS },
   })
   const [successPassword, setSuccessPassword] = useState<string | null>(null)
+  const [permissionsSummaryEmp, setPermissionsSummaryEmp] = useState<Employee | null>(null)
 
   useEffect(() => {
     const init = async () => {
@@ -236,6 +270,8 @@ export default function AdvancedSettingsPage() {
           owner_id: row.owner_id as string,
           full_name: (row.full_name as string) ?? '',
           email: (row.email as string) ?? null,
+          phone: (row.phone as string) ?? null,
+          job_title: (row.job_title as string) ?? null,
           permissions: { ...DEFAULT_PERMISSIONS, ...(row.permissions as Record<PermissionKey, boolean>) },
           is_active: (row.is_active as boolean) ?? true,
           created_at: row.created_at as string,
@@ -254,6 +290,8 @@ export default function AdvancedSettingsPage() {
     setForm({
       full_name: '',
       email: '',
+      phone: '',
+      job_title: '',
       temporary_password: generateTemporaryPassword(),
       permissions: { ...DEFAULT_PERMISSIONS },
     })
@@ -267,6 +305,8 @@ export default function AdvancedSettingsPage() {
     setForm({
       full_name: emp.full_name,
       email: emp.email ?? '',
+      phone: emp.phone ?? '',
+      job_title: emp.job_title ?? '',
       temporary_password: '',
       permissions: { ...DEFAULT_PERMISSIONS, ...emp.permissions },
     })
@@ -288,6 +328,15 @@ export default function AdvancedSettingsPage() {
       return
     }
     if (!user?.id) return
+    const phoneTrimmed = (form.phone ?? '').trim()
+    if (!phoneTrimmed) {
+      setSaveError('رقم الجوال مطلوب (10 أرقام)')
+      return
+    }
+    if (!isValidPhone10Digits(phoneTrimmed)) {
+      setSaveError('رقم الجوال يجب أن يكون 10 أرقام بالضبط')
+      return
+    }
     const emailTrimmed = (form.email ?? '').trim()
     if (!editingId && !emailTrimmed) {
       setSaveError('البريد الإلكتروني مطلوب')
@@ -300,9 +349,12 @@ export default function AdvancedSettingsPage() {
     setSaveLoading(true)
     setSaveError(null)
     if (editingId) {
+      const jobTitleTrimmed = (form.job_title ?? '').trim() || null
       const payload = {
         full_name: name,
         email: emailTrimmed || null,
+        phone: phoneDigitsOnly(phoneTrimmed),
+        job_title: jobTitleTrimmed,
         permissions: form.permissions,
         is_active: true,
         updated_at: new Date().toISOString(),
@@ -332,6 +384,8 @@ export default function AdvancedSettingsPage() {
         body: JSON.stringify({
           full_name: name,
           email: emailTrimmed,
+          phone: phoneDigitsOnly(phoneTrimmed),
+          job_title: (form.job_title ?? '').trim() || undefined,
           temporary_password: (form.temporary_password ?? '').trim(),
           permissions: form.permissions,
         }),
@@ -380,25 +434,23 @@ export default function AdvancedSettingsPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100" dir="rtl">
       <header className="bg-white/90 backdrop-blur border-b border-slate-200 sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <Link
-                href="/dashboard"
-                className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                لوحة التحكم
-              </Link>
-              <div className="flex items-center gap-2">
-                <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-teal-100 text-teal-600">
-                  <Settings className="w-5 h-5" />
-                </span>
-                <div>
-                  <h1 className="text-xl font-bold text-slate-800">الإعدادات المتقدمة</h1>
-                  <p className="text-xs text-slate-500">إدارة الموظفين وصلاحيات الوصول</p>
-                </div>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-teal-100 text-teal-600">
+                <Settings className="w-5 h-5" />
+              </span>
+              <div>
+                <h1 className="text-xl font-bold text-slate-800">الإعدادات المتقدمة</h1>
+                <p className="text-xs text-slate-500">إدارة الموظفين وصلاحيات الوصول</p>
               </div>
             </div>
+            <Link
+              href="/dashboard"
+              className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              لوحة التحكم
+            </Link>
           </div>
         </div>
       </header>
@@ -466,8 +518,10 @@ export default function AdvancedSettingsPage() {
                   <tr className="bg-slate-50 border-b border-slate-200">
                     <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">الاسم</th>
                     <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">البريد</th>
-                    <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">الحالة</th>
-                    <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700 w-32">إجراءات</th>
+                    <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">المسمى الوظيفي</th>
+                    <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">الجوال</th>
+                    <th className="text-center py-3 px-4 text-sm font-semibold text-slate-700">الحالة</th>
+                    <th className="text-center py-3 px-4 text-sm font-semibold text-slate-700 w-32">إجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -475,20 +529,32 @@ export default function AdvancedSettingsPage() {
                     <tr key={emp.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition">
                       <td className="py-3 px-4 font-medium text-slate-800">{emp.full_name}</td>
                       <td className="py-3 px-4 text-sm text-slate-600">{emp.email || '—'}</td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 text-sm text-slate-600">{emp.job_title || '—'}</td>
+                      <td className="py-3 px-4 text-sm text-slate-600">{emp.phone || '—'}</td>
+                      <td className="py-3 px-4 align-middle text-center">
                         <button
                           type="button"
                           onClick={() => toggleActive(emp)}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${
-                            emp.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                            emp.is_active
+                              ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-200/60 shadow-sm'
+                              : 'bg-red-50 text-red-600 border border-red-200/80'
                           }`}
                         >
-                          {emp.is_active ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${emp.is_active ? 'bg-emerald-500' : 'bg-red-500'}`} />
                           {emp.is_active ? 'نشط' : 'معطّل'}
                         </button>
                       </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-1">
+                      <td className="py-3 px-4 align-middle text-center">
+                        <div className="flex items-center justify-center gap-1 flex-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => setPermissionsSummaryEmp(emp)}
+                            className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg transition"
+                            title="ملخص الصلاحيات"
+                          >
+                            <ListChecks className="w-4 h-4" />
+                          </button>
                           <button
                             type="button"
                             onClick={() => openEdit(emp)}
@@ -516,6 +582,114 @@ export default function AdvancedSettingsPage() {
         </section>
 
       </main>
+
+      {/* مودال ملخص صلاحيات الموظف */}
+      {permissionsSummaryEmp && (
+        <>
+          <div
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm cursor-pointer"
+            onClick={() => setPermissionsSummaryEmp(null)}
+            aria-hidden
+          />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="permissions-summary-title"
+            >
+              <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+                <h3 id="permissions-summary-title" className="font-bold text-slate-800 flex items-center gap-2">
+                  <ListChecks className="w-5 h-5 text-teal-600" />
+                  ملخص الصلاحيات
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setPermissionsSummaryEmp(null)}
+                  className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition"
+                  aria-label="إغلاق"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="space-y-1.5 pb-2 border-b border-slate-100">
+                  <p className="text-sm font-medium text-slate-800">{permissionsSummaryEmp.full_name}</p>
+                  <p className="text-sm text-slate-600">المسمى الوظيفي: {permissionsSummaryEmp.job_title || '—'}</p>
+                  <p className="text-sm text-slate-600">رقم الجوال: {permissionsSummaryEmp.phone || '—'}</p>
+                  <p className="text-sm text-slate-500">البريد: {permissionsSummaryEmp.email || '—'}</p>
+                </div>
+                {!Object.values(permissionsSummaryEmp.permissions).some(Boolean) ? (
+                  <p className="text-sm text-slate-500 py-4">لا توجد صلاحيات معطاة لهذا الموظف</p>
+                ) : (
+                <div className="space-y-4">
+                  <p className="text-sm font-semibold text-slate-700 mb-3">صلاحيات الوصول</p>
+                  <p className="text-xs text-slate-500 mb-3">الصلاحيات المعطاة فقط</p>
+                  {PERMISSION_GROUPS.map((group) => {
+                    const enabledKeys = group.keys.filter((key) => permissionsSummaryEmp.permissions[key] ?? false)
+                    if (enabledKeys.length === 0) return null
+                    return (
+                      <div key={group.title}>
+                        <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">{group.title}</p>
+                        <div className="space-y-2">
+                          {enabledKeys.map((key) => (
+                            <div
+                              key={key}
+                              className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50/50 transition"
+                            >
+                              <span className="text-sm text-slate-700">{PERMISSION_LABELS[key]}</span>
+                              <Check className="w-5 h-5 text-teal-500 flex-shrink-0" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {(() => {
+                    const cardRowsWithAny = CARD_PERMISSION_ROWS.filter(
+                      (row) => {
+                        const { viewKey, editKey, extraKey } = row
+                        const viewOn = permissionsSummaryEmp.permissions[viewKey] ?? false
+                        const editOn = permissionsSummaryEmp.permissions[editKey] ?? false
+                        const extraOn = extraKey ? (permissionsSummaryEmp.permissions[extraKey.key] ?? false) : false
+                        return viewOn || editOn || extraOn
+                      }
+                    )
+                    if (cardRowsWithAny.length === 0) return null
+                    return (
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">تفاصيل المبنى</p>
+                        <div className="space-y-2">
+                          {cardRowsWithAny.map(({ label, viewKey, editKey, extraKey }) => {
+                            const viewOn = permissionsSummaryEmp.permissions[viewKey] ?? false
+                            const editOn = permissionsSummaryEmp.permissions[editKey] ?? false
+                            const extraOn = extraKey ? (permissionsSummaryEmp.permissions[extraKey.key] ?? false) : false
+                            const parts = []
+                            if (viewOn) parts.push('معاينة')
+                            if (editOn) parts.push('تعديل')
+                            if (extraOn) parts.push(extraKey!.label)
+                            return (
+                              <div
+                                key={viewKey}
+                                className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50/50 transition"
+                              >
+                                <span className="text-sm text-slate-700 min-w-0">{label}</span>
+                                <span className="text-xs text-slate-500 flex-shrink-0">{parts.join('، ')}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* مودال إضافة/تعديل موظف */}
       {modalOpen && (
@@ -558,6 +732,19 @@ export default function AdvancedSettingsPage() {
                 </div>
 
                 <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">رقم الجوال *</label>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={form.phone ?? ''}
+                    onChange={(e) => setForm((p) => ({ ...p, phone: phoneDigitsOnly(e.target.value) }))}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    placeholder="05xxxxxxxx"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">البريد الإلكتروني *</label>
                   <input
                     type="email"
@@ -567,9 +754,17 @@ export default function AdvancedSettingsPage() {
                     placeholder="employee@example.com"
                     required={!editingId}
                   />
-                  {!editingId && (
-                    <p className="mt-1 text-xs text-slate-500 font-normal mr-[3px]">سيُستخدم لتسجيل الدخول. أرسل للموظف كلمة المرور المؤقتة أدناه (بالبريد أو واتساب)</p>
-                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">المسمى الوظيفي</label>
+                  <input
+                    type="text"
+                    value={form.job_title ?? ''}
+                    onChange={(e) => setForm((p) => ({ ...p, job_title: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    placeholder="مثال: مدير مبيعات، منسق حجوزات"
+                  />
                 </div>
 
                 {!editingId && (
@@ -594,7 +789,6 @@ export default function AdvancedSettingsPage() {
                         توليد
                       </button>
                     </div>
-                    <p className="mt-1 text-xs text-slate-500 font-normal mr-[3px]">أرسلها للموظف مع رابط تسجيل الدخول. يمكنه لاحقاً استخدام «نسيت كلمة المرور» لتعيين كلمة خاصة به</p>
                   </div>
                 )}
 
@@ -603,86 +797,96 @@ export default function AdvancedSettingsPage() {
                   <p className="text-xs text-slate-500 mb-3">فعّل الأقسام التي يمكن للموظف الوصول إليها</p>
                   <div className="space-y-4">
                     {PERMISSION_GROUPS.map((group) => (
-                      <div key={group.title}>
-                        <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">{group.title}</p>
-                        <div className="space-y-2">
-                          {group.keys.map((key) => {
-                            const checked = form.permissions[key] ?? false
-                            return (
-                              <label
-                                key={key}
-                                className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50/50 transition cursor-pointer"
-                              >
-                                <span className="text-sm text-slate-700">{PERMISSION_LABELS[key]}</span>
-                                <button
-                                  type="button"
-                                  role="switch"
-                                  aria-checked={checked}
-                                  onClick={() => setPermission(key, !checked)}
-                                  className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-teal-400 focus:ring-offset-2 ${
-                                    checked ? 'bg-teal-500' : 'bg-slate-300'
-                                  }`}
+                      <React.Fragment key={group.title}>
+                        <div>
+                          <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">{group.title}</p>
+                          <div className="space-y-2">
+                            {group.keys.map((key) => {
+                              const checked = form.permissions[key] ?? false
+                              return (
+                                <label
+                                  key={key}
+                                  className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50/50 transition cursor-pointer"
                                 >
-                                  <span
-                                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm ring-0 transition-all duration-200 ${
-                                      checked
-                                        ? 'right-0.5 left-auto rtl:right-auto rtl:left-0.5'
-                                        : 'left-0.5 right-auto rtl:left-auto rtl:right-0.5'
+                                  <span className="text-sm text-slate-700">{PERMISSION_LABELS[key]}</span>
+                                  <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={checked}
+                                    onClick={() => setPermission(key, !checked)}
+                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-teal-400 focus:ring-offset-2 ${
+                                      checked ? 'bg-teal-500' : 'bg-slate-300'
                                     }`}
-                                  />
-                                </button>
-                              </label>
-                            )
-                          })}
+                                  >
+                                    <span
+                                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm ring-0 transition-all duration-200 ${
+                                        checked
+                                          ? 'right-0.5 left-auto rtl:right-auto rtl:left-0.5'
+                                          : 'left-0.5 right-auto rtl:left-auto rtl:right-0.5'
+                                      }`}
+                                    />
+                                  </button>
+                                </label>
+                              )
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                    {/* تفاصيل المبنى (الكاردات): معاينة + تعديل لكل كارد */}
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">تفاصيل المبنى (الكاردات)</p>
-                      <p className="text-xs text-slate-400 mb-2">معاينة = إظهار الكارد فقط — تعديل = إمكانية تعديل محتواه</p>
-                      <div className="space-y-2">
-                        {CARD_PERMISSION_ROWS.map(({ label, viewKey, editKey }) => {
-                          const viewChecked = form.permissions[viewKey] ?? false
-                          const editChecked = form.permissions[editKey] ?? false
-                          const Switch = ({ keyName, checked }: { keyName: PermissionKey; checked: boolean }) => (
-                            <button
-                              type="button"
-                              role="switch"
-                              aria-checked={checked}
-                              onClick={() => setPermission(keyName, !checked)}
-                              className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-teal-400 focus:ring-offset-2 ${
-                                checked ? 'bg-teal-500' : 'bg-slate-300'
-                              }`}
-                            >
-                              <span
-                                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm ring-0 transition-all duration-200 ${
-                                  checked ? 'right-0.5 left-auto rtl:right-auto rtl:left-0.5' : 'left-0.5 right-auto rtl:left-auto rtl:right-0.5'
-                                }`}
-                              />
-                            </button>
-                          )
-                          return (
-                            <div
-                              key={viewKey}
-                              className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50/50 transition"
-                            >
-                              <span className="text-sm text-slate-700 min-w-0">{label}</span>
-                              <div className="flex items-center gap-4 flex-shrink-0">
-                                <div className="flex flex-col items-center gap-0.5">
-                                  <span className="text-[10px] text-slate-400">معاينة</span>
-                                  <Switch keyName={viewKey} checked={viewChecked} />
-                                </div>
-                                <div className="flex flex-col items-center gap-0.5">
-                                  <span className="text-[10px] text-slate-400">تعديل</span>
-                                  <Switch keyName={editKey} checked={editChecked} />
-                                </div>
-                              </div>
+                        {/* تفاصيل المبنى: مباشرة بعد الوحدات */}
+                        {group.title === 'الوحدات' && (
+                          <div>
+                            <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">تفاصيل المبنى</p>
+                            <div className="space-y-2">
+                              {CARD_PERMISSION_ROWS.map(({ label, viewKey, editKey, extraKey }) => {
+                                const viewChecked = form.permissions[viewKey] ?? false
+                                const editChecked = form.permissions[editKey] ?? false
+                                const extraChecked = extraKey ? (form.permissions[extraKey.key] ?? false) : false
+                                const Switch = ({ keyName, checked }: { keyName: PermissionKey; checked: boolean }) => (
+                                  <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={checked}
+                                    onClick={() => setPermission(keyName, !checked)}
+                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-teal-400 focus:ring-offset-2 ${
+                                      checked ? 'bg-teal-500' : 'bg-slate-300'
+                                    }`}
+                                  >
+                                    <span
+                                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm ring-0 transition-all duration-200 ${
+                                        checked ? 'right-0.5 left-auto rtl:right-auto rtl:left-0.5' : 'left-0.5 right-auto rtl:left-auto rtl:right-0.5'
+                                      }`}
+                                    />
+                                  </button>
+                                )
+                                return (
+                                  <div
+                                    key={viewKey}
+                                    className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50/50 transition"
+                                  >
+                                    <span className="text-sm text-slate-700 min-w-0">{label}</span>
+                                    <div className="flex items-center gap-4 flex-shrink-0">
+                                      {extraKey && (
+                                        <div className="flex flex-col items-center gap-0.5">
+                                          <span className="text-[10px] text-slate-400">{extraKey.label}</span>
+                                          <Switch keyName={extraKey.key} checked={extraChecked} />
+                                        </div>
+                                      )}
+                                      <div className="flex flex-col items-center gap-0.5">
+                                        <span className="text-[10px] text-slate-400">معاينة</span>
+                                        <Switch keyName={viewKey} checked={viewChecked} />
+                                      </div>
+                                      <div className="flex flex-col items-center gap-0.5">
+                                        <span className="text-[10px] text-slate-400">تعديل</span>
+                                        <Switch keyName={editKey} checked={editChecked} />
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
                             </div>
-                          )
-                        })}
-                      </div>
-                    </div>
+                          </div>
+                        )}
+                      </React.Fragment>
+                    ))}
                   </div>
                 </div>
               </div>

@@ -3,18 +3,19 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { showToast } from "./toast";
 import { FaInfoCircle, FaBuilding, FaShieldAlt, FaMapMarkerAlt, FaUsers, FaTools, FaBolt, FaPhoneAlt, FaChevronDown, FaChevronUp } from "react-icons/fa";
-import { FaDoorOpen, FaLayerGroup, FaUserShield, FaImages } from "react-icons/fa";
+import { FaDoorOpen, FaLayerGroup, FaUserShield, FaImages, FaCar } from "react-icons/fa";
 import BuildingCard from "@/components/BuildingCard";
 
 import { createClient } from "@/lib/supabase/client";
+import { phoneDigitsOnly, isValidPhone10Digits } from "@/lib/validation-utils";
 import ImagesGallery from "../images-gallery";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, LayoutDashboard, ArrowRight, Building2, Pencil, X, Check } from "lucide-react";
+import { ChevronDown, LayoutDashboard, ArrowRight, Building2, Pencil, X, Check, FileText, Ruler, MoveVertical } from "lucide-react";
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
 
 // مفتاح الكارد -> صلاحية العرض (معاينة)
-const CARD_PERMISSION_MAP: Record<string, 'details_basic' | 'details_building' | 'details_facilities' | 'details_guard' | 'details_location' | 'details_association' | 'details_engineering' | 'details_electricity'> = {
+const CARD_PERMISSION_MAP: Record<string, 'details_basic' | 'details_building' | 'details_facilities' | 'details_guard' | 'details_location' | 'details_association' | 'details_engineering' | 'details_electricity' | 'details_driver_rooms' | 'details_elevators_maintenance'> = {
   basic: 'details_basic',
   building: 'details_building',
   facilities: 'details_facilities',
@@ -23,10 +24,12 @@ const CARD_PERMISSION_MAP: Record<string, 'details_basic' | 'details_building' |
   association: 'details_association',
   engineering: 'details_engineering',
   electricity: 'details_electricity',
+  driver_rooms: 'details_driver_rooms',
+  elevators_maintenance: 'details_elevators_maintenance',
 };
 
 // مفتاح الكارد -> صلاحية التعديل
-const CARD_EDIT_PERMISSION_MAP: Record<string, 'details_basic_edit' | 'details_building_edit' | 'details_facilities_edit' | 'details_guard_edit' | 'details_location_edit' | 'details_association_edit' | 'details_engineering_edit' | 'details_electricity_edit'> = {
+const CARD_EDIT_PERMISSION_MAP: Record<string, 'details_basic_edit' | 'details_building_edit' | 'details_facilities_edit' | 'details_guard_edit' | 'details_location_edit' | 'details_association_edit' | 'details_engineering_edit' | 'details_electricity_edit' | 'details_driver_rooms_edit' | 'details_elevators_maintenance_edit'> = {
   basic: 'details_basic_edit',
   building: 'details_building_edit',
   facilities: 'details_facilities_edit',
@@ -35,6 +38,8 @@ const CARD_EDIT_PERMISSION_MAP: Record<string, 'details_basic_edit' | 'details_b
   association: 'details_association_edit',
   engineering: 'details_engineering_edit',
   electricity: 'details_electricity_edit',
+  driver_rooms: 'details_driver_rooms_edit',
+  elevators_maintenance: 'details_elevators_maintenance_edit',
 };
 
 // تعريف أنواع البيانات
@@ -78,6 +83,14 @@ interface Building {
   guard_shift?: string | null;
   guard_has_salary?: boolean;
   guard_salary_amount?: number | string | null;
+  elevator_type?: string | null;
+  maintenance_company?: string | null;
+  maintenance_contract_number?: string | null;
+  last_maintenance_date?: string | null;
+  elevator_emergency_phone?: string | null;
+  elevator_installation_contact_name?: string | null;
+  maintenance_contract_date?: string | null;
+  warranty_months?: number | null;
 }
 
 function DetailsContent() {
@@ -182,16 +195,27 @@ function DetailsContent() {
 
   const canEditBuilding = can('buildings_edit');
   const canEditCard = (cardKey: string) => (CARD_EDIT_PERMISSION_MAP[cardKey] ? can(CARD_EDIT_PERMISSION_MAP[cardKey]) : false);
-  const allowedCardKeys = (['basic', 'building', 'facilities', 'guard', 'location', 'association', 'engineering', 'electricity'] as const).filter(
+  const allowedCardKeys = (['basic', 'building', 'facilities', 'guard', 'location', 'association', 'engineering', 'electricity', 'driver_rooms', 'elevators_maintenance'] as const).filter(
     (key) => can(CARD_PERMISSION_MAP[key])
   );
 
   const [building, setBuilding] = useState<Building | null>(null);
   const [loading, setLoading] = useState(true);
-  const [units, setUnits] = useState<Array<{ id: string; unit_number: string; floor: number | string; electricity_meter_number?: string | null }>>([]);
+  const [units, setUnits] = useState<Array<{
+    id: string;
+    unit_number: string;
+    floor: number | string;
+    electricity_meter_number?: string | null;
+    driver_room_number?: string | null;
+    status?: string;
+    electricity_meter_transferred_with_sale?: boolean | null;
+    driver_room_transferred_with_sale?: boolean | null;
+  }>>([]);
   const [unitsLoading, setUnitsLoading] = useState(false);
   const [editingMeter, setEditingMeter] = useState<string | null>(null);
   const [meterDraft, setMeterDraft] = useState("");
+  const [editingDriverRoom, setEditingDriverRoom] = useState<string | null>(null);
+  const [driverRoomDraft, setDriverRoomDraft] = useState("");
   const [guardIdPreview, setGuardIdPreview] = useState<string | null>(null);
   const [savingGuardPhoto, setSavingGuardPhoto] = useState(false);
   const [uploadingInsurance, setUploadingInsurance] = useState(false);
@@ -203,6 +227,17 @@ function DetailsContent() {
     guard_shift: '',
     guard_has_salary: false,
     guard_salary_amount: '' as string | number,
+  });
+  const [isEditingElevatorMaintenanceCard, setIsEditingElevatorMaintenanceCard] = useState(false);
+  const [elevatorMaintenanceEdit, setElevatorMaintenanceEdit] = useState({
+    elevator_type: '',
+    maintenance_company: '',
+    maintenance_contract_number: '',
+    maintenance_contract_date: '',
+    warranty_months: '' as string | number,
+    last_maintenance_date: '',
+    elevator_emergency_phone: '',
+    elevator_installation_contact_name: '',
   });
 
   // تعريف بيانات اتحاد الملاك خارج JSX
@@ -321,13 +356,13 @@ function DetailsContent() {
     }
   }, [building?.id, searchParams]);
 
-  // جلب وحدات المبنى عند فتح كارد عدادات الكهرباء
+  // جلب وحدات المبنى عند فتح كارد عدادات الكهرباء أو غرف السائق
   useEffect(() => {
-    if (!building?.id || openCard !== "electricity") return;
+    if (!building?.id || (openCard !== "electricity" && openCard !== "driver_rooms")) return;
     setUnitsLoading(true);
     supabase
       .from("units")
-      .select("id, unit_number, floor, electricity_meter_number")
+      .select("id, unit_number, floor, electricity_meter_number, driver_room_number, status, electricity_meter_transferred_with_sale, driver_room_transferred_with_sale")
       .eq("building_id", building.id)
       .order("floor", { ascending: true })
       .order("unit_number", { ascending: true })
@@ -388,8 +423,24 @@ function DetailsContent() {
     }
   }, [building?.id, openCard, building?.total_floors, building?.total_units, building?.build_status, building?.unitsperfloor, building?.parking_slots, building?.driver_rooms, building?.street_type, building?.building_facing, building?.elevators, building?.year_built, building?.description]);
 
+  useEffect(() => {
+    if (building && openCard === 'elevators_maintenance') {
+      setElevatorMaintenanceEdit({
+        elevator_type: building.elevator_type ?? '',
+        maintenance_company: building.maintenance_company ?? '',
+        maintenance_contract_number: building.maintenance_contract_number ?? '',
+        maintenance_contract_date: building.maintenance_contract_date ?? '',
+        warranty_months: building.warranty_months ?? '',
+        last_maintenance_date: building.last_maintenance_date ?? '',
+        elevator_emergency_phone: building.elevator_emergency_phone ?? '',
+        elevator_installation_contact_name: building.elevator_installation_contact_name ?? '',
+      });
+    }
+  }, [building?.id, openCard, building?.elevator_type, building?.maintenance_company, building?.maintenance_contract_number, building?.maintenance_contract_date, building?.warranty_months, building?.last_maintenance_date, building?.elevator_emergency_phone, building?.elevator_installation_contact_name]);
+
   const saveUnitMeter = async (unitId: string, value: string) => {
-    const v = value.trim() || null;
+    const raw = value.trim();
+    const v = raw ? raw.toUpperCase() : null;
     const { error } = await supabase
       .from("units")
       .update({ electricity_meter_number: v, updated_at: new Date().toISOString() })
@@ -422,6 +473,54 @@ function DetailsContent() {
         }
       }
     } else showToast("فشل حفظ رقم العداد");
+  };
+
+  const saveUnitDriverRoom = async (unitId: string, value: string) => {
+    const v = value.trim() || null;
+    const { error } = await supabase
+      .from("units")
+      .update({ driver_room_number: v, updated_at: new Date().toISOString() })
+      .eq("id", unitId);
+    if (!error) {
+      setUnits(prev => prev.map(u => u.id === unitId ? { ...u, driver_room_number: v } : u));
+      setEditingDriverRoom(null);
+      setDriverRoomDraft("");
+      showToast("تم حفظ رقم غرفة السائق بنجاح");
+    } else showToast("فشل حفظ رقم غرفة السائق");
+  };
+
+  const saveElevatorMaintenance = async () => {
+    if (!building?.id) return;
+    const { error } = await supabase
+      .from("buildings")
+      .update({
+        elevator_type: elevatorMaintenanceEdit.elevator_type.trim() || null,
+        maintenance_company: elevatorMaintenanceEdit.maintenance_company.trim() || null,
+        maintenance_contract_number: elevatorMaintenanceEdit.maintenance_contract_number.trim() || null,
+        maintenance_contract_date: elevatorMaintenanceEdit.maintenance_contract_date?.toString().trim() || null,
+        warranty_months: elevatorMaintenanceEdit.warranty_months !== '' && elevatorMaintenanceEdit.warranty_months != null ? Number(elevatorMaintenanceEdit.warranty_months) : null,
+        last_maintenance_date: elevatorMaintenanceEdit.last_maintenance_date.trim() || null,
+        elevator_emergency_phone: elevatorMaintenanceEdit.elevator_emergency_phone.trim() || null,
+        elevator_installation_contact_name: elevatorMaintenanceEdit.elevator_installation_contact_name.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", building.id);
+    if (!error) {
+      setBuilding({
+        ...building,
+        ...elevatorMaintenanceEdit,
+        elevator_type: elevatorMaintenanceEdit.elevator_type.trim() || null,
+        maintenance_company: elevatorMaintenanceEdit.maintenance_company.trim() || null,
+        maintenance_contract_number: elevatorMaintenanceEdit.maintenance_contract_number.trim() || null,
+        maintenance_contract_date: elevatorMaintenanceEdit.maintenance_contract_date?.toString().trim() || null,
+        warranty_months: elevatorMaintenanceEdit.warranty_months !== '' && elevatorMaintenanceEdit.warranty_months != null ? Number(elevatorMaintenanceEdit.warranty_months) : null,
+        last_maintenance_date: elevatorMaintenanceEdit.last_maintenance_date.trim() || null,
+        elevator_emergency_phone: elevatorMaintenanceEdit.elevator_emergency_phone.trim() || null,
+        elevator_installation_contact_name: elevatorMaintenanceEdit.elevator_installation_contact_name.trim() || null,
+      });
+      setIsEditingElevatorMaintenanceCard(false);
+      showToast("تم حفظ بيانات المصاعد والصيانة");
+    } else showToast("فشل الحفظ");
   };
 
   const saveGuardPhoto = async (dataUrl: string) => {
@@ -479,7 +578,7 @@ function DetailsContent() {
               </div>
               <div className="min-w-0">
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-800 tracking-tight truncate">
-                  {building?.name || "تفاصيل المبنى"}
+                  تفاصيل العمارة — {building?.name || "المبنى"}
                 </h1>
                 <p className="text-xs sm:text-sm text-blue-700/80 mt-0.5">إدارة أقسام العمارة — بيانات وتشغيل وتحديثات</p>
               </div>
@@ -507,6 +606,8 @@ function DetailsContent() {
                         { id: "card-association", key: "association", label: "اتحاد الملاك", icon: FaUsers },
                         { id: "card-engineering", key: "engineering", label: "المكتب الهندسي", icon: FaTools },
                         { id: "card-electricity", key: "electricity", label: "عدادات الكهرباء", icon: FaBolt },
+                        { id: "card-driver-rooms", key: "driver_rooms", label: "غرف السائق", icon: FaCar },
+                        { id: "card-elevators-maintenance", key: "elevators_maintenance", label: "المصاعد والصيانة", icon: MoveVertical },
                       ]
                         .filter(({ key }) => allowedCardKeys.includes(key as (typeof allowedCardKeys)[number]))
                         .map(({ id, key, label, icon: Icon }) => (
@@ -626,20 +727,6 @@ function DetailsContent() {
                   <p className="text-gray-800 font-medium">{building.plot_number ?? '—'}</p>
                 )}
               </div>
-              {/* رقم رخصة البناء */}
-              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">رقم رخصة البناء</p>
-                {isEditingBasicCard ? (
-                  <input
-                    className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none"
-                    type="text"
-                    value={basicEdit.building_license_number ?? ''}
-                    onChange={e => setBasicEdit({ ...basicEdit, building_license_number: e.target.value })}
-                  />
-                ) : (
-                  <p className="text-gray-800 font-medium">{building.building_license_number ?? '—'}</p>
-                )}
-              </div>
               {/* رقم الصك */}
               <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
                 <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">رقم الصك</p>
@@ -652,6 +739,20 @@ function DetailsContent() {
                   />
                 ) : (
                   <p className="text-gray-800 font-medium">{building.deed_number ?? '—'}</p>
+                )}
+              </div>
+              {/* رقم رخصة البناء */}
+              <div className="rounded-xl bg-white/90 border border-blue-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">رقم رخصة البناء</p>
+                {isEditingBasicCard ? (
+                  <input
+                    className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-blue-500 rounded-none"
+                    type="text"
+                    value={basicEdit.building_license_number ?? ''}
+                    onChange={e => setBasicEdit({ ...basicEdit, building_license_number: e.target.value })}
+                  />
+                ) : (
+                  <p className="text-gray-800 font-medium">{building.building_license_number ?? '—'}</p>
                 )}
               </div>
               {/* الحي */}
@@ -1185,7 +1286,7 @@ function DetailsContent() {
                       <div className="rounded-xl bg-white/90 border border-amber-100 px-4 py-2 shadow-sm">
                         <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-1">رقم الجوال</p>
                         {isEditingGuardCard ? (
-                          <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-amber-500 rounded-none" type="text" value={guardEdit.guard_phone ?? ''} onChange={e => setGuardEdit({ ...guardEdit, guard_phone: e.target.value })} />
+                          <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-amber-500 rounded-none" type="tel" inputMode="numeric" maxLength={10} value={guardEdit.guard_phone ?? ''} onChange={e => setGuardEdit({ ...guardEdit, guard_phone: phoneDigitsOnly(e.target.value) })} />
                         ) : (
                           <a href={building.guard_phone ? `tel:${building.guard_phone}` : '#'} className="text-gray-800 font-medium hover:text-amber-600 transition flex items-center gap-2">
                             {building.guard_phone || '—'}
@@ -1240,9 +1341,13 @@ function DetailsContent() {
                       {isEditingGuardCard && (
                         <div className="sm:col-span-2 flex gap-3 mt-1">
                           <button type="button" className="px-4 py-2 bg-gradient-to-br from-amber-500 to-amber-700 text-white rounded-xl text-sm font-bold hover:from-amber-600 hover:to-amber-800 transition" onClick={async () => {
+                            if (guardEdit.guard_phone && !isValidPhone10Digits(guardEdit.guard_phone)) {
+                              showToast('رقم جوال الحارس يجب أن يكون 10 أرقام بالضبط', 'error');
+                              return;
+                            }
                             const { error } = await supabase.from('buildings').update({
                               guard_name: guardEdit.guard_name || null,
-                              guard_phone: guardEdit.guard_phone || null,
+                              guard_phone: guardEdit.guard_phone ? phoneDigitsOnly(guardEdit.guard_phone) : null,
                               guard_room_number: guardEdit.guard_room_number || null,
                               guard_shift: guardEdit.guard_shift || null,
                               guard_has_salary: guardEdit.guard_has_salary,
@@ -1407,7 +1512,7 @@ function DetailsContent() {
 
         {/* كارد اتحاد الملاك قابل للطي */}
         {can('details_association') && (
-        <div id="card-association" className="rounded-2xl mb-8 overflow-hidden border border-emerald-200/60 shadow-xl shadow-emerald-900/5 bg-gradient-to-b from-white to-emerald-50/30">
+        <div id="card-association" className="rounded-2xl mb-8 overflow-hidden border border-indigo-200/60 shadow-xl shadow-indigo-900/5 bg-gradient-to-b from-white to-indigo-50/30">
           <div className="relative">
             <button
               type="button"
@@ -1415,15 +1520,15 @@ function DetailsContent() {
               onClick={() => setOpenCard(openCard === 'association' ? null : 'association')}
               aria-expanded={openCard === 'association'}
             >
-              <span className="flex items-center justify-center rounded-full h-16 w-16 bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/25 mb-2 ring-4 ring-emerald-100">
+              <span className="flex items-center justify-center rounded-full h-16 w-16 bg-gradient-to-br from-indigo-400 to-indigo-600 shadow-lg shadow-indigo-500/25 mb-2 ring-4 ring-indigo-100">
                 <FaUsers className="text-white text-3xl" />
               </span>
-              <span className="text-xl font-bold bg-gradient-to-l from-emerald-700 to-emerald-600 bg-clip-text text-transparent">اتحاد الملاك</span>
-              <span className="mt-2 text-emerald-500">{openCard === 'association' ? <FaChevronUp className="text-emerald-500" /> : <FaChevronDown className="text-emerald-500" />}</span>
+              <span className="text-xl font-bold bg-gradient-to-l from-indigo-700 to-indigo-600 bg-clip-text text-transparent">اتحاد الملاك</span>
+              <span className="mt-2 text-indigo-500">{openCard === 'association' ? <FaChevronUp className="text-indigo-500" /> : <FaChevronDown className="text-indigo-500" />}</span>
             </button>
             {openCard === 'association' && canEditCard('association') && (
               <button
-                className="absolute top-4 left-4 bg-emerald-100 text-emerald-700 rounded-full p-2 border border-emerald-300 hover:bg-emerald-200 transition"
+                className="absolute top-4 left-4 bg-indigo-100 text-indigo-700 rounded-full p-2 border border-indigo-300 hover:bg-indigo-200 transition"
                 onClick={() => setIsEditingAssociationCard(v => !v)}
                 title={isEditingAssociationCard ? 'إغلاق التعديل' : 'تعديل اتحاد الملاك'}
               >
@@ -1433,8 +1538,8 @@ function DetailsContent() {
           </div>
           {openCard === 'association' && building && (
             <div className="px-5 pb-5">
-              <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-3 shadow-sm mb-4">
-                <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2">حالة الاتحاد</p>
+              <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-3 shadow-sm mb-4">
+                <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-2">حالة الاتحاد</p>
                 <div className="flex items-center gap-3">
                   <div className={`relative w-14 h-7 rounded-full transition-colors cursor-pointer ${associationEdit.hasAssociation ? 'bg-amber-600' : 'bg-gray-200'}`} onClick={() => { const next = !associationEdit.hasAssociation; setAssociationEdit({ ...associationEdit, hasAssociation: next }); if (next) setIsEditingAssociationCard(true); }}>
                     <div className="absolute top-0.5 right-0.5 bg-white border border-gray-300 rounded-full h-6 w-6 transition-transform" style={{ transform: associationEdit.hasAssociation ? 'translateX(-28px)' : 'translateX(0)' }} />
@@ -1442,90 +1547,90 @@ function DetailsContent() {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">اسم مسؤول الاتحاد</p>
+                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">اسم مسؤول الاتحاد</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-emerald-500 rounded-none" type="text" value={associationEdit.managerName ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, managerName: e.target.value })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="text" value={associationEdit.managerName ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, managerName: e.target.value })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.managerName || '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">رقم تسجيل الاتحاد</p>
+                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">رقم تسجيل الاتحاد</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-emerald-500 rounded-none" type="text" value={associationEdit.registrationNumber ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, registrationNumber: e.target.value })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="text" value={associationEdit.registrationNumber ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, registrationNumber: e.target.value })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.registrationNumber || '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">رقم الحساب</p>
+                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">رقم الحساب</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-emerald-500 rounded-none" type="text" value={associationEdit.accountNumber ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, accountNumber: e.target.value })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="text" value={associationEdit.accountNumber ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, accountNumber: e.target.value })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.accountNumber || '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">رقم IBAN</p>
+                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">رقم IBAN</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-emerald-500 rounded-none" type="text" value={associationEdit.iban ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, iban: e.target.value })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="text" value={associationEdit.iban ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, iban: e.target.value })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.iban || '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">رقم التواصل</p>
+                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">رقم التواصل</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-emerald-500 rounded-none" type="text" value={associationEdit.contactNumber ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, contactNumber: e.target.value })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="text" value={associationEdit.contactNumber ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, contactNumber: e.target.value })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.contactNumber || '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">عدد الوحدات المسجلة</p>
+                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">عدد الوحدات المسجلة</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-emerald-500 rounded-none" type="number" value={associationEdit.registeredUnitsCount ?? 0} onChange={e => setAssociationEdit({ ...associationEdit, registeredUnitsCount: Number(e.target.value) })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="number" value={associationEdit.registeredUnitsCount ?? 0} onChange={e => setAssociationEdit({ ...associationEdit, registeredUnitsCount: Number(e.target.value) })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.registeredUnitsCount ?? '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">تاريخ البداية</p>
+                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">تاريخ البداية</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-emerald-500 rounded-none" type="date" value={associationEdit.startDate ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, startDate: e.target.value })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="date" value={associationEdit.startDate ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, startDate: e.target.value })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.startDate || '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">تاريخ النهاية</p>
+                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">تاريخ النهاية</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-emerald-500 rounded-none" type="date" value={associationEdit.endDate ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, endDate: e.target.value })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="date" value={associationEdit.endDate ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, endDate: e.target.value })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.endDate || '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">الرسوم الشهرية</p>
+                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">الرسوم الشهرية</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-emerald-500 rounded-none" type="number" value={associationEdit.monthlyFee ?? 0} onChange={e => setAssociationEdit({ ...associationEdit, monthlyFee: Number(e.target.value) })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="number" value={associationEdit.monthlyFee ?? 0} onChange={e => setAssociationEdit({ ...associationEdit, monthlyFee: Number(e.target.value) })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.monthlyFee ?? '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm col-span-2">
-                  <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2">يشمل الماء / يشمل الكهرباء</p>
+                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm col-span-2">
+                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-2">يشمل الماء / يشمل الكهرباء</p>
                   <div className="flex items-center gap-6">
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-700">يشمل الماء</span>
-                      <div className={`relative w-14 h-7 rounded-full transition-colors cursor-pointer ${associationEdit.includesWater ? 'bg-amber-600' : 'bg-gray-200'}`} onClick={() => setAssociationEdit({ ...associationEdit, includesWater: !associationEdit.includesWater })}>
+                      <div className={`relative w-14 h-7 rounded-full transition-colors cursor-pointer ${associationEdit.includesWater ? 'bg-indigo-600' : 'bg-gray-200'}`} onClick={() => setAssociationEdit({ ...associationEdit, includesWater: !associationEdit.includesWater })}>
                         <div className="absolute top-0.5 right-0.5 bg-white border border-gray-300 rounded-full h-6 w-6 transition-transform" style={{ transform: associationEdit.includesWater ? 'translateX(-28px)' : 'translateX(0)' }} />
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-700">يشمل الكهرباء</span>
-                      <div className={`relative w-14 h-7 rounded-full transition-colors cursor-pointer ${associationEdit.includesElectricity ? 'bg-amber-600' : 'bg-gray-200'}`} onClick={() => setAssociationEdit({ ...associationEdit, includesElectricity: !associationEdit.includesElectricity })}>
+                      <div className={`relative w-14 h-7 rounded-full transition-colors cursor-pointer ${associationEdit.includesElectricity ? 'bg-indigo-600' : 'bg-gray-200'}`} onClick={() => setAssociationEdit({ ...associationEdit, includesElectricity: !associationEdit.includesElectricity })}>
                         <div className="absolute top-0.5 right-0.5 bg-white border border-gray-300 rounded-full h-6 w-6 transition-transform" style={{ transform: associationEdit.includesElectricity ? 'translateX(-28px)' : 'translateX(0)' }} />
                       </div>
                     </div>
@@ -1535,7 +1640,7 @@ function DetailsContent() {
                 {isEditingAssociationCard && (
                   <div className="col-span-2 flex gap-4 mt-2">
                   <button
-                    className="px-5 py-2 bg-gradient-to-br from-emerald-500 to-emerald-700 text-white rounded-xl shadow-lg hover:from-emerald-600 hover:to-emerald-800 transition text-sm font-bold border-0"
+                    className="px-5 py-2 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white rounded-xl shadow-lg hover:from-indigo-600 hover:to-indigo-800 transition text-sm font-bold border-0"
                     onClick={async () => {
                       const { error } = await supabase
                         .from('buildings')
@@ -1581,18 +1686,24 @@ function DetailsContent() {
           </div>
           {openCard === 'engineering' && building && (
             <div className="px-5 pb-5">
-              <div className="rounded-xl bg-white/90 border border-teal-100 px-4 py-4 shadow-sm flex flex-col items-center justify-center">
-                <div className="flex flex-wrap gap-3 justify-center">
+              <div className="rounded-xl bg-white/95 border border-teal-100 px-5 py-5 shadow-md flex flex-col items-center justify-center gap-4">
+                <div className="flex flex-wrap gap-3 justify-center items-stretch">
                   {can('deeds') && (
-                  <button className="px-4 py-2 bg-white border border-teal-200 text-teal-700 rounded-xl hover:bg-teal-50 transition text-sm font-bold" onClick={() => router.push(`/building-deeds?buildingId=${building.id}`)}>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 px-4 py-3.5 bg-white border border-teal-200 text-teal-700 rounded-xl hover:bg-teal-50 hover:border-teal-300 transition text-sm font-bold shadow-sm"
+                    onClick={() => router.push(`/building-deeds?buildingId=${building.id}`)}
+                  >
+                    <FileText className="w-4 h-4 text-teal-600" />
                     الصكوك ومحاضر الفرز
                   </button>
                   )}
                   <button
                     type="button"
-                    className="px-4 py-2 bg-white border border-teal-200 text-teal-700 rounded-xl hover:bg-teal-50 transition text-sm font-bold"
+                    className="inline-flex items-center gap-2 px-4 py-3 bg-white border border-teal-200 text-teal-700 rounded-xl hover:bg-teal-50 transition text-sm font-bold"
                     onClick={() => router.push(`/dashboard/buildings/documents?buildingId=${building.id}`)}
                   >
+                    <Ruler className="w-4 h-4 text-teal-600" />
                     الخرائط الهندسيه ومستندات المبنى
                   </button>
                 </div>
@@ -1630,12 +1741,12 @@ function DetailsContent() {
                   <p className="text-slate-500 text-sm py-4">لا توجد وحدات مسجلة لهذا المبنى.</p>
                 ) : (
                   <div className="overflow-x-auto rounded-lg border border-amber-100">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm table-fixed">
                     <thead>
                       <tr className="bg-gradient-to-r from-amber-50 to-yellow-50 text-slate-700 border-b border-slate-200">
-                        <th className="px-4 py-3 text-right font-semibold">رقم الوحدة</th>
-                        <th className="px-4 py-3 text-right font-semibold">الدور</th>
-                        <th className="px-4 py-3 text-right font-semibold">رقم عداد الكهرباء</th>
+                        <th className="px-4 py-3 text-right font-semibold w-auto">رقم الوحدة</th>
+                        <th className="px-4 py-3 text-right font-semibold w-auto">الدور</th>
+                        <th className="px-4 py-3 text-right font-semibold w-[55%]">رقم عداد الكهرباء</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1643,48 +1754,36 @@ function DetailsContent() {
                         <tr key={unit.id} className="border-b border-slate-100 hover:bg-slate-50/50" data-seq={index + 1}>
                           <td className="px-4 py-3 text-slate-800 font-medium">{unit.unit_number}</td>
                           <td className="px-4 py-3 text-slate-700">{unit.floor}</td>
-                          <td className="px-4 py-3">
-                            {editingMeter === unit.id && canEditCard('electricity') ? (
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="text"
-                                  value={meterDraft ?? ''}
-                                  onChange={(e) => setMeterDraft(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") saveUnitMeter(unit.id, meterDraft);
-                                    if (e.key === "Escape") { setEditingMeter(null); setMeterDraft(""); }
-                                  }}
-                                  className="flex-1 min-w-0 rounded-lg border border-amber-300 px-3 py-1.5 text-sm focus:ring-2 focus:ring-amber-400"
-                                  autoFocus
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => saveUnitMeter(unit.id, meterDraft)}
-                                  className="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600"
-                                >
-                                  حفظ
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => { setEditingMeter(null); setMeterDraft(""); }}
-                                  className="px-2 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs hover:bg-slate-200"
-                                >
-                                  إلغاء
-                                </button>
+                          <td className="px-4 py-3 w-[55%]">
+                            {editingMeter === unit.id && canEditCard('electricity') && !(unit.status === 'sold' && unit.electricity_meter_transferred_with_sale) ? (
+                              <div className="w-full px-3 py-2 rounded-lg border border-dashed border-amber-200 bg-white/50">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    value={meterDraft ?? ''}
+                                    onChange={(e) => setMeterDraft(e.target.value.toUpperCase())}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") saveUnitMeter(unit.id, meterDraft);
+                                      if (e.key === "Escape") { setEditingMeter(null); setMeterDraft(""); }
+                                    }}
+                                    className="flex-1 min-w-0 rounded-lg border border-amber-300 px-3 py-1.5 text-sm focus:outline-none focus:border-amber-400 uppercase font-mono"
+                                    autoFocus
+                                  />
+                                  <button type="button" onClick={() => saveUnitMeter(unit.id, meterDraft)} className="shrink-0 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600">حفظ</button>
+                                  <button type="button" onClick={() => { setEditingMeter(null); setMeterDraft(""); }} className="shrink-0 px-2 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs hover:bg-slate-200">إلغاء</button>
+                                </div>
                               </div>
-                            ) : canEditCard('electricity') ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingMeter(unit.id);
-                                  setMeterDraft(unit.electricity_meter_number || "");
-                                }}
-                                className="text-right w-full px-3 py-2 rounded-lg border border-dashed border-slate-200 text-slate-600 hover:border-amber-400 hover:bg-amber-50/50 hover:text-slate-800 transition text-sm font-mono"
-                              >
-                                {unit.electricity_meter_number || "إضافة رقم العداد"}
+                            ) : canEditCard('electricity') && !(unit.status === 'sold' && unit.electricity_meter_transferred_with_sale) ? (
+                              <button type="button" onClick={() => { setEditingMeter(unit.id); setMeterDraft((unit.electricity_meter_number || "").toUpperCase()); }} className="text-right w-full px-3 py-2 rounded-lg border border-dashed border-slate-200 text-slate-600 hover:border-amber-400 hover:bg-amber-50/50 hover:text-slate-800 transition text-sm font-mono uppercase">
+                                {(unit.electricity_meter_number || "إضافة رقم العداد").toUpperCase()}
                               </button>
                             ) : (
-                              <span className="text-slate-600 font-mono text-sm">{unit.electricity_meter_number || "—"}</span>
+                              <div className="text-right w-full px-3 py-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/30 text-slate-600 font-mono text-sm uppercase" title={unit.status === 'sold' && unit.electricity_meter_transferred_with_sale ? "تم نقل الملكية — غير قابل للتعديل" : undefined}>
+                                <span className="flex items-center justify-between gap-2 w-full">
+                                  <span>{(unit.electricity_meter_number || "—").toUpperCase()}</span>
+                                  {unit.status === 'sold' && unit.electricity_meter_transferred_with_sale && <span className="text-[10px] text-amber-600">تم نقل الملكية</span>}
+                                </span>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -1696,6 +1795,281 @@ function DetailsContent() {
               </div>
             </div>
           )}
+        </div>
+        )}
+
+        {/* كارد غرف السائق قابل للطي */}
+        {can('details_driver_rooms') && (
+        <div id="card-driver-rooms" className="rounded-2xl mb-8 overflow-hidden border border-sky-200/60 shadow-xl shadow-sky-900/5 bg-gradient-to-b from-white to-sky-50/30">
+          <div className="relative">
+            <button
+              type="button"
+              className="flex flex-col items-center w-full focus:outline-none pt-5 pb-3 cursor-pointer select-none hover:opacity-95 transition-opacity"
+              onClick={() => setOpenCard(openCard === 'driver_rooms' ? null : 'driver_rooms')}
+              aria-expanded={openCard === 'driver_rooms'}
+            >
+              <span className="flex items-center justify-center rounded-full h-16 w-16 bg-gradient-to-br from-sky-400 to-sky-600 shadow-lg shadow-sky-500/25 mb-2 ring-4 ring-sky-100">
+                <FaCar className="text-white text-3xl" />
+              </span>
+              <span className="text-xl font-bold bg-gradient-to-l from-sky-700 to-sky-600 bg-clip-text text-transparent">غرف السائق</span>
+              <span className="mt-2 text-sky-500">{openCard === 'driver_rooms' ? <FaChevronUp className="text-sky-500" /> : <FaChevronDown className="text-sky-500" />}</span>
+            </button>
+          </div>
+          {openCard === 'driver_rooms' && building && (
+            <div className="px-5 pb-5">
+              <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-4 shadow-sm">
+                {unitsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin w-8 h-8 border-2 border-sky-400 border-t-transparent rounded-full" />
+                  </div>
+                ) : units.length === 0 ? (
+                  <p className="text-slate-500 text-sm py-4">لا توجد وحدات مسجلة لهذا المبنى.</p>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border border-sky-100">
+                  <table className="w-full text-sm table-fixed">
+                    <thead>
+                      <tr className="bg-gradient-to-r from-sky-50 to-sky-50/80 text-slate-700 border-b border-slate-200">
+                        <th className="px-4 py-3 text-right font-semibold w-auto">رقم الوحدة</th>
+                        <th className="px-4 py-3 text-right font-semibold w-auto">الدور</th>
+                        <th className="px-4 py-3 text-right font-semibold w-[55%]">رقم غرفة السائق</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {units.map((unit, index) => (
+                        <tr key={unit.id} className="border-b border-slate-100 hover:bg-slate-50/50" data-seq={index + 1}>
+                          <td className="px-4 py-3 text-slate-800 font-medium">{unit.unit_number}</td>
+                          <td className="px-4 py-3 text-slate-700">{unit.floor}</td>
+                          <td className="px-4 py-3 w-[55%]">
+                            {editingDriverRoom === unit.id && canEditCard('driver_rooms') && !(unit.status === 'sold' && unit.driver_room_transferred_with_sale) ? (
+                              <div className="w-full px-3 py-2 rounded-lg border border-dashed border-sky-200 bg-white/50">
+                                <div className="flex items-center gap-2">
+                                  <input type="text" value={driverRoomDraft ?? ''} onChange={(e) => setDriverRoomDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveUnitDriverRoom(unit.id, driverRoomDraft); if (e.key === "Escape") { setEditingDriverRoom(null); setDriverRoomDraft(""); } }} className="flex-1 min-w-0 rounded-lg border border-sky-300 px-3 py-1.5 text-sm focus:outline-none focus:border-sky-400" autoFocus />
+                                  <button type="button" onClick={() => saveUnitDriverRoom(unit.id, driverRoomDraft)} className="shrink-0 px-3 py-1.5 rounded-lg bg-sky-500 text-white text-xs font-semibold hover:bg-sky-600">حفظ</button>
+                                  <button type="button" onClick={() => { setEditingDriverRoom(null); setDriverRoomDraft(""); }} className="shrink-0 px-2 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs hover:bg-slate-200">إلغاء</button>
+                                </div>
+                              </div>
+                            ) : canEditCard('driver_rooms') && !(unit.status === 'sold' && unit.driver_room_transferred_with_sale) ? (
+                              <button type="button" onClick={() => { setEditingDriverRoom(unit.id); setDriverRoomDraft(unit.driver_room_number || ""); }} className="text-right w-full px-3 py-2 rounded-lg border border-dashed border-slate-200 text-slate-600 hover:border-sky-400 hover:bg-sky-50/50 hover:text-slate-800 transition text-sm">
+                                {unit.driver_room_number || "إضافة رقم غرفة السائق"}
+                              </button>
+                            ) : (
+                              <div className="text-right w-full px-3 py-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/30 text-slate-600 text-sm">
+                                <span className="flex items-center justify-between gap-2 w-full">
+                                  <span>{unit.driver_room_number || "—"}</span>
+                                  {unit.status === 'sold' && unit.driver_room_transferred_with_sale && <span className="text-[10px] text-sky-600">تم نقل الملكية</span>}
+                                </span>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+        )}
+
+        {/* كارد المصاعد والصيانة */}
+        {can('details_elevators_maintenance') && (
+        <div id="card-elevators-maintenance" className="rounded-2xl mb-8 overflow-hidden border border-emerald-200/60 shadow-xl shadow-emerald-900/5 bg-gradient-to-b from-white to-emerald-50/30">
+          <div className="relative">
+            <button
+              type="button"
+              className="flex flex-col items-center w-full focus:outline-none pt-5 pb-3 cursor-pointer select-none hover:opacity-95 transition-opacity"
+              onClick={() => setOpenCard(openCard === 'elevators_maintenance' ? null : 'elevators_maintenance')}
+              aria-expanded={openCard === 'elevators_maintenance'}
+            >
+              <span className="flex items-center justify-center rounded-full h-16 w-16 bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/25 mb-2 ring-4 ring-emerald-100">
+                <MoveVertical className="text-white w-8 h-8" />
+              </span>
+              <span className="text-xl font-bold bg-gradient-to-l from-emerald-700 to-emerald-600 bg-clip-text text-transparent">المصاعد والصيانة</span>
+              <span className="mt-2 text-emerald-500">{openCard === 'elevators_maintenance' ? <FaChevronUp className="text-emerald-500" /> : <FaChevronDown className="text-emerald-500" />}</span>
+            </button>
+            {openCard === 'elevators_maintenance' && canEditCard('elevators_maintenance') && (
+              <button
+                className="absolute left-4 top-4 text-emerald-500 hover:text-emerald-700 bg-emerald-50 rounded-full p-2 shadow"
+                title={isEditingElevatorMaintenanceCard ? "إلغاء" : "تعديل"}
+                onClick={() => {
+                  if (!isEditingElevatorMaintenanceCard && building) {
+                    setElevatorMaintenanceEdit({
+                      elevator_type: building.elevator_type ?? '',
+                      maintenance_company: building.maintenance_company ?? '',
+                      maintenance_contract_number: building.maintenance_contract_number ?? '',
+                      maintenance_contract_date: building.maintenance_contract_date ?? '',
+                      warranty_months: building.warranty_months ?? '',
+                      last_maintenance_date: building.last_maintenance_date ?? '',
+                      elevator_emergency_phone: building.elevator_emergency_phone ?? '',
+                      elevator_installation_contact_name: building.elevator_installation_contact_name ?? '',
+                    });
+                  }
+                  setIsEditingElevatorMaintenanceCard(v => !v);
+                }}
+              >
+                {isEditingElevatorMaintenanceCard ? <FaChevronUp /> : <FaTools />}
+              </button>
+            )}
+          </div>
+          {openCard === 'elevators_maintenance' && building && (() => {
+            const contractDate = isEditingElevatorMaintenanceCard ? elevatorMaintenanceEdit.maintenance_contract_date : (building.maintenance_contract_date ?? '');
+            const months = isEditingElevatorMaintenanceCard ? (elevatorMaintenanceEdit.warranty_months === '' ? null : Number(elevatorMaintenanceEdit.warranty_months)) : (building.warranty_months ?? null);
+            let warrantyEndDate: string | null = null;
+            if (contractDate && months != null && !Number.isNaN(months) && months > 0) {
+              const d = new Date(contractDate);
+              if (!Number.isNaN(d.getTime())) {
+                d.setMonth(d.getMonth() + months);
+                warrantyEndDate = d.toISOString().slice(0, 10);
+              }
+            }
+            const today = new Date().toISOString().slice(0, 10);
+            const warrantyExpired = warrantyEndDate && warrantyEndDate < today;
+            const warrantyExpiringSoon = warrantyEndDate && warrantyEndDate >= today && warrantyEndDate <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+            return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 px-5 pb-5">
+              {(warrantyExpired || warrantyExpiringSoon) && (
+                <div className={`md:col-span-2 rounded-xl px-4 py-3 text-sm font-medium ${warrantyExpired ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-amber-50 border border-amber-200 text-amber-800'}`}>
+                  {warrantyExpired ? 'انتهى ضمان عقد المصاعد — يفضّل تجديد العقد أو التواصل مع شركة الصيانة.' : `ضمان عقد المصاعد ينتهي قريباً (${warrantyEndDate}) — يفضّل التواصل مع شركة الصيانة.`}
+                </div>
+              )}
+              <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">نوع المصاعد</p>
+                {isEditingElevatorMaintenanceCard ? (
+                  <input
+                    className="w-full bg-transparent border-0 border-b border-dashed border-slate-300 text-slate-800 text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-emerald-500 rounded-none"
+                    type="text"
+                    value={elevatorMaintenanceEdit.elevator_type}
+                    onChange={e => setElevatorMaintenanceEdit({ ...elevatorMaintenanceEdit, elevator_type: e.target.value })}
+                  />
+                ) : (
+                  <p className="text-slate-800 text-sm">{building.elevator_type || "—"}</p>
+                )}
+              </div>
+              <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">اسم شركة المصاعد</p>
+                {isEditingElevatorMaintenanceCard ? (
+                  <input
+                    className="w-full bg-transparent border-0 border-b border-dashed border-slate-300 text-slate-800 text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-emerald-500 rounded-none"
+                    type="text"
+                    value={elevatorMaintenanceEdit.maintenance_company}
+                    onChange={e => setElevatorMaintenanceEdit({ ...elevatorMaintenanceEdit, maintenance_company: e.target.value })}
+                  />
+                ) : (
+                  <p className="text-slate-800 text-sm">{building.maintenance_company || "—"}</p>
+                )}
+              </div>
+              <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">رقم عقد الصيانة</p>
+                {isEditingElevatorMaintenanceCard ? (
+                  <input
+                    className="w-full bg-transparent border-0 border-b border-dashed border-slate-300 text-slate-800 text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-emerald-500 rounded-none"
+                    type="text"
+                    value={elevatorMaintenanceEdit.maintenance_contract_number}
+                    onChange={e => setElevatorMaintenanceEdit({ ...elevatorMaintenanceEdit, maintenance_contract_number: e.target.value })}
+                  />
+                ) : (
+                  <p className="text-slate-800 text-sm">{building.maintenance_contract_number || "—"}</p>
+                )}
+              </div>
+              <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">تاريخ العقد</p>
+                {isEditingElevatorMaintenanceCard ? (
+                  <input
+                    className="w-full bg-transparent border-0 border-b border-dashed border-slate-300 text-slate-800 text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-emerald-500 rounded-none"
+                    type="date"
+                    value={elevatorMaintenanceEdit.maintenance_contract_date}
+                    onChange={e => setElevatorMaintenanceEdit({ ...elevatorMaintenanceEdit, maintenance_contract_date: e.target.value })}
+                  />
+                ) : (
+                  <p className="text-slate-800 text-sm">{building.maintenance_contract_date || "—"}</p>
+                )}
+              </div>
+              <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">مدة الضمان (شهر)</p>
+                {isEditingElevatorMaintenanceCard ? (
+                  <>
+                    <input
+                      className="w-full bg-transparent border-0 border-b border-dashed border-slate-300 text-slate-800 text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-emerald-500 rounded-none"
+                      type="number"
+                      min={1}
+                      value={elevatorMaintenanceEdit.warranty_months === '' ? '' : elevatorMaintenanceEdit.warranty_months}
+                      onChange={e => setElevatorMaintenanceEdit({ ...elevatorMaintenanceEdit, warranty_months: e.target.value === '' ? '' : Number(e.target.value) })}
+                    />
+                    {warrantyEndDate && <p className="text-xs text-emerald-600 mt-1">ينتهي في: {warrantyEndDate}</p>}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-slate-800 text-sm">{building.warranty_months != null ? `${building.warranty_months} شهر` : "—"}</p>
+                    {warrantyEndDate && <p className="text-xs text-emerald-600 mt-1">ينتهي في: {warrantyEndDate}</p>}
+                  </>
+                )}
+              </div>
+              <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">تاريخ آخر صيانة</p>
+                {isEditingElevatorMaintenanceCard ? (
+                  <input
+                    className="w-full bg-transparent border-0 border-b border-dashed border-slate-300 text-slate-800 text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-emerald-500 rounded-none"
+                    type="date"
+                    value={elevatorMaintenanceEdit.last_maintenance_date}
+                    onChange={e => setElevatorMaintenanceEdit({ ...elevatorMaintenanceEdit, last_maintenance_date: e.target.value })}
+                  />
+                ) : (
+                  <p className="text-slate-800 text-sm">{building.last_maintenance_date || "—"}</p>
+                )}
+              </div>
+              <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">رقم مسؤول التركيب</p>
+                {isEditingElevatorMaintenanceCard ? (
+                  <input
+                    className="w-full bg-transparent border-0 border-b border-dashed border-slate-300 text-slate-800 text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-emerald-500 rounded-none placeholder:text-slate-400 placeholder:text-[10px]"
+                    type="text"
+                    placeholder="مندوب التركيب / موظف الشركة"
+                    value={elevatorMaintenanceEdit.elevator_emergency_phone}
+                    onChange={e => setElevatorMaintenanceEdit({ ...elevatorMaintenanceEdit, elevator_emergency_phone: e.target.value })}
+                  />
+                ) : (
+                  <p className={`text-sm ${building.elevator_emergency_phone ? 'text-slate-800' : 'text-slate-400 text-[10px] font-normal border-0 border-b border-dashed border-slate-300 py-0.5'}`}>{building.elevator_emergency_phone || 'مندوب التركيب / موظف الشركة'}</p>
+                )}
+              </div>
+              <div className="rounded-xl bg-white/90 border border-emerald-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">اسم مسؤول التركيب</p>
+                {isEditingElevatorMaintenanceCard ? (
+                  <input
+                    className="w-full bg-transparent border-0 border-b border-dashed border-slate-300 text-slate-800 text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-emerald-500 rounded-none placeholder:text-slate-400 placeholder:text-[10px]"
+                    type="text"
+                    placeholder="مندوب التركيب / موظف الشركة"
+                    value={elevatorMaintenanceEdit.elevator_installation_contact_name}
+                    onChange={e => setElevatorMaintenanceEdit({ ...elevatorMaintenanceEdit, elevator_installation_contact_name: e.target.value })}
+                  />
+                ) : (
+                  <p className={`text-sm ${building.elevator_installation_contact_name ? 'text-slate-800' : 'text-slate-400 text-[10px] font-normal border-0 border-b border-dashed border-slate-300 py-0.5'}`}>{building.elevator_installation_contact_name || 'مندوب التركيب / موظف الشركة'}</p>
+                )}
+              </div>
+              {isEditingElevatorMaintenanceCard && (
+                <div className="md:col-span-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={saveElevatorMaintenance}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 text-white text-sm font-medium shadow hover:bg-emerald-600"
+                  >
+                    <Check className="w-4 h-4" />
+                    حفظ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingElevatorMaintenanceCard(false)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm hover:bg-slate-50"
+                  >
+                    <X className="w-4 h-4" />
+                    إلغاء
+                  </button>
+                </div>
+              )}
+            </div>
+            );
+          })()}
         </div>
         )}
 

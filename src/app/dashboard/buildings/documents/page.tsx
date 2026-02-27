@@ -18,6 +18,9 @@ import {
   Eye,
   ChevronLeft,
   FolderInput,
+  Check,
+  Search,
+  RotateCcw,
 } from "lucide-react";
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
 
@@ -42,6 +45,7 @@ interface BuildingDocument {
   created_at: string;
 }
 
+/** مجلدات افتراضية لمكتب هندسي — تتبع تسلسل العمل من التصميم إلى التنفيذ والتراخيص */
 const DEFAULT_FOLDER_NAMES = [
   "1- النموذج الإنشائي للأساسات",
   "2- مذكرة حساب التصميم الإنشائي",
@@ -51,13 +55,22 @@ const DEFAULT_FOLDER_NAMES = [
   "6- المخطط الرئيسي",
   "7- بند الكميات",
   "8- تقرير التربة",
+  "9- كروكي الواجهات",
+  "10- المخططات الكهربائية والسباكة",
   "PDF تنفيذي",
   "نماذج كروكيات غير معتمدة",
+  "مراسلات واعتمادات المكتب",
+  "مستندات تراخيص البناء والهدم",
 ];
 
 function isPdf(type: string | null, fileName: string): boolean {
   if (type?.toLowerCase()?.includes("pdf")) return true;
   return fileName?.toLowerCase()?.endsWith(".pdf") ?? false;
+}
+
+/** إخفاء الترقيم من أول الاسم للعرض فقط (مثل "1- " أو "10- ") */
+function stripNumbering(name: string): string {
+  return name.replace(/^\d+-\s*/, "");
 }
 
 export default function BuildingDocumentsPage() {
@@ -81,14 +94,54 @@ export default function BuildingDocumentsPage() {
   const [confirmDelete, setConfirmDelete] = useState<{ type: "folder"; folder: BuildingFolder } | { type: "document"; doc: BuildingDocument } | null>(null);
   const [moveFolder, setMoveFolder] = useState<BuildingFolder | null>(null);
   const [moveDocument, setMoveDocument] = useState<BuildingDocument | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState<string | null>(null);
   const [downloadLoading, setDownloadLoading] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [selectedFolderIds, setSelectedFolderIds] = useState<Set<string>>(new Set());
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
+  const [allBuildingDocuments, setAllBuildingDocuments] = useState<BuildingDocument[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [docMenuPlacement, setDocMenuPlacement] = useState<{ top: number; left?: number; right?: number } | null>(null);
+  const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
+  const [restoringDefault, setRestoringDefault] = useState(false);
+  const [confirmBulkDeleteOpen, setConfirmBulkDeleteOpen] = useState(false);
   const supabase = createClient();
+
+  /** وضع القائمة مرن: فوق/تحت/يمين/يسار حسب المساحة في الشاشة (fixed + إحداثيات محسوبة) */
+  const openDocMenu = (docId: string, ev: React.MouseEvent) => {
+    const target = ev.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    const menuW = 200;
+    const menuH = 160;
+    const w = typeof window !== "undefined" ? window.innerWidth : 0;
+    const h = typeof window !== "undefined" ? window.innerHeight : 0;
+    const gap = 4;
+    let top: number;
+    if (rect.bottom + menuH + gap <= h) {
+      top = rect.bottom + gap;
+    } else if (rect.top - menuH - gap >= 0) {
+      top = rect.top - menuH - gap;
+    } else {
+      top = Math.max(gap, Math.min(rect.bottom + gap, h - menuH - gap));
+    }
+    let left: number | undefined;
+    let right: number | undefined;
+    if (rect.left + menuW <= w && rect.left >= 0) {
+      left = rect.left;
+    } else if (rect.right - menuW >= 0) {
+      right = w - rect.right;
+    } else {
+      left = Math.max(0, Math.min(rect.left, w - menuW));
+    }
+    setDocMenuPlacement({ top, ...(right != null ? { right } : { left: left ?? 0 }) });
+    setMenuOpen(menuOpen === docId ? null : docId);
+  };
 
   const canAccess = ready && can("details_engineering");
   const canUpload = can("documents_upload");
-  const canCreateFolder = can("documents_create_folder");
+  const canEditFolders = can("documents_edit_folders");
+  const canCreateFolder = can("documents_create_folder") && canEditFolders;
   const canDelete = can("documents_delete");
 
   const loadBuilding = useCallback(async () => {
@@ -127,6 +180,45 @@ export default function BuildingDocumentsPage() {
     if (!error) setDocuments(data || []);
   }, [buildingId, currentFolderId, supabase]);
 
+  const loadAllDocumentsForBuilding = useCallback(async () => {
+    if (!buildingId) return;
+    const { data: allData, error } = await supabase
+      .from("building_documents")
+      .select("id, building_id, folder_id, file_name, storage_path, file_type, file_size, created_at")
+      .eq("building_id", buildingId)
+      .order("created_at", { ascending: false });
+    if (!error) setAllBuildingDocuments(allData || []);
+  }, [buildingId, supabase]);
+
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setAllBuildingDocuments([]);
+      return;
+    }
+    if (allBuildingDocuments.length > 0) return;
+    let cancelled = false;
+    setSearchLoading(true);
+    loadAllDocumentsForBuilding().then(() => {
+      if (!cancelled) setSearchLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [searchQuery.trim(), loadAllDocumentsForBuilding, allBuildingDocuments.length]);
+
+  /** مسار المجلد كنص (للعرض في نتائج البحث) */
+  const getFolderPathString = useCallback((folderId: string | null): string => {
+    if (!folderId) return "الرئيسية";
+    const path: string[] = [];
+    let id: string | null = folderId;
+    while (id) {
+      const f = folders.find((x) => x.id === id);
+      if (!f) break;
+path.unshift(stripNumbering(f.name));
+    id = f.parent_id;
+    }
+    return path.length ? path.join(" › ") : "الرئيسية";
+  }, [folders]);
+
   useEffect(() => {
     if (!buildingId || !canAccess) {
       setLoading(false);
@@ -152,6 +244,28 @@ export default function BuildingDocumentsPage() {
   const childFolders = folders.filter(
     (f) => (f.parent_id ?? null) === currentFolderId
   );
+
+  const isSearchMode = searchQuery.trim().length >= 2;
+  const searchFilteredDocs = isSearchMode
+    ? allBuildingDocuments.filter((d) =>
+        d.file_name.toLowerCase().includes(searchQuery.trim().toLowerCase())
+      )
+    : [];
+  const displayedDocuments = isSearchMode ? searchFilteredDocs : documents;
+
+  /** مسار المجلدات من الرئيسية إلى المجلد الحالي (للـ breadcrumb) */
+  const folderPathToCurrent = ((): BuildingFolder[] => {
+    if (!currentFolderId) return [];
+    const path: BuildingFolder[] = [];
+    let id: string | null = currentFolderId;
+    while (id) {
+      const f = folders.find((x) => x.id === id);
+      if (!f) break;
+      path.unshift(f);
+      id = f.parent_id;
+    }
+    return path;
+  })();
 
   const createFolder = async (parentId: string | null, name: string) => {
     if (!buildingId || !name.trim()) return;
@@ -184,6 +298,51 @@ export default function BuildingDocumentsPage() {
     }
     setCreatingDefault(false);
     loadFolders();
+  };
+
+  /** استعادة المجلدات الافتراضية المحذوفة فقط (فارغة) بنفس الترتيب */
+  const restoreDefaultFolders = async () => {
+    if (!buildingId) return;
+    setRestoringDefault(true);
+    const rootFolders = folders.filter((f) => f.parent_id === null);
+    const existingNames = new Set(rootFolders.map((f) => f.name));
+    for (let i = 0; i < DEFAULT_FOLDER_NAMES.length; i++) {
+      const name = DEFAULT_FOLDER_NAMES[i];
+      if (!existingNames.has(name)) {
+        await supabase.from("building_folders").insert({
+          building_id: buildingId,
+          parent_id: null,
+          name,
+          sort_order: i + 1,
+        });
+      }
+    }
+    setRestoringDefault(false);
+    setRestoreConfirmOpen(false);
+    loadFolders();
+  };
+
+  const executeBulkDelete = async () => {
+    const docIdsToDelete = new Set(selectedDocumentIds);
+    for (const folderId of selectedFolderIds) {
+      const docsInFolder = documents.filter((d) => d.folder_id === folderId);
+      docsInFolder.forEach((d) => docIdsToDelete.add(d.id));
+    }
+    for (const id of docIdsToDelete) {
+      const doc = documents.find((d) => d.id === id);
+      if (doc) {
+        await supabase.storage.from(BUCKET).remove([doc.storage_path]);
+        await supabase.from("building_documents").delete().eq("id", id);
+      }
+    }
+    for (const id of selectedFolderIds) {
+      await supabase.from("building_folders").delete().eq("id", id);
+    }
+    setSelectedFolderIds(new Set());
+    setSelectedDocumentIds(new Set());
+    setConfirmBulkDeleteOpen(false);
+    loadFolders();
+    loadDocuments();
   };
 
   const updateFolderName = async () => {
@@ -297,7 +456,7 @@ export default function BuildingDocumentsPage() {
   };
 
   const openPreview = async (doc: BuildingDocument) => {
-    setPreviewLoading(true);
+    setPreviewLoading(doc.id);
     try {
       if (!isPdf(doc.file_type, doc.file_name)) {
         const url = await getSignedUrl(doc);
@@ -309,7 +468,7 @@ export default function BuildingDocumentsPage() {
       setPreviewUrl(URL.createObjectURL(blob));
       setPreviewDoc(doc);
     } finally {
-      setPreviewLoading(false);
+      setPreviewLoading(null);
     }
   };
 
@@ -370,27 +529,28 @@ export default function BuildingDocumentsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-sky-50/40 p-4 sm:p-6" dir="rtl">
       <div className="max-w-4xl mx-auto">
-        <header className="flex flex-wrap items-center gap-3 mb-6">
-          <Link
-            href={`/dashboard/buildings/details?buildingId=${buildingId}#card-engineering`}
-            className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-teal-200 text-teal-700 hover:bg-teal-50"
-          >
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-teal-500 flex items-center justify-center">
+        <header className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-teal-500 flex items-center justify-center flex-shrink-0">
               <Building2 className="w-5 h-5 text-white" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-800">
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold text-slate-800 truncate">
                 خرائط ومستندات العمارة — {building?.name ?? buildingId}
               </h1>
-              <p className="text-sm text-slate-500">مجلدات افتراضية وملفات (PDF معاينة فقط)</p>
+              <p className="text-sm text-slate-500">مجلدات وملفات المشروع</p>
             </div>
           </div>
+          <Link
+            href={`/dashboard/buildings/details?buildingId=${buildingId}#card-engineering`}
+            className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-teal-200 text-teal-700 hover:bg-teal-50 transition-colors flex-shrink-0"
+            title="رجوع إلى تفاصيل المبنى"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </Link>
         </header>
 
-        {/* Breadcrumb — الرئيسية منطقة إفلات عند السحب */}
+        {/* Breadcrumb — مسار المجلدات بالكامل + منطقة إفلات عند السحب */}
         <nav className="flex flex-wrap items-center gap-2 mb-4 text-sm">
           <span
             className={`inline-flex items-center rounded-lg px-2 py-1 transition-colors ${currentFolderId && dragOverId === "root" ? "bg-teal-100 ring-1 ring-teal-300" : ""}`}
@@ -427,16 +587,27 @@ export default function BuildingDocumentsPage() {
               الرئيسية
             </button>
           </span>
-          {currentFolder && (
-            <>
-              <ChevronLeft className="w-4 h-4 text-slate-400 rotate-180" />
-              <span className="text-slate-700 font-medium">{currentFolder.name}</span>
-            </>
-          )}
+          {folderPathToCurrent.map((f) => (
+            <span key={f.id} className="flex items-center gap-2">
+              <ChevronLeft className="w-4 h-4 text-slate-400 rotate-180 flex-shrink-0" />
+              {f.id === currentFolderId ? (
+                <span className="text-slate-800 font-medium">{stripNumbering(f.name)}</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setCurrentFolderId(f.id)}
+                  className="text-teal-600 hover:underline"
+                >
+                  {stripNumbering(f.name)}
+                </button>
+              )}
+            </span>
+          ))}
         </nav>
 
         {/* Actions */}
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-col gap-3 mb-4">
+          <div className="flex flex-wrap gap-2">
           {canCreateFolder && folders.filter((f) => f.parent_id === null).length === 0 && (
             <button
               type="button"
@@ -444,7 +615,22 @@ export default function BuildingDocumentsPage() {
               disabled={creatingDefault}
               className="px-4 py-2 bg-amber-100 border border-amber-200 text-amber-800 rounded-xl text-sm font-medium hover:bg-amber-200 disabled:opacity-50"
             >
-              {creatingDefault ? "جاري الإنشاء…" : "إنشاء مجلدات افتراضية"}
+              {creatingDefault ? "جاري الإنشاء…" : "إنشاء مجلدات المشروع"}
+            </button>
+          )}
+          {canCreateFolder && (() => {
+            const rootNames = new Set(folders.filter((f) => f.parent_id === null).map((f) => f.name));
+            const hasMissingDefault = DEFAULT_FOLDER_NAMES.some((name) => !rootNames.has(name));
+            return rootNames.size > 0 && hasMissingDefault;
+          })() && (
+            <button
+              type="button"
+              onClick={() => setRestoreConfirmOpen(true)}
+              className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors"
+              title="استعادة تنظيم الملفات"
+              aria-label="استعادة تنظيم الملفات"
+            >
+              <RotateCcw className="w-4 h-4" />
             </button>
           )}
           {canUpload && (
@@ -495,6 +681,20 @@ export default function BuildingDocumentsPage() {
               </button>
             </div>
           ) : null}
+          </div>
+          <div className="flex items-center min-w-0 flex-1 rounded-xl border border-slate-200 bg-white overflow-hidden focus-within:border-slate-300">
+            <span className="flex items-center justify-center w-10 h-10 flex-shrink-0 text-slate-400 pointer-events-none" aria-hidden>
+              <Search className="w-4 h-4" />
+            </span>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="بحث في كل الملفات والمجلدات…"
+              className="flex-1 min-w-0 py-2.5 pe-2 ps-0 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none bg-transparent border-0"
+              aria-label="بحث في الملفات"
+            />
+          </div>
         </div>
 
         {/* Rename form */}
@@ -516,9 +716,36 @@ export default function BuildingDocumentsPage() {
           </div>
         )}
 
+        {/* شريط حذف المحدد */}
+        {(selectedFolderIds.size > 0 || selectedDocumentIds.size > 0) && (
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4 p-3 bg-teal-50 border border-teal-200 rounded-xl">
+            <span className="text-sm font-medium text-teal-800">
+              محدّد: {selectedFolderIds.size} مجلد، {selectedDocumentIds.size} ملف
+            </span>
+            <div className="flex items-center gap-2">
+              {((selectedFolderIds.size > 0 && canEditFolders && canDelete) || (selectedDocumentIds.size > 0 && canDelete)) && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmBulkDeleteOpen(true)}
+                  className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+                >
+                  <Trash2 className="w-4 h-4 inline-block ml-1 align-middle" /> حذف المحدد
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => { setSelectedFolderIds(new Set()); setSelectedDocumentIds(new Set()); }}
+                className="px-3 py-1.5 bg-white border border-teal-200 text-teal-700 rounded-lg text-sm font-medium hover:bg-teal-50"
+              >
+                إلغاء التحديد
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Folders */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-6">
-          {childFolders.map((f) => (
+          {childFolders.map((f, index) => (
             <div
               key={f.id}
               draggable={canCreateFolder}
@@ -527,7 +754,7 @@ export default function BuildingDocumentsPage() {
                 e.dataTransfer.setData("application/json", JSON.stringify({ type: "folder", id: f.id }));
                 e.dataTransfer.effectAllowed = "move";
               }}
-              className={`relative group rounded-xl border p-4 shadow-sm transition-all ${dragOverId === f.id ? "border-teal-400 bg-teal-50 ring-2 ring-teal-300" : "border-teal-100 bg-white hover:border-teal-200"}`}
+              className={`relative group rounded-xl border p-4 pt-3 shadow-sm transition-all min-h-[100px] flex flex-col ${selectedFolderIds.has(f.id) ? "border-teal-500 bg-teal-50/80 ring-2 ring-teal-300" : dragOverId === f.id ? "border-teal-400 bg-teal-50 ring-2 ring-teal-300" : "border-teal-100 bg-white hover:border-teal-200"}`}
               onDragOver={(e) => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = "move";
@@ -554,60 +781,109 @@ export default function BuildingDocumentsPage() {
                 } catch (_) {}
               }}
             >
+              {/* صف الأيقونات: تحديد (إن وُجد) + النقاط الثلاث — بدون تداخل مع المحتوى */}
+              <div className="flex items-center justify-between gap-1 min-h-[28px] flex-shrink-0 z-10">
+                {selectedFolderIds.size > 0 ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedFolderIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(f.id)) next.delete(f.id);
+                        else next.add(f.id);
+                        return next;
+                      });
+                    }}
+                    className="p-1 rounded-md hover:bg-slate-100 transition-colors text-slate-500"
+                    aria-label={selectedFolderIds.has(f.id) ? "إلغاء التحديد" : "تحديد"}
+                  >
+                    {selectedFolderIds.has(f.id) ? (
+                      <Check className="w-4 h-4 text-teal-600" />
+                    ) : (
+                      <span className="block w-4 h-4 rounded border border-slate-300 bg-white" />
+                    )}
+                  </button>
+                ) : (
+                  <span className="w-6" aria-hidden />
+                )}
+                <button
+                  type="button"
+                  className="p-1.5 rounded-lg opacity-80 group-hover:opacity-100 hover:bg-slate-100 transition-opacity text-slate-500 hover:text-slate-700"
+                  onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === f.id ? null : f.id); }}
+                  aria-label="خيارات المجلد"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </button>
+              </div>
+              {/* المحتوى: أيقونة المجلد (مع الرقم التسلسلي) + الاسم */}
               <button
                 type="button"
-                className="absolute left-2 top-2 p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-slate-100"
-                onClick={() => setMenuOpen(menuOpen === f.id ? null : f.id)}
+                className="flex-1 z-0 w-full flex flex-col items-center justify-center gap-2 text-right rounded-b-xl min-h-0 -m-1 p-1"
+                onClick={() => setCurrentFolderId(f.id)}
               >
-                <MoreVertical className="w-4 h-4 text-slate-500" />
+                <span className="relative inline-flex items-center justify-center flex-shrink-0">
+                  <FolderOpen className="w-9 h-9 text-teal-500" />
+                  <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[2.5px] text-[10px] font-bold text-teal-600 tabular-nums">
+                    {index + 1}
+                  </span>
+                </span>
+                <span className="text-sm font-medium text-slate-800 truncate w-full">{stripNumbering(f.name)}</span>
               </button>
+              {/* القائمة المنسدلة تُعرض فوق المحتوى */}
               {menuOpen === f.id && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} aria-hidden />
-                  <div className="absolute left-2 top-10 z-20 bg-white border rounded-lg shadow-lg py-1 min-w-[140px]">
+                  <div className="fixed inset-0 z-[90]" onClick={() => setMenuOpen(null)} aria-hidden />
+                  <div className="absolute left-0 top-8 z-[100] bg-white border border-slate-200 rounded-xl shadow-xl py-1 min-w-[180px]">
+                    {canEditFolders && (
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 text-right"
+                        onClick={() => {
+                          setRenameFolder(f);
+                          setNewFolderName(f.name);
+                          setMenuOpen(null);
+                        }}
+                      >
+                        <Pencil className="w-4 h-4" /> إعادة تسمية
+                      </button>
+                    )}
+                    {canDelete && canEditFolders && (
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 text-right"
+                        onClick={() => { openDeleteFolderModal(f); setMenuOpen(null); }}
+                      >
+                        <Trash2 className="w-4 h-4" /> حذف
+                      </button>
+                    )}
                     <button
                       type="button"
-                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 text-right"
                       onClick={() => {
-                        setRenameFolder(f);
-                        setNewFolderName(f.name);
+                        setSelectedFolderIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(f.id)) next.delete(f.id);
+                          else next.add(f.id);
+                          return next;
+                        });
                         setMenuOpen(null);
                       }}
                     >
-                      <Pencil className="w-4 h-4" /> إعادة تسمية
+                      <Check className="w-4 h-4" /> {selectedFolderIds.has(f.id) ? "إلغاء التحديد" : "تحديد"}
                     </button>
                     {canCreateFolder && (
                       <button
                         type="button"
-                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                        onClick={() => {
-                          setMoveFolder(f);
-                          setMenuOpen(null);
-                        }}
+                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 text-right"
+                        onClick={() => { setMoveFolder(f); setMenuOpen(null); }}
                       >
                         <FolderInput className="w-4 h-4" /> نقل
-                      </button>
-                    )}
-                    {canDelete && (
-                      <button
-                        type="button"
-                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                        onClick={() => openDeleteFolderModal(f)}
-                      >
-                        <Trash2 className="w-4 h-4" /> حذف
                       </button>
                     )}
                   </div>
                 </>
               )}
-              <button
-                type="button"
-                className="w-full flex flex-col items-center gap-2 text-right"
-                onClick={() => setCurrentFolderId(f.id)}
-              >
-                <FolderOpen className="w-10 h-10 text-teal-500" />
-                <span className="text-sm font-medium text-slate-800 truncate w-full">{f.name}</span>
-              </button>
             </div>
           ))}
         </div>
@@ -618,12 +894,23 @@ export default function BuildingDocumentsPage() {
             الملفات
           </div>
           <ul className="divide-y divide-slate-100">
-            {documents.length === 0 && (
-              <li className="px-4 py-8 text-center text-slate-500 text-sm">
-                لا توجد ملفات في هذا المجلد. استخدم "رفع ملفات" لإضافة PDF أو غيرها.
+            {searchLoading && isSearchMode && (
+              <li className="px-4 py-6 text-center text-slate-500 text-sm flex items-center justify-center gap-2">
+                <span className="inline-block w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                جاري البحث…
               </li>
             )}
-            {documents.map((doc) => (
+            {!searchLoading && isSearchMode && displayedDocuments.length === 0 && (
+              <li className="px-4 py-8 text-center text-slate-500 text-sm">
+                لا توجد نتائج لـ &quot;{searchQuery.trim()}&quot;
+              </li>
+            )}
+            {!searchLoading && !isSearchMode && documents.length === 0 && (
+              <li className="px-4 py-8 text-center text-slate-500 text-sm">
+                لا توجد ملفات في هذا المجلد. استخدم &quot;رفع ملفات&quot; لإضافة PDF أو غيرها.
+              </li>
+            )}
+            {!searchLoading && displayedDocuments.map((doc) => (
               <li
                 key={doc.id}
                 draggable={canCreateFolder}
@@ -632,11 +919,16 @@ export default function BuildingDocumentsPage() {
                   e.dataTransfer.setData("application/json", JSON.stringify({ type: "document", id: doc.id }));
                   e.dataTransfer.effectAllowed = "move";
                 }}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 group"
+                className={`flex items-center gap-3 px-4 py-3 group rounded-lg border ${selectedDocumentIds.has(doc.id) ? "bg-teal-50/80 border-teal-300 ring-1 ring-teal-200" : "hover:bg-slate-50 border-transparent"}`}
               >
-                <FileText className="w-5 h-5 text-slate-400 flex-shrink-0" />
+                {selectedDocumentIds.has(doc.id) ? <Check className="w-5 h-5 text-teal-600 flex-shrink-0" /> : <FileText className="w-5 h-5 text-slate-400 flex-shrink-0" />}
                 <div className="flex-1 min-w-0">
                   <span className="text-sm font-medium text-slate-800 truncate block">{doc.file_name}</span>
+                  {isSearchMode && (
+                    <span className="text-xs text-slate-500 truncate block" title={getFolderPathString(doc.folder_id)}>
+                      {getFolderPathString(doc.folder_id)}
+                    </span>
+                  )}
                   {doc.file_size != null && (
                     <span className="text-xs text-slate-500">
                       {(doc.file_size / 1024).toFixed(1)} ك.ب
@@ -648,11 +940,11 @@ export default function BuildingDocumentsPage() {
                     <button
                       type="button"
                       onClick={() => openPreview(doc)}
-                      disabled={previewLoading}
+                      disabled={previewLoading === doc.id}
                       className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg disabled:opacity-50"
                       title="معاينة"
                     >
-                      {previewLoading ? (
+                      {previewLoading === doc.id ? (
                         <span className="inline-block w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
                       ) : (
                         <Eye className="w-4 h-4" />
@@ -675,34 +967,55 @@ export default function BuildingDocumentsPage() {
                   <div className="relative">
                     <button
                       type="button"
-                      onClick={() => setMenuOpen(menuOpen === doc.id ? null : doc.id)}
+                      onClick={(e) => openDocMenu(doc.id, e)}
                       className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg"
                     >
                       <MoreVertical className="w-4 h-4" />
                     </button>
-                    {menuOpen === doc.id && (
+                    {menuOpen === doc.id && docMenuPlacement && (
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} aria-hidden />
-                        <div className="absolute left-0 top-full mt-1 z-20 bg-white border rounded-lg shadow-lg py-1 min-w-[140px]">
+                        <div
+                          className="fixed z-20 bg-white border border-slate-200 rounded-xl shadow-xl py-1 min-w-[180px]"
+                          style={{
+                            top: docMenuPlacement.top,
+                            ...(docMenuPlacement.right != null ? { right: docMenuPlacement.right } : { left: docMenuPlacement.left ?? 0 }),
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-teal-50 text-right font-medium"
+                            onClick={() => {
+                              setSelectedDocumentIds((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(doc.id)) next.delete(doc.id);
+                                else next.add(doc.id);
+                                return next;
+                              });
+                              setMenuOpen(null);
+                            }}
+                          >
+                            <Check className="w-4 h-4 flex-shrink-0" /> {selectedDocumentIds.has(doc.id) ? "إلغاء التحديد" : "تحديد"}
+                          </button>
                           {canCreateFolder && (
                             <button
                               type="button"
-                              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                              className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 text-right"
                               onClick={() => {
                                 setMoveDocument(doc);
                                 setMenuOpen(null);
                               }}
                             >
-                              <FolderInput className="w-4 h-4" /> نقل
+                              <FolderInput className="w-4 h-4 flex-shrink-0" /> نقل
                             </button>
                           )}
                           {canDelete && (
                             <button
                               type="button"
-                              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                              className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 text-right"
                               onClick={() => openDeleteDocumentModal(doc)}
                             >
-                              <Trash2 className="w-4 h-4" /> حذف
+                              <Trash2 className="w-4 h-4 flex-shrink-0" /> حذف
                             </button>
                           )}
                         </div>
@@ -715,6 +1028,93 @@ export default function BuildingDocumentsPage() {
           </ul>
         </div>
       </div>
+
+      {/* تأكيد استعادة تنظيم الملفات */}
+      {restoreConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200">
+            <div className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-teal-50 flex items-center justify-center">
+                  <RotateCcw className="w-6 h-6 text-teal-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">استعادة تنظيم الملفات</h3>
+                  <p className="text-sm text-slate-600 mt-1">هل تريد استعادة تنظيم الملفات؟</p>
+                </div>
+              </div>
+              <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                إعادة إنشاء المجلدات المحذوفة (فارغة)
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setRestoreConfirmOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 transition"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={restoreDefaultFolders}
+                disabled={restoringDefault}
+                className="px-4 py-2 rounded-xl bg-teal-600 text-white hover:bg-teal-700 transition disabled:opacity-50 inline-flex items-center gap-2"
+              >
+                {restoringDefault ? (
+                  <>
+                    <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    جاري الاستعادة…
+                  </>
+                ) : (
+                  "نعم، استعادة"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* تأكيد حذف المحدد */}
+      {confirmBulkDeleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200">
+            <div className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center">
+                  <Trash2 className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">تأكيد حذف المحدد</h3>
+                  <p className="text-sm text-slate-600">هذا الإجراء نهائي ولا يمكن التراجع عنه</p>
+                </div>
+              </div>
+              <p className="mt-4 rounded-xl border border-red-100 bg-red-50/50 px-4 py-3 text-sm text-slate-700">
+                هل أنت متأكد من حذف {[
+                  selectedFolderIds.size > 0 && `${selectedFolderIds.size} مجلد`,
+                  selectedDocumentIds.size > 0 && `${selectedDocumentIds.size} ملف`,
+                ].filter(Boolean).join(" و")}؟ سيتم حذف محتويات المجلدات أيضاً.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setConfirmBulkDeleteOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 transition"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={executeBulkDelete}
+                className="px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700 transition"
+              >
+                نعم، حذف
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* تأكيد الحذف */}
       {confirmDelete && (
@@ -734,7 +1134,7 @@ export default function BuildingDocumentsPage() {
               </div>
               <div className="mt-4 rounded-xl border border-red-100 bg-red-50/50 px-4 py-3 text-sm text-gray-700">
                 {confirmDelete.type === "folder"
-                  ? <>هل أنت متأكد من حذف المجلد <span className="font-bold text-gray-900">&quot;{confirmDelete.folder.name}&quot;</span> وجميع محتوياته؟</>
+                  ? <>هل أنت متأكد من حذف المجلد <span className="font-bold text-gray-900">&quot;{stripNumbering(confirmDelete.folder.name)}&quot;</span> وجميع محتوياته؟</>
                   : <>هل أنت متأكد من حذف الملف <span className="font-bold text-gray-900">&quot;{confirmDelete.doc.file_name}&quot;</span>؟</>}
               </div>
             </div>
@@ -755,7 +1155,7 @@ export default function BuildingDocumentsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl">
           <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-gray-200">
             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-bold text-gray-900">نقل المجلد &quot;{moveFolder.name}&quot;</h3>
+              <h3 className="font-bold text-gray-900">نقل المجلد &quot;{stripNumbering(moveFolder.name)}&quot;</h3>
               <button type="button" onClick={() => setMoveFolder(null)} className="p-1 text-slate-500 hover:bg-slate-100 rounded-lg">×</button>
             </div>
             <div className="p-4 max-h-64 overflow-y-auto space-y-1">
@@ -773,7 +1173,7 @@ export default function BuildingDocumentsPage() {
                   className="flex items-center gap-2 w-full px-3 py-2 text-right text-sm rounded-lg hover:bg-teal-50 text-slate-700"
                   onClick={() => moveFolderTo(moveFolder, target.id)}
                 >
-                  <FolderOpen className="w-4 h-4 text-teal-500" /> {target.name}
+                  <FolderOpen className="w-4 h-4 text-teal-500" /> {stripNumbering(target.name)}
                 </button>
               ))}
             </div>
@@ -804,7 +1204,7 @@ export default function BuildingDocumentsPage() {
                   className="flex items-center gap-2 w-full px-3 py-2 text-right text-sm rounded-lg hover:bg-teal-50 text-slate-700"
                   onClick={() => moveDocumentTo(moveDocument, target.id)}
                 >
-                  <FolderOpen className="w-4 h-4 text-teal-500" /> {target.name}
+                  <FolderOpen className="w-4 h-4 text-teal-500" /> {stripNumbering(target.name)}
                 </button>
               ))}
             </div>

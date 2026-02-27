@@ -8,6 +8,7 @@ import { useDashboardAuth } from '@/hooks/useDashboardAuth'
 import { showToast } from '@/app/dashboard/buildings/details/toast'
 import {
   ArrowLeft,
+  ArrowRightLeft,
   Activity,
   Plus,
   Edit,
@@ -44,7 +45,7 @@ interface Unit {
 
 interface ActivityItem {
   id: string
-  type: 'add' | 'edit' | 'delete' | 'booking' | 'sold' | 'reserved' | 'association_end' | 'meter_added'
+  type: 'add' | 'edit' | 'delete' | 'booking' | 'sold' | 'reserved' | 'association_end' | 'meter_added' | 'ownership_transferred' | 'reservation_cancelled' | 'deposit_refunded'
   building_name: string
   building_id?: string
   user_name: string
@@ -63,6 +64,9 @@ export default function ActivitiesPage() {
   const [units, setUnits] = useState<Unit[]>([])
   const [reservations, setReservations] = useState<ReservationRow[]>([])
   const [meterAddedLogs, setMeterAddedLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
+  const [ownershipTransferredLogs, setOwnershipTransferredLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
+  const [reservationCancelledLogs, setReservationCancelledLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
+  const [depositRefundedLogs, setDepositRefundedLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
   const [filter, setFilter] = useState<FilterType>('all')
   const router = useRouter()
   const supabase = createClient()
@@ -121,6 +125,30 @@ export default function ActivitiesPage() {
           .order('created_at', { ascending: false })
           .limit(50)
         setMeterAddedLogs((meterLogs || []) as Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>)
+
+        const { data: transferLogs } = await supabase
+          .from('activity_logs')
+          .select('id, action_description, metadata, created_at')
+          .eq('action_type', 'ownership_transferred')
+          .order('created_at', { ascending: false })
+          .limit(50)
+        setOwnershipTransferredLogs((transferLogs || []) as Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>)
+
+        const { data: cancelledLogs } = await supabase
+          .from('activity_logs')
+          .select('id, action_description, metadata, created_at')
+          .eq('action_type', 'reservation_cancelled')
+          .order('created_at', { ascending: false })
+          .limit(50)
+        setReservationCancelledLogs((cancelledLogs || []) as Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>)
+
+        const { data: refundedLogs } = await supabase
+          .from('activity_logs')
+          .select('id, action_description, metadata, created_at')
+          .eq('action_type', 'deposit_refunded')
+          .order('created_at', { ascending: false })
+          .limit(50)
+        setDepositRefundedLogs((refundedLogs || []) as Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>)
       } catch (err) {
         console.error('Error fetching activities:', err)
       } finally {
@@ -239,14 +267,41 @@ export default function ActivitiesPage() {
       timestamp: log.created_at,
       details: log.action_description || 'تم إضافة عداد'
     }))
-    let all = [...fromUnits, ...fromReservations, ...fromExpiredReservations, ...fromBuildings, ...fromAssoc, ...fromMeterAdded]
+    const fromOwnershipTransferred: ActivityItem[] = ownershipTransferredLogs.map(log => ({
+      id: `transfer-${log.id}`,
+      type: 'ownership_transferred' as const,
+      building_name: (log.metadata?.building_name as string) || '—',
+      building_id: (log.metadata?.building_id as string) || undefined,
+      user_name: (log.metadata?.created_by_name as string) || 'النظام',
+      timestamp: log.created_at,
+      details: log.action_description || 'نقل ملكية'
+    }))
+    const fromReservationCancelled: ActivityItem[] = reservationCancelledLogs.map(log => ({
+      id: `cancelled-${log.id}`,
+      type: 'reservation_cancelled' as const,
+      building_name: (log.metadata?.building_name as string) || '—',
+      building_id: (log.metadata?.building_id as string) || undefined,
+      user_name: (log.metadata?.created_by_name as string) || 'النظام',
+      timestamp: log.created_at,
+      details: log.action_description || 'إلغاء حجز'
+    }))
+    const fromDepositRefunded: ActivityItem[] = depositRefundedLogs.map(log => ({
+      id: `refund-${log.id}`,
+      type: 'deposit_refunded' as const,
+      building_name: (log.metadata?.building_name as string) || '—',
+      building_id: (log.metadata?.building_id as string) || undefined,
+      user_name: (log.metadata?.created_by_name as string) || 'النظام',
+      timestamp: log.created_at,
+      details: log.action_description || 'استرداد عربون'
+    }))
+    let all = [...fromUnits, ...fromReservations, ...fromExpiredReservations, ...fromBuildings, ...fromAssoc, ...fromMeterAdded, ...fromOwnershipTransferred, ...fromReservationCancelled, ...fromDepositRefunded]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
     if (filter !== 'all') {
       all = all.filter(a => a.type === filter)
     }
     return all
-  }, [units, buildings, reservations, associationEndReminders, meterAddedLogs, filter])
+  }, [units, buildings, reservations, associationEndReminders, meterAddedLogs, ownershipTransferredLogs, reservationCancelledLogs, depositRefundedLogs, filter])
 
   // عرض النشاطات حسب الصلاحيات (خاص بلوحة الموظف)
   const filteredActivities = useMemo(() => {
@@ -256,6 +311,8 @@ export default function ActivitiesPage() {
       if (a.type === 'add') return can('building_details') || can('buildings')
       if (a.type === 'association_end') return can('details_association')
       if (a.type === 'meter_added') return can('details_electricity')
+      if (a.type === 'ownership_transferred') return can('deeds')
+      if (a.type === 'reservation_cancelled' || a.type === 'deposit_refunded') return can('reservations')
       return true
     })
   }, [activities, can])
@@ -285,6 +342,9 @@ export default function ActivitiesPage() {
       case 'reserved': return <Calendar className="w-4 h-4 text-amber-600" />
       case 'association_end': return <Users className="w-4 h-4 text-emerald-600" />
       case 'meter_added': return <Zap className="w-4 h-4 text-amber-600" />
+      case 'ownership_transferred': return <ArrowRightLeft className="w-4 h-4 text-teal-600" />
+      case 'reservation_cancelled': return <Trash2 className="w-4 h-4 text-red-600" />
+      case 'deposit_refunded': return <ArrowRightLeft className="w-4 h-4 text-amber-600" />
       default: return <Activity className="w-4 h-4 text-gray-600" />
     }
   }
@@ -313,25 +373,23 @@ export default function ActivitiesPage() {
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-5">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/dashboard"
-                className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                لوحة التحكم
-              </Link>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl">
-                  <Activity className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-gray-800">سجل النشاطات</h1>
-                  <p className="text-sm text-gray-500">{filteredActivities.length} نشاط</p>
-                </div>
+          <div className="flex flex-wrap items-center justify-between py-5 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl">
+                <Activity className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-800">سجل النشاطات</h1>
+                <p className="text-sm text-gray-500">{filteredActivities.length} نشاط</p>
               </div>
             </div>
+            <Link
+              href="/dashboard"
+              className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              لوحة التحكم
+            </Link>
           </div>
         </div>
       </div>
@@ -373,7 +431,9 @@ export default function ActivitiesPage() {
                 <Link
                   key={activity.id}
                   href={activity.building_id
-                    ? `/dashboard/buildings/details?buildingId=${activity.building_id}${activity.type === 'association_end' ? '#card-association' : activity.type === 'meter_added' ? '#card-electricity' : ''}`
+                    ? activity.type === 'ownership_transferred'
+                    ? `/building-deeds?buildingId=${activity.building_id}`
+                    : `/dashboard/buildings/details?buildingId=${activity.building_id}${activity.type === 'association_end' ? '#card-association' : activity.type === 'meter_added' ? '#card-electricity' : ''}`
                     : '#'}
                   className="flex items-start gap-4 p-5 hover:bg-gray-50/80 transition-colors group cursor-pointer block"
                 >
@@ -385,6 +445,7 @@ export default function ActivitiesPage() {
                     activity.type === 'reserved' ? 'bg-amber-100' :
                     activity.type === 'association_end' ? 'bg-emerald-100' :
                     activity.type === 'meter_added' ? 'bg-amber-100' :
+                    activity.type === 'ownership_transferred' ? 'bg-teal-100' :
                     'bg-gray-100'
                   }`}>
                     {getActivityIcon(activity.type)}
