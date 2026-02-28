@@ -422,7 +422,7 @@ function EditUnitPageContent() {
               </button>
             )}
             <Link
-              href={form.building_id ? `/dashboard/units?buildingId=${form.building_id}` : "/dashboard/units"}
+              href="/dashboard/units"
               className={`inline-flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition ${form.status === "sold" ? "flex-1" : ""}`}
             >
               <ArrowRight className="w-4 h-4" />

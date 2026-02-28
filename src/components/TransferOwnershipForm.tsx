@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { phoneDigitsOnly, isValidPhone10Digits } from "@/lib/validation-utils";
 import { showToast } from "@/app/dashboard/buildings/details/toast";
 import { formatReceiptNumberDisplay } from "@/lib/receipt-utils";
-import { ArrowRightLeft, Phone, FileText } from "lucide-react";
+import { ArrowRightLeft, Phone, FileText, X, Receipt } from "lucide-react";
 
 const DEEDS_BUCKET = "building-images";
 const TAX_EXEMPTION_PATH_PREFIX = "tax-exemption";
@@ -27,15 +26,19 @@ export interface TransferUnit {
   tax_exemption_file_url?: string | null;
   transfer_check_image_url?: string | null;
   transfer_check_amount?: number | null;
+  transfer_check_bank_name?: string | null;
+  transfer_check_number?: string | null;
   transfer_payment_method?: TransferPaymentMethod | null;
   transfer_cash_amount?: number | null;
   transfer_bank_name?: string | null;
   transfer_amount?: number | null;
+  transfer_reference_number?: string | null;
   transfer_real_estate_request_no?: string | null;
   transfer_id_image_url?: string | null;
   electricity_meter_transferred_with_sale?: boolean | null;
   driver_room_transferred_with_sale?: boolean | null;
   driver_room_number?: string | null;
+  price?: number | null;
   [key: string]: unknown;
 }
 
@@ -58,6 +61,10 @@ export interface UnitReservation {
   receipt_number: string | null;
   customer_name: string;
   customer_phone: string;
+  marketer_name?: string | null;
+  marketer_phone?: string | null;
+  customer_iban_or_account?: string | null;
+  customer_bank_name?: string | null;
   status: string;
 }
 
@@ -77,7 +84,11 @@ export default function TransferOwnershipForm({
     cash_amount: "" as string,
     bank_name: "",
     transfer_amount: "" as string,
+    transfer_reference: "",
     check_amount: "" as string,
+    check_bank_name: "",
+    check_number: "",
+    commission_amount: "" as string,
     real_estate_request_no: "",
     electricity_meter_transferred: false,
     driver_room_transferred: false,
@@ -92,20 +103,26 @@ export default function TransferOwnershipForm({
   const [reservation, setReservation] = useState<UnitReservation | null>(null);
   const [depositIncluded, setDepositIncluded] = useState<boolean | null>(null);
   const [depositRefundAccount, setDepositRefundAccount] = useState("");
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
 
   const fetchReservation = useCallback(async () => {
     const supabase = createClient();
     const { data } = await supabase
       .from("reservations")
-      .select("id, unit_id, building_id, deposit_amount, receipt_number, customer_name, customer_phone, status")
+      .select("id, unit_id, building_id, deposit_amount, receipt_number, customer_name, customer_phone, marketer_name, marketer_phone, customer_iban_or_account, customer_bank_name, status")
       .eq("unit_id", unit.id)
       .in("status", ["active", "pending", "confirmed", "reserved"])
       .gt("deposit_amount", 0)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (data) setReservation(data as UnitReservation);
-    else setReservation(null);
+    if (data) {
+      setReservation(data as UnitReservation);
+      const r = data as UnitReservation;
+      if (r.customer_iban_or_account?.trim()) setDepositRefundAccount(r.customer_iban_or_account.trim());
+    } else {
+      setReservation(null);
+    }
   }, [unit.id]);
 
   useEffect(() => {
@@ -115,11 +132,13 @@ export default function TransferOwnershipForm({
   useEffect(() => {
     const u = unit as TransferUnit & {
       transfer_check_amount?: number;
+      transfer_check_bank_name?: string;
       transfer_real_estate_request_no?: string;
       transfer_payment_method?: string | null;
       transfer_cash_amount?: number;
       transfer_bank_name?: string;
       transfer_amount?: number;
+      transfer_reference_number?: string;
     };
     const validMethods: TransferPaymentMethod[] = ["cash", "transfer", "certified_check"];
     const rawPm = (u?.transfer_payment_method ?? "").toString().trim();
@@ -135,7 +154,11 @@ export default function TransferOwnershipForm({
       cash_amount: u?.transfer_cash_amount != null ? Number(u.transfer_cash_amount).toLocaleString("en") : "",
       bank_name: u?.transfer_bank_name ?? "",
       transfer_amount: u?.transfer_amount != null ? Number(u.transfer_amount).toLocaleString("en") : "",
+      transfer_reference: u?.transfer_reference_number ?? "",
       check_amount: u?.transfer_check_amount != null ? Number(u.transfer_check_amount).toLocaleString("en") : "",
+      check_bank_name: u?.transfer_check_bank_name ?? "",
+      check_number: u?.transfer_check_number ?? "",
+      commission_amount: "",
       real_estate_request_no: u?.transfer_real_estate_request_no ?? "",
       electricity_meter_transferred: !!(unit as TransferUnit & { electricity_meter_transferred_with_sale?: boolean }).electricity_meter_transferred_with_sale,
       driver_room_transferred:
@@ -254,6 +277,7 @@ export default function TransferOwnershipForm({
       const cashNum = form.payment_methods.includes("cash") ? toNum(form.cash_amount) : null;
       const transferNum = form.payment_methods.includes("transfer") ? toNum(form.transfer_amount) : null;
       const checkNum = form.payment_methods.includes("certified_check") ? toNum(form.check_amount) : null;
+      const commissionNum = toNum(form.commission_amount);
       const salePrice = (cashNum ?? 0) + (transferNum ?? 0) + (checkNum ?? 0);
       const paymentMethodStorage = form.payment_methods.join(",");
 
@@ -268,8 +292,11 @@ export default function TransferOwnershipForm({
         transfer_cash_amount: form.payment_methods.includes("cash") && cashNum != null ? cashNum : null,
         transfer_bank_name: form.payment_methods.includes("transfer") ? (form.bank_name.trim() || null) : null,
         transfer_amount: form.payment_methods.includes("transfer") && transferNum != null ? transferNum : null,
+        transfer_reference_number: form.payment_methods.includes("transfer") ? (form.transfer_reference.trim() || null) : null,
         transfer_check_image_url: form.payment_methods.includes("certified_check") ? checkImageUrl : null,
         transfer_check_amount: form.payment_methods.includes("certified_check") && checkNum != null ? checkNum : null,
+        transfer_check_bank_name: form.payment_methods.includes("certified_check") ? (form.check_bank_name.trim() || null) : null,
+        transfer_check_number: form.payment_methods.includes("certified_check") ? (form.check_number.trim() || null) : null,
         transfer_real_estate_request_no: form.real_estate_request_no.trim() || null,
         transfer_id_image_url: idImageUrl,
         electricity_meter_transferred_with_sale: form.electricity_meter_transferred,
@@ -294,6 +321,7 @@ export default function TransferOwnershipForm({
           buyer_phone: phoneVal || null,
           sale_date: new Date().toISOString(),
           sale_price: salePrice,
+          commission_amount: commissionNum,
           payment_method: paymentMethodStorage,
           bank_name: form.payment_methods.includes("transfer") ? (form.bank_name.trim() || null) : null,
           down_payment: null,
@@ -354,15 +382,15 @@ export default function TransferOwnershipForm({
     "w-full border border-slate-200 rounded-xl px-4 py-2 text-sm file:mr-3 file:py-1.5 file:px-3 file:text-xs file:rounded-lg file:border file:border-slate-300/60 file:bg-white/40 file:backdrop-blur-sm file:text-slate-700 file:cursor-pointer hover:file:bg-white/60";
 
   return (
-    <div className={compact ? "space-y-4" : "space-y-5"}>
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <ArrowRightLeft className="w-5 h-5 text-amber-600" />
-            إتمام نقل الملكية — الوحدة {unit.unit_number} · عمارة {buildingName}
-          </h3>
-          {unit.status !== "sold" && (
-            <p className="text-sm text-slate-500 mt-1">أضف بيانات المشتري واضغط حفظ لتسجيل الوحدة مباعة.</p>
+    <div className={compact ? "space-y-5" : "space-y-6"}>
+      <div className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-l from-amber-50/80 to-slate-50/80 border border-amber-100/80">
+        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center">
+          <ArrowRightLeft className="w-5 h-5 text-amber-600" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-slate-800">الوحدة {unit.unit_number} · {buildingName}</p>
+          {(unit.price != null && Number(unit.price) > 0) && (
+            <p className="text-sm font-medium text-amber-800/90 mt-0.5 dir-ltr">سعر الوحدة: {Number(unit.price).toLocaleString("en")} ر.س</p>
           )}
         </div>
       </div>
@@ -371,7 +399,9 @@ export default function TransferOwnershipForm({
         <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{saveError}</div>
       )}
 
-      <div className={`grid gap-4 ${compact ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"}`}>
+      <section>
+        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">بيانات المشتري</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">اسم المشتري الجديد</label>
           <input
@@ -401,10 +431,9 @@ export default function TransferOwnershipForm({
           />
           {phoneError && <p className="mt-1 text-sm text-red-600">{phoneError}</p>}
         </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">رقم طلب التصرفات العقارية</label>
+        </div>
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-slate-700 mb-1">رقم طلب التصرفات العقارية</label>
         <input
           type="text"
           value={form.real_estate_request_no}
@@ -412,11 +441,13 @@ export default function TransferOwnershipForm({
           className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
           placeholder="رقم الطلب"
         />
-      </div>
+        </div>
+      </section>
 
-      <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-4 space-y-4">
+      <section>
+        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">طريقة الدفع</h4>
+      <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-4">
         <label className="block text-sm font-semibold text-slate-800">طريقة الشراء</label>
-        <p className="text-xs text-slate-500 mb-2">يمكن اختيار طريقة واحدة أو أكثر (مثلاً: كاش + تحويل)</p>
         <div className="flex flex-wrap gap-3">
           {(["cash", "transfer", "certified_check"] as const).map((method) => {
             const isChecked = form.payment_methods.includes(method);
@@ -459,9 +490,9 @@ export default function TransferOwnershipForm({
         )}
 
         {form.payment_methods.includes("transfer") && (
-          <div className={`grid gap-4 ${compact ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"}`}>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">اسم البنك المحول عليه</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">اسم البنك</label>
               <input
                 type="text"
                 value={form.bank_name}
@@ -484,124 +515,224 @@ export default function TransferOwnershipForm({
                 placeholder="مبلغ الحوالة"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">رقم الحوالة</label>
+              <input
+                type="text"
+                value={form.transfer_reference}
+                onChange={(e) => setForm((p) => ({ ...p, transfer_reference: e.target.value }))}
+                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                placeholder="رقم الحوالة"
+              />
+            </div>
           </div>
         )}
 
         {form.payment_methods.includes("certified_check") && (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">مبلغ الشيك</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">مبلغ الشيك</label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={form.check_amount}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "");
+                    setForm((p) => ({ ...p, check_amount: raw === "" ? "" : Number(raw).toLocaleString("en") }));
+                  }}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  placeholder="مبلغ الشيك"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">إرفاق صورة الشيك</label>
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*" onChange={(e) => setCheckImageFile(e.target.files?.[0] || null)} className={fileInputClass} />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">اسم البنك</label>
+                <input
+                  type="text"
+                  value={form.check_bank_name}
+                  onChange={(e) => setForm((p) => ({ ...p, check_bank_name: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  placeholder="اسم البنك"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">رقم الشيك</label>
+                <input
+                  type="text"
+                  value={form.check_number}
+                  onChange={(e) => setForm((p) => ({ ...p, check_number: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  placeholder="رقم الشيك"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      </section>
+
+      {reservation != null && (reservation.deposit_amount == null || Number(reservation.deposit_amount) > 0) && (
+        <section>
+          <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">الحجز والعربون</h4>
+          <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">سند العربون</label>
+                <button
+                  type="button"
+                  onClick={() => setShowReceiptModal(true)}
+                  className="inline-flex items-center gap-2 text-slate-700 hover:text-amber-600 font-medium text-sm transition"
+                >
+                  <FileText className="w-4 h-4 text-slate-500" />
+                  معاينة سند العربون
+                  {reservation.receipt_number ? ` (${formatReceiptNumberDisplay(reservation.receipt_number)})` : ""}
+                </button>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">مبلغ العربون</label>
+                <p className="text-sm font-semibold text-slate-800 dir-ltr">{reservation.deposit_amount != null ? Number(reservation.deposit_amount).toLocaleString("en") : "—"} ر.س</p>
+              </div>
+            </div>
+            <div className="pt-2 border-t border-slate-200/80">
+              <label className="block text-sm font-medium text-slate-700 mb-3">هل يشمل العربون مبلغ الشراء؟</label>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="deposit_included"
+                    checked={depositIncluded === true}
+                    onChange={() => setDepositIncluded(true)}
+                    className="rounded-full border-slate-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <span className="text-sm text-slate-700">نعم — مشمول في المبلغ</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="deposit_included"
+                    checked={depositIncluded === false}
+                    onChange={() => setDepositIncluded(false)}
+                    className="rounded-full border-slate-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <span className="text-sm text-slate-700">لا — استرداد</span>
+                </label>
+              </div>
+            </div>
+            {depositIncluded === false && (
+              <div className="pt-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">رقم حساب المشتري لتحويل العربون (استرداد)</label>
+                <input
+                  type="text"
+                  value={depositRefundAccount}
+                  onChange={(e) => setDepositRefundAccount(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  placeholder="IBAN أو رقم الحساب"
+                />
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      <section>
+        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">المسوق والعمولة</h4>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">اسم المسوق</label>
+          <div className="w-full border border-slate-200 rounded-xl px-4 py-2.5 bg-slate-50 text-slate-700 text-sm min-h-[42px] flex items-center">
+            {reservation?.marketer_name?.trim() || "—"}
+          </div>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">رقم المسوق</label>
+          <div className="w-full border border-slate-200 rounded-xl px-4 py-2.5 bg-slate-50 text-slate-700 text-sm min-h-[42px] flex items-center dir-ltr">
+            {reservation?.marketer_phone?.trim() || "—"}
+          </div>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">عمولة البيع</label>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={form.commission_amount}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/\D/g, "");
+              setForm((p) => ({ ...p, commission_amount: raw === "" ? "" : Number(raw).toLocaleString("en") }));
+            }}
+            className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+            placeholder="العمولة"
+          />
+        </div>
+      </div>
+      </section>
+
+      <section>
+        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">المرفقات</h4>
+        <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-slate-700">صورة هوية العميل</label>
               <input
-                type="text"
-                inputMode="decimal"
-                value={form.check_amount}
-                onChange={(e) => {
-                  const raw = e.target.value.replace(/\D/g, "");
-                  setForm((p) => ({ ...p, check_amount: raw === "" ? "" : Number(raw).toLocaleString("en") }));
-                }}
-                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                placeholder="مبلغ الشيك"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+                onChange={(e) => setIdImageFile(e.target.files?.[0] || null)}
+                className={`${fileInputClass} w-full max-w-full`}
               />
             </div>
             <div className="space-y-3">
-              <label className="block text-sm font-medium text-slate-700">إرفاق صورة الشيك</label>
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*" onChange={(e) => setCheckImageFile(e.target.files?.[0] || null)} className={fileInputClass} />
-            </div>
-          </>
-        )}
-      </div>
-
-      {reservation != null && (reservation.deposit_amount == null || Number(reservation.deposit_amount) > 0) && (
-        <div className="rounded-xl border border-sky-100 bg-sky-50/50 p-4 space-y-4">
-          <p className="text-sm font-semibold text-slate-800">الوحدة محجوزة بعربون (إدارة الحجوزات)</p>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-slate-600 text-sm">سند العربون:</span>
-            <Link
-              href={`/dashboard/reservations?previewReceipt=${reservation.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sky-700 hover:text-sky-800 font-medium text-sm"
-            >
-              <FileText className="w-4 h-4" />
-              معاينة سند العربون
-              {reservation.receipt_number ? ` — ${formatReceiptNumberDisplay(reservation.receipt_number)}` : ""}
-            </Link>
-          </div>
-          <p className="text-xs text-slate-500">
-            مبلغ العربون: {reservation.deposit_amount != null ? Number(reservation.deposit_amount).toLocaleString("ar-SA") : "—"} ريال
-          </p>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">هل يشمل العربون مبلغ الشراء؟</label>
-            <div className="flex flex-wrap gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label htmlFor="tax-exemption-cb" className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
                 <input
-                  type="radio"
-                  name="deposit_included"
-                  checked={depositIncluded === true}
-                  onChange={() => setDepositIncluded(true)}
-                  className="rounded-full border-slate-300 text-sky-600 focus:ring-sky-500"
+                  id="tax-exemption-cb"
+                  type="checkbox"
+                  checked={!!form.tax_exemption}
+                  onChange={(e) => setForm((p) => ({ ...p, tax_exemption: e.target.checked }))}
+                  className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 h-4 w-4"
                 />
-                <span className="text-sm text-slate-700">نعم — مشمول في المبلغ (يظهر في إدارة الحجوزات: تم المخالصة)</span>
+                يوجد إعفاء ضريبي
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
+              {form.tax_exemption ? (
                 <input
-                  type="radio"
-                  name="deposit_included"
-                  checked={depositIncluded === false}
-                  onChange={() => setDepositIncluded(false)}
-                  className="rounded-full border-slate-300 text-sky-600 focus:ring-sky-500"
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+                  onChange={(e) => setTaxExemptionFile(e.target.files?.[0] || null)}
+                  className={`${fileInputClass} w-full max-w-full`}
                 />
-                <span className="text-sm text-slate-700">لا — استرداد (يظهر: تم مخالصة الاسترداد)</span>
-              </label>
+              ) : (
+                <div className="w-full rounded-xl border border-slate-200 px-4 py-2.5 flex items-center justify-center text-sm text-slate-500 bg-slate-50/50">لا يوجد إعفاء ضريبي</div>
+              )}
             </div>
           </div>
-          {depositIncluded === false && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">رقم حساب المشتري لتحويل العربون (استرداد)</label>
-              <input
-                type="text"
-                value={depositRefundAccount}
-                onChange={(e) => setDepositRefundAccount(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-                placeholder="IBAN أو رقم الحساب"
-              />
-            </div>
-          )}
         </div>
-      )}
+      </section>
 
-      <div className="space-y-3">
-        <label className="block text-sm font-medium text-slate-700">إرفاق صورة الهوية</label>
-        <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*" onChange={(e) => setIdImageFile(e.target.files?.[0] || null)} className={fileInputClass} />
-      </div>
-
-      <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 space-y-3">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" checked={!!form.tax_exemption} onChange={(e) => setForm((p) => ({ ...p, tax_exemption: e.target.checked }))} className="rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
-          <span className="text-sm font-medium text-slate-700">يوجد إعفاء ضريبي</span>
-        </label>
-        {form.tax_exemption && (
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">إرفاق صورة أو PDF للإعفاء</label>
-            <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*" onChange={(e) => setTaxExemptionFile(e.target.files?.[0] || null)} className={fileInputClass} />
-          </div>
-        )}
+      <section>
+        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">تفاصيل إضافية</h4>
+      <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-3">
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={!!form.electricity_meter_transferred} onChange={(e) => setForm((p) => ({ ...p, electricity_meter_transferred: e.target.checked }))} className="rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
           <span className="text-sm font-medium text-slate-700">نقل عداد الكهرباء مع الوحدة</span>
         </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" checked={!!form.driver_room_transferred} onChange={(e) => setForm((p) => ({ ...p, driver_room_transferred: e.target.checked }))} className="rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
-          <span className="text-sm font-medium text-slate-700">نقل غرفة السائق مع الوحدة</span>
-        </label>
         {unit.driver_room_number && String(unit.driver_room_number).trim() ? (
-          <p className="text-sm text-teal-700">الوحدة مسجلة بغرفة سائق في النظام.</p>
+          <>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={!!form.driver_room_transferred} onChange={(e) => setForm((p) => ({ ...p, driver_room_transferred: e.target.checked }))} className="rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
+              <span className="text-sm font-medium text-slate-700">نقل غرفة السائق مع الوحدة</span>
+            </label>
+            <p className="text-sm text-slate-500">الوحدة مسجلة بغرفة سائق في النظام.</p>
+          </>
         ) : (
-          <p className="text-sm text-amber-800 font-medium">الوحدة غير مسجلة بغرفة سائق — يمكن التحديد يدوياً أو إضافتها من تعديل الوحدة.</p>
+          <p className="text-sm text-slate-500">الوحدة غير مسجلة بغرفة سائق.</p>
         )}
       </div>
+      </section>
 
-      <div className="flex flex-wrap gap-3 pt-2">
+      <div className="flex flex-wrap gap-3 pt-2 border-t border-slate-100">
         <button
           type="button"
           onClick={() => form.buyer_name.trim() && !saving && setConfirmOpen(true)}
@@ -629,6 +760,34 @@ export default function TransferOwnershipForm({
                 تراجع
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showReceiptModal && reservation && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" onClick={() => setShowReceiptModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-[420px] p-6" onClick={(e) => e.stopPropagation()} dir="rtl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Receipt className="w-5 h-5" />
+                سند عربون حجز
+              </h3>
+              <button type="button" onClick={() => setShowReceiptModal(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="border-b-2 border-slate-700 pb-3 mb-4">
+              <h1 className="text-xl font-bold text-slate-800">سند عربون حجز</h1>
+            </div>
+            <table className="w-full text-sm border-collapse">
+              <tbody className="[&>tr]:border-b [&>tr]:border-slate-100">
+                <tr><td className="py-2 text-slate-500 w-32">رقم السند</td><td className="py-2 font-mono font-semibold">{formatReceiptNumberDisplay(reservation.receipt_number)}</td></tr>
+                <tr><td className="py-2 text-slate-500">الوحدة</td><td className="py-2">وحدة {unit.unit_number} — الطابق {unit.floor}</td></tr>
+                <tr><td className="py-2 text-slate-500">العمارة</td><td className="py-2">{buildingName}</td></tr>
+                <tr><td className="py-2 text-slate-500">العميل</td><td className="py-2">{reservation.customer_name} — <span className="dir-ltr">{reservation.customer_phone}</span></td></tr>
+                <tr><td className="py-2 text-slate-500">مبلغ العربون</td><td className="py-2">{reservation.deposit_amount != null ? `${Number(reservation.deposit_amount).toLocaleString("en")} ر.س` : "—"}</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       )}

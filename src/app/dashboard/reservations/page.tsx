@@ -781,7 +781,9 @@ export default function ReservationsPage() {
                     <th className="text-right p-3 font-semibold text-gray-700">العميل</th>
                     <th className="text-right p-3 font-semibold text-gray-700">المسوق</th>
                     <th className="text-right p-3 font-semibold text-gray-700">تاريخ الحجز</th>
-                    <th className="text-right p-3 font-semibold text-gray-700">تاريخ الانتهاء</th>
+                    <th className="text-right p-3 font-semibold text-gray-700">
+                      {statusFilter === "completed" ? "تاريخ البيع" : statusFilter === "cancelled" ? "تاريخ الإلغاء" : "تاريخ الانتهاء"}
+                    </th>
                     <th className="text-right p-3 font-semibold text-gray-700">العربون</th>
                     <th className="text-center p-3 font-semibold text-gray-700">سند العربون</th>
                     <th className="text-right p-3 font-semibold text-gray-700">الحالة</th>
@@ -806,7 +808,9 @@ export default function ReservationsPage() {
                         {r.marketer_phone && <span className="block text-xs text-gray-500">{r.marketer_phone}</span>}
                       </td>
                       <td className="p-3 text-gray-600 font-mono text-xs">{formatDateNumeric(r.reservation_date)}</td>
-                      <td className="p-3 text-gray-600 font-mono text-xs">{formatDateNumeric(r.expiry_date)}</td>
+                      <td className="p-3 text-gray-600 font-mono text-xs">
+                        {formatDateNumeric(r.status === "completed" ? r.completed_at : r.status === "cancelled" ? r.cancelled_at : r.expiry_date)}
+                      </td>
                       <td className="p-3">
                         {r.deposit_amount != null ? `${r.deposit_amount} ${RIYAL_SYMBOL}` : "—"}
                         {r.status !== "completed" && (

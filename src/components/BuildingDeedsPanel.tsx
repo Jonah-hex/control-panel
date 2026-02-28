@@ -600,6 +600,22 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
                   </a>
                 </div>
               )}
+              {viewOwnerUnit.transfer_check_image_url && (
+                <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
+                  <span className="text-slate-600 shrink-0">
+                    {viewOwnerUnit.transfer_check_amount != null ? `الشيك المصدق (${Number(viewOwnerUnit.transfer_check_amount).toLocaleString("en")} ر.س)` : "صورة الشيك المصدق"}
+                  </span>
+                  <a
+                    href={viewOwnerUnit.transfer_check_image_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1 rounded-lg text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                    title="معاينة صورة الشيك"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </a>
+                </div>
+              )}
               <div className="pt-3 border-t border-slate-100">
                 <button type="button" disabled className="w-full py-2 rounded-xl border border-dashed border-slate-200 text-slate-400 text-sm font-medium cursor-not-allowed">
                   معاينة استلام الوحدة (قريباً)

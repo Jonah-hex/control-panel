@@ -19,6 +19,7 @@ import {
   Printer,
   User,
   MapPin,
+  ClipboardCheck,
 } from "lucide-react";
 
 type SaleRow = {
@@ -29,6 +30,7 @@ type SaleRow = {
   buyer_id_number?: string | null;
   sale_date: string;
   sale_price: number;
+  commission_amount?: number | null;
   payment_method: string | null;
   payment_status: string | null;
   bank_name?: string | null;
@@ -131,29 +133,36 @@ export default function SalesPage() {
   const [salesError, setSalesError] = useState<string | null>(null);
   const [selectedSale, setSelectedSale] = useState<SaleRow | null>(null);
   const [saleLinkedReservation, setSaleLinkedReservation] = useState<SaleLinkedReservation | null>(null);
+  const [selectedSaleUnit, setSelectedSaleUnit] = useState<Record<string, unknown> | null>(null);
+  const [selectedSaleHandover, setSelectedSaleHandover] = useState<{ handover_date: string; status: string } | null>(null);
 
   useEffect(() => {
     if (!selectedSale?.id) {
       setSaleLinkedReservation(null);
+      setSelectedSaleUnit(null);
+      setSelectedSaleHandover(null);
       return;
     }
+    const supabase = createClient();
     (async () => {
-      const { data } = await supabase
-        .from("reservations")
-        .select("marketer_name, marketer_phone, customer_name, customer_phone, customer_email, reservation_date, deposit_amount, receipt_number, deposit_settlement_type, customer_iban_or_account, customer_bank_name, completed_at")
-        .eq("sale_id", selectedSale.id)
-        .maybeSingle();
-      setSaleLinkedReservation(data as SaleLinkedReservation | null);
+      const [res, unitRes, handoverRes] = await Promise.all([
+        supabase.from("reservations").select("marketer_name, marketer_phone, customer_name, customer_phone, customer_email, reservation_date, deposit_amount, receipt_number, deposit_settlement_type, customer_iban_or_account, customer_bank_name, completed_at").eq("sale_id", selectedSale.id).maybeSingle(),
+        selectedSale.unit_id ? supabase.from("units").select("price, owner_name, owner_phone, previous_owner_name, tax_exemption_status, transfer_payment_method, transfer_cash_amount, transfer_bank_name, transfer_amount, transfer_reference_number, transfer_check_amount, transfer_check_bank_name, transfer_check_number, transfer_check_image_url, transfer_real_estate_request_no, electricity_meter_transferred_with_sale, driver_room_transferred_with_sale, driver_room_number").eq("id", selectedSale.unit_id).maybeSingle() : { data: null },
+        selectedSale.unit_id ? supabase.from("unit_handovers").select("handover_date, status").eq("unit_id", selectedSale.unit_id).maybeSingle() : { data: null },
+      ]);
+      setSaleLinkedReservation(res.data as SaleLinkedReservation | null);
+      setSelectedSaleUnit((unitRes.data as Record<string, unknown>) || null);
+      setSelectedSaleHandover(handoverRes.data ? { handover_date: (handoverRes.data as { handover_date: string }).handover_date, status: (handoverRes.data as { status: string }).status } : null);
     })();
-  }, [selectedSale?.id]);
+  }, [selectedSale?.id, selectedSale?.unit_id]);
 
   async function fetchSalesWithRelations() {
     const { data: salesData, error } = await supabase
       .from("sales")
-      .select("id, buyer_name, buyer_email, buyer_phone, buyer_id_number, sale_date, sale_price, payment_method, payment_status, bank_name, down_payment, remaining_payment, contract_url, notes, created_at, unit_id, building_id")
+      .select("id, buyer_name, buyer_email, buyer_phone, buyer_id_number, sale_date, sale_price, commission_amount, payment_method, payment_status, bank_name, down_payment, remaining_payment, contract_url, notes, created_at, unit_id, building_id")
       .order("created_at", { ascending: false });
     if (error) return { error, rows: [] as SaleRow[] };
-    const rows = (salesData || []) as { unit_id: string; building_id: string }[];
+    const rows = (salesData || []) as (SaleRow & { unit_id: string; building_id: string })[];
     const unitIds = [...new Set(rows.map((r) => r.unit_id).filter(Boolean))];
     const buildingIds = [...new Set(rows.map((r) => r.building_id).filter(Boolean))];
     const [unitsRes, buildingsRes] = await Promise.all([
@@ -402,7 +411,7 @@ export default function SalesPage() {
                 سجل المبيعات
               </h2>
             </div>
-            {loading ? (
+      {loading ? (
               <div className="flex justify-center items-center py-16">
                 <div className="animate-spin w-10 h-10 border-2 border-amber-500 border-t-transparent rounded-full" />
               </div>
@@ -539,10 +548,10 @@ export default function SalesPage() {
                   </div>
                 ) : reservations.length === 0 ? (
                   <div className="text-center py-10 text-slate-500 text-sm">لا توجد وحدات محجوزة حالياً — يمكن إنشاء حجوزات من إدارة التسويق / الحجوزات</div>
-                ) : (
-                    <div className="overflow-x-auto">
+      ) : (
+        <div className="overflow-x-auto">
                       <table className="w-full text-center border-collapse">
-                        <thead>
+            <thead>
                           <tr className="bg-slate-50 border-b border-slate-200">
                             <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">العمارة</th>
                             <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">الوحدة</th>
@@ -551,9 +560,9 @@ export default function SalesPage() {
                             <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">العربون</th>
                             <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">رقم السند</th>
                             <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">إجراء</th>
-                          </tr>
-                        </thead>
-                        <tbody>
+              </tr>
+            </thead>
+            <tbody>
                           {reservationsPaginated.map((r) => (
                             <tr key={r.id} className="border-b border-slate-100 hover:bg-amber-50/30 transition">
                               <td className="p-3 text-slate-800 font-medium">
@@ -571,18 +580,28 @@ export default function SalesPage() {
                               </td>
                               <td className="p-3 text-slate-600 text-sm font-mono">{formatReceiptNumberDisplay(r.receipt_number)}</td>
                               <td className="p-3">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (r.unit && typeof r.unit === "object" && "id" in r.unit) {
-                                      openTransferForUnit(r.unit as TransferUnit, (r.building && typeof r.building === "object" && "name" in r.building ? String(r.building.name) : "") || "");
-                                    }
-                                  }}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition"
-                                >
-                                  <ArrowRightLeft className="w-4 h-4" />
-                                  إتمام البيع
-                                </button>
+                                <div className="flex flex-wrap items-center justify-center gap-2">
+                                  <Link
+                                    href={r.unit && typeof r.unit === "object" && "id" in r.unit ? `/dashboard/sales/handover/${(r.unit as TransferUnit).id}` : "#"}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition"
+                                    title="استلام ومعاينة الوحدة (قبل إتمام البيع)"
+                                  >
+                                    <ClipboardCheck className="w-4 h-4" />
+                                    استلام الوحدة
+                                  </Link>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (r.unit && typeof r.unit === "object" && "id" in r.unit) {
+                                        openTransferForUnit(r.unit as TransferUnit, (r.building && typeof r.building === "object" && "name" in r.building ? String(r.building.name) : "") || "");
+                                      }
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition"
+                                  >
+                                    <ArrowRightLeft className="w-4 h-4" />
+                                    إتمام البيع
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -701,11 +720,11 @@ export default function SalesPage() {
                               <ArrowRightLeft className="w-4 h-4" />
                               نقل ملكية
                             </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
                 </div>
               )}
             </div>
@@ -713,36 +732,33 @@ export default function SalesPage() {
         )}
       </div>
 
-      {/* مودال تفاصيل عملية البيع — قابل للطباعة A4 */}
+      {/* مودال تفاصيل عملية البيع — الطباعة عبر نافذة A4 */}
       {selectedSale && (
         <>
-          <style dangerouslySetInnerHTML={{ __html: `
-            @media print {
-              body * { visibility: hidden !important; }
-              #sale-detail-print, #sale-detail-print * { visibility: visible !important; }
-              #sale-detail-print {
-                position: fixed !important;
-                left: 0 !important;
-                top: 0 !important;
-                width: 210mm !important;
-                min-height: 297mm !important;
-                max-width: 100% !important;
-                background: white !important;
-                z-index: 99999 !important;
-                padding: 15mm !important;
-                box-shadow: none !important;
-                border: none !important;
-              }
-              .no-print { display: none !important; }
-            }
-          `}} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-sm no-print" onClick={() => setSelectedSale(null)}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-sm" onClick={() => setSelectedSale(null)}>
             <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-end gap-2 mb-4 no-print">
+              <div className="flex items-center justify-end gap-2 mb-4">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => { const el = document.getElementById("sale-detail-print"); if (el) { window.print(); } }}
+                    onClick={() => {
+                      const el = document.getElementById("sale-detail-print");
+                      if (!el) return;
+                      const content = el.innerHTML;
+                      const cssLink = document.querySelector('link[rel="stylesheet"][href*="_next"]') as HTMLLinkElement | null;
+                      const cssHref = cssLink?.href ?? "";
+                      const html = "<!DOCTYPE html><html dir=\"rtl\" lang=\"ar\"><head><meta charset=\"utf-8\"><title>بطاقة تفاصيل البيع</title>"
+                        + (cssHref ? "<link rel=\"stylesheet\" href=\"" + cssHref + "\">" : "")
+                        + "<style>@page{size:A4;margin:15mm}body{width:210mm;margin:0 auto;padding:15mm 15mm 15mm 34mm;min-height:297mm;box-sizing:border-box;background:#fff}</style></head><body>"
+                        + content + "</body></html>";
+                      const w = window.open("", "_blank");
+                      if (!w) return;
+                      w.document.write(html);
+                      w.document.close();
+                      w.onload = () => {
+                        setTimeout(() => { w.focus(); w.print(); w.close(); }, 300);
+                      };
+                    }}
                     className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200"
                   >
                     <Printer className="w-4 h-4" />
@@ -753,7 +769,8 @@ export default function SalesPage() {
                   </button>
                 </div>
               </div>
-              <div id="sale-detail-print" className="bg-white text-slate-800" style={{ minHeight: "260mm" }}>
+              <div className="sale-print-wrapper" style={{ position: "relative" }}>
+              <div id="sale-detail-print" className="bg-white text-slate-800">
                 <div className="border-b border-slate-200 pb-4 mb-4">
                   <h1 className="text-xl font-bold text-slate-900 text-center">بطاقة تفاصيل عملية البيع</h1>
                 </div>
@@ -780,7 +797,7 @@ export default function SalesPage() {
                       {(selectedSale.buyer_id_number ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">رقم هوية المشتري</span><span className="font-medium dir-ltr">{selectedSale.buyer_id_number}</span></p>}
                     </div>
                   </section>
-                  {(saleLinkedReservation?.marketer_name ?? saleLinkedReservation?.marketer_phone) && (
+                  {((saleLinkedReservation?.marketer_name ?? saleLinkedReservation?.marketer_phone) || selectedSale.commission_amount != null) && (
                     <section>
                       <h2 className="text-sm font-bold text-amber-700 uppercase tracking-wider mb-2 flex items-center gap-2">
                         <User className="w-4 h-4" />
@@ -789,6 +806,7 @@ export default function SalesPage() {
                       <div className="bg-slate-50 rounded-xl p-4 space-y-2">
                         {(saleLinkedReservation?.marketer_name ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">اسم المسوق</span><span className="font-medium">{saleLinkedReservation.marketer_name}</span></p>}
                         {(saleLinkedReservation?.marketer_phone ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">جوال المسوق</span><span className="font-medium dir-ltr">{saleLinkedReservation.marketer_phone}</span></p>}
+                        <p className="flex justify-between text-sm"><span className="text-slate-500">عمولة البيع</span><span className="font-medium">{selectedSale.commission_amount != null ? `${Number(selectedSale.commission_amount).toLocaleString("en")} ر.س` : "لا يوجد عمولة بيع"}</span></p>
                       </div>
                     </section>
                   )}
@@ -798,17 +816,46 @@ export default function SalesPage() {
                       تفاصيل البيع والدفع
                     </h2>
                     <div className="bg-slate-50 rounded-xl p-4 space-y-2">
-                      <p className="flex justify-between text-sm"><span className="text-slate-500">تاريخ البيع</span><span className="font-medium">{selectedSale.sale_date?.slice(0, 10) || "—"}</span></p>
                       <p className="flex justify-between text-sm"><span className="text-slate-500">سعر البيع</span><span className="font-bold dir-ltr">{Number(selectedSale.sale_price).toLocaleString("en")} ر.س</span></p>
+                      <p className="flex justify-between text-sm"><span className="text-slate-500">طريقة الدفع</span><span className="font-medium">{(selectedSale.payment_method ?? "").split(",").map((m) => m.trim()).filter(Boolean).map((m) => (m === "cash" ? "كاش" : m === "transfer" ? "تحويل" : m === "certified_check" ? "شيك مصدق" : m)).join(" + ") || "—"}</span></p>
+                      {selectedSaleUnit?.transfer_cash_amount != null && Number(selectedSaleUnit.transfer_cash_amount) > 0 && (
+                        <>
+                          <p className="flex justify-between text-sm"><span className="text-slate-500">مبلغ الكاش</span><span className="font-medium dir-ltr">{Number(selectedSaleUnit.transfer_cash_amount).toLocaleString("en")} ر.س</span></p>
+                          <div className="border-t border-slate-200/80 my-2" />
+                        </>
+                      )}
+                      {selectedSaleUnit?.transfer_amount != null && Number(selectedSaleUnit.transfer_amount) > 0 && <p className="flex justify-between text-sm"><span className="text-slate-500">مبلغ الحوالة</span><span className="font-medium dir-ltr">{Number(selectedSaleUnit.transfer_amount).toLocaleString("en")} ر.س</span></p>}
+                      {(selectedSaleUnit?.transfer_bank_name ?? "").toString().trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">اسم البنك (تحويل)</span><span className="font-medium">{String(selectedSaleUnit.transfer_bank_name)}</span></p>}
+                      {((selectedSaleUnit?.transfer_bank_name ?? "").toString().trim() || (selectedSaleUnit?.transfer_amount != null && Number(selectedSaleUnit.transfer_amount) > 0)) && <div className="border-t border-slate-200/80 my-2" />}
+                      {selectedSaleUnit?.transfer_check_amount != null && Number(selectedSaleUnit.transfer_check_amount) > 0 && (
+                        <>
+                          <p className="flex justify-between text-sm"><span className="text-slate-500">مبلغ الشيك المصدق</span><span className="font-medium dir-ltr">{Number(selectedSaleUnit.transfer_check_amount).toLocaleString("en")} ر.س</span></p>
+                          {(selectedSaleUnit?.transfer_check_number ?? "").toString().trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">رقم الشيك</span><span className="font-medium dir-ltr">{String(selectedSaleUnit.transfer_check_number)}</span></p>}
+                          <div className="border-t border-slate-200/80 my-2" />
+                        </>
+                      )}
                       {(selectedSale.down_payment != null && selectedSale.down_payment > 0) && <p className="flex justify-between text-sm"><span className="text-slate-500">المقدم</span><span className="font-medium dir-ltr">{Number(selectedSale.down_payment).toLocaleString("en")} ر.س</span></p>}
                       {(selectedSale.remaining_payment != null && selectedSale.remaining_payment > 0) && <p className="flex justify-between text-sm"><span className="text-slate-500">المتبقي</span><span className="font-medium dir-ltr">{Number(selectedSale.remaining_payment).toLocaleString("en")} ر.س</span></p>}
-                      <p className="flex justify-between text-sm"><span className="text-slate-500">طريقة الدفع</span><span className="font-medium">{(selectedSale.payment_method ?? "").split(",").map((m) => m.trim()).filter(Boolean).map((m) => (m === "cash" ? "كاش" : m === "transfer" ? "تحويل" : m === "certified_check" ? "شيك مصدق" : m)).join(" + ") || "—"}</span></p>
-                      {(selectedSale.bank_name ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">اسم البنك</span><span className="font-medium">{selectedSale.bank_name}</span></p>}
                       <p className="flex justify-between text-sm"><span className="text-slate-500">حالة الدفع</span><span className="font-medium">{selectedSale.payment_status === "completed" ? "مكتمل" : selectedSale.payment_status === "partial" ? "جزئي" : "قيد الانتظار"}</span></p>
                       {(selectedSale.notes ?? "").trim() && <p className="text-sm mt-2"><span className="text-slate-500 block mb-1">ملاحظات</span><span className="font-medium">{(selectedSale.notes ?? "").replace(/نقل ملكية/g, "نقل الملكية")}</span></p>}
                       {(selectedSale.contract_url ?? "").trim() && <p className="text-sm mt-2"><span className="text-slate-500 block mb-1">رابط العقد</span><span className="font-medium break-all dir-ltr text-xs">{selectedSale.contract_url}</span></p>}
                     </div>
                   </section>
+                  {(selectedSaleUnit && Object.keys(selectedSaleUnit).length > 0) || selectedSaleHandover ? (
+                    <section>
+                      <h2 className="text-sm font-bold text-amber-700 uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        تفاصيل نقل الملكية والوحدة
+                      </h2>
+                      <div className="bg-slate-50 rounded-xl p-4 space-y-2">
+                        {(selectedSaleUnit?.previous_owner_name ?? "").toString().trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">المالك السابق</span><span className="font-medium">{String(selectedSaleUnit.previous_owner_name)}</span></p>}
+                        {(selectedSaleUnit?.transfer_reference_number ?? "").toString().trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">رقم الحوالة</span><span className="font-medium dir-ltr">{String(selectedSaleUnit.transfer_reference_number)}</span></p>}
+                        {selectedSaleUnit && <p className="flex justify-between text-sm"><span className="text-slate-500">نقل عداد الكهرباء مع الوحدة</span><span className="font-medium">{selectedSaleUnit.electricity_meter_transferred_with_sale === true ? "نعم" : "لا"}</span></p>}
+                        {selectedSaleUnit && <p className="flex justify-between text-sm"><span className="text-slate-500">حالة غرفة السائق</span><span className="font-medium">{selectedSaleUnit.driver_room_number != null && String(selectedSaleUnit.driver_room_number).trim() ? `رقم ${String(selectedSaleUnit.driver_room_number)} — ${selectedSaleUnit.driver_room_transferred_with_sale === true ? "تم النقل مع الوحدة" : "لم يُنقل مع الوحدة"}` : "غير مسجّلة"}</span></p>}
+                        <p className="flex justify-between text-sm"><span className="text-slate-500">الاستلام</span><span className="font-medium">{selectedSaleHandover ? `تم — ${selectedSaleHandover.handover_date ? new Date(selectedSaleHandover.handover_date).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) : ""}` : "لم يُسجّل استلام بعد"}</span></p>
+                      </div>
+                    </section>
+                  ) : null}
                   {saleLinkedReservation && (saleLinkedReservation.deposit_amount != null || saleLinkedReservation.receipt_number || saleLinkedReservation.deposit_settlement_type || saleLinkedReservation.customer_iban_or_account || saleLinkedReservation.customer_bank_name) && (
                     <section>
                       <h2 className="text-sm font-bold text-amber-700 uppercase tracking-wider mb-2 flex items-center gap-2">
@@ -820,14 +867,15 @@ export default function SalesPage() {
                         {saleLinkedReservation.completed_at && <p className="flex justify-between text-sm"><span className="text-slate-500">تاريخ إتمام البيع</span><span className="font-medium">{saleLinkedReservation.completed_at.slice(0, 10)}</span></p>}
                         {saleLinkedReservation.deposit_amount != null && <p className="flex justify-between text-sm"><span className="text-slate-500">مبلغ العربون</span><span className="font-medium dir-ltr">{Number(saleLinkedReservation.deposit_amount).toLocaleString("en")} ر.س</span></p>}
                         {(saleLinkedReservation.receipt_number ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">رقم سند العربون</span><span className="font-medium dir-ltr">{formatReceiptNumberDisplay(saleLinkedReservation.receipt_number)}</span></p>}
-                        {(saleLinkedReservation.deposit_settlement_type ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">نوع مخالصة العربون</span><span className="font-medium">{saleLinkedReservation.deposit_settlement_type === "included" ? "مشمول في البيع (تم المخالصة)" : saleLinkedReservation.deposit_settlement_type === "refund" ? "استرداد (تم مخالصة الاسترداد)" : saleLinkedReservation.deposit_settlement_type}</span></p>}
+                        {(saleLinkedReservation.deposit_settlement_type ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">نوع مخالصة العربون</span><span className="font-medium">تم المخالصة</span></p>}
                         {(saleLinkedReservation.customer_iban_or_account ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">آيبان / رقم الحساب للاسترداد</span><span className="font-medium dir-ltr text-xs">{saleLinkedReservation.customer_iban_or_account}</span></p>}
                         {(saleLinkedReservation.customer_bank_name ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">بنك الاسترداد</span><span className="font-medium">{saleLinkedReservation.customer_bank_name}</span></p>}
                       </div>
                     </section>
                   )}
                 </div>
-                <p className="text-xs text-slate-400 mt-6 text-center">تم الإنشاء من لوحة إدارة المبيعات — {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })}</p>
+                <p className="text-xs text-slate-400 mt-6 text-center">تم الإنشاء من لوحة إدارة المبيعات — {selectedSale.created_at ? new Date(selectedSale.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—"}</p>
+              </div>
               </div>
             </div>
           </div>
@@ -836,11 +884,15 @@ export default function SalesPage() {
 
       {/* مودال إتمام نقل الملكية */}
       {transferUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-sm" onClick={closeTransferModal}>
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 relative" onClick={(e) => e.stopPropagation()}>
-            <button type="button" onClick={closeTransferModal} className="absolute left-4 top-4 p-2 rounded-lg hover:bg-slate-100 text-slate-500" aria-label="إغلاق">
-              <X className="w-5 h-5" />
-            </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md" onClick={closeTransferModal}>
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+              <h2 className="text-base font-bold text-slate-800">نقل الملكية</h2>
+              <button type="button" onClick={closeTransferModal} className="p-2 rounded-lg hover:bg-slate-200/80 text-slate-500 hover:text-slate-700 transition" aria-label="إغلاق">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
             <TransferOwnershipForm
               unit={transferUnit}
               buildingId={transferUnit.building_id}
@@ -849,6 +901,7 @@ export default function SalesPage() {
               onCancel={closeTransferModal}
               compact
             />
+            </div>
           </div>
         </div>
       )}

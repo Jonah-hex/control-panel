@@ -109,6 +109,9 @@ CREATE TABLE IF NOT EXISTS units (
   transfer_cash_amount DECIMAL(15,2),  -- المبلغ (كاش)
   transfer_bank_name VARCHAR(255),     -- اسم البنك المحول عليه (تحويل)
   transfer_amount DECIMAL(15,2),       -- مبلغ الحوالة (تحويل)
+  transfer_reference_number VARCHAR(100), -- رقم الحوالة البنكية (تحويل)
+  transfer_check_bank_name VARCHAR(255),  -- اسم البنك عند الدفع شيكاً مصدقاً
+  transfer_check_number VARCHAR(100),     -- رقم الشيك (شيك مصدق)
   transfer_real_estate_request_no VARCHAR(100), -- رقم طلب التصرفات العقارية
   transfer_id_image_url TEXT,          -- رابط صورة هوية المشتري
   electricity_meter_transferred_with_sale BOOLEAN DEFAULT FALSE, -- تم نقل عداد الكهرباء مع الوحدة (غير قابل للتعديل في جدول العدادات)
@@ -176,6 +179,7 @@ CREATE TABLE IF NOT EXISTS sales (
   -- بيانات البيع
   sale_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   sale_price DECIMAL(15, 2) NOT NULL,
+  commission_amount DECIMAL(15, 2),
   payment_method VARCHAR(100), -- 'cash', 'transfer', 'certified_check'
   bank_name VARCHAR(255),       -- اسم البنك (عند التحويل)
   
@@ -196,6 +200,10 @@ CREATE TABLE IF NOT EXISTS sales (
   CONSTRAINT fk_unit_sales FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE CASCADE,
   CONSTRAINT fk_building_sales FOREIGN KEY (building_id) REFERENCES buildings(id) ON DELETE CASCADE
 );
+
+-- 4.1 جدول استلام الوحدات (نموذج الاستلام — مدير المبيعات يسلم الوحدة للمشتري)
+-- يُنشأ عبر add_unit_handovers.sql مع RLS
+-- unit_handovers: unit_id, building_id, sale_id, reservation_id, handover_date, delivered_by, received_by, checklist (JSONB), notes, status
 
 -- 5. جدول الموظفين/الحراس (Staff Table)
 CREATE TABLE IF NOT EXISTS staff (
