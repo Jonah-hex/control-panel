@@ -10,7 +10,6 @@ import {
   ArrowLeft,
   TrendingUp,
   TrendingDown,
-  DollarSign,
   Users,
   Gauge,
   CheckCircle2,
@@ -21,6 +20,7 @@ import {
   RefreshCw,
   LayoutDashboard
 } from 'lucide-react'
+import { RiyalIcon } from '@/components/icons/RiyalIcon'
 
 interface Building {
   id: string
@@ -287,7 +287,7 @@ export default function StatisticsPage() {
 
           <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300">
             <div className="flex items-center justify-between mb-3">
-              <DollarSign className="w-10 h-10 opacity-90" />
+              <RiyalIcon className="w-10 h-10 opacity-90" />
               <TrendingUp className="w-5 h-5 opacity-80" />
             </div>
             <span className="text-sm font-semibold opacity-90">إجمالي الإيرادات</span>
@@ -378,7 +378,7 @@ export default function StatisticsPage() {
           <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-white/20 p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-cyan-600 to-cyan-700 rounded-xl flex items-center justify-center">
-                <DollarSign className="w-7 h-7 text-white" />
+                <RiyalIcon className="w-7 h-7 text-white" />
               </div>
               <div>
                 <h3 className="text-lg font-bold text-gray-800">متوسط سعر الوحدة</h3>

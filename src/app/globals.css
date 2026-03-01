@@ -929,8 +929,12 @@ main {
   animation: parallax 0.8s ease-out;
 }
 
-/* سند العربون — طباعة صفحة السند فقط (بدون لوحة التحكم)، بدون لوجو */
+/* سند العربون — طباعة صفحة واحدة: النص كبير، الختم المائي يظهر */
 @media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
   body.receipt-print-active * {
     visibility: hidden;
   }
@@ -948,11 +952,52 @@ main {
   }
   body.receipt-print-active .receipt-modal > div {
     max-width: 210mm !important;
+    max-height: 277mm !important;
+    overflow: hidden !important;
     box-shadow: none !important;
     border: none !important;
     position: static !important;
+    padding: 16px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    font-size: 20px !important;
+  }
+  body.receipt-print-active .receipt-modal .receipt-unified table,
+  body.receipt-print-active .receipt-modal .receipt-unified table td {
+    font-size: 20px !important;
+    line-height: 1.8 !important;
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+  }
+  body.receipt-print-active .receipt-modal .receipt-body h1 {
+    font-size: 20px !important;
+    line-height: 1.6 !important;
   }
   body.receipt-print-active .receipt-modal .print\:hidden {
     display: none !important;
+  }
+}
+
+/* تقارير التسويق — هوامش وتنسيق الطباعة */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm 15mm;
+  }
+  main.reports-print {
+    padding: 0 8px !important;
+    max-width: 100% !important;
+  }
+  main.reports-print .max-w-6xl {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+  main.reports-print header {
+    margin-bottom: 12px !important;
+    padding: 10px 12px !important;
+  }
+  main.reports-print section {
+    margin-bottom: 14px !important;
+    break-inside: avoid;
   }
 }

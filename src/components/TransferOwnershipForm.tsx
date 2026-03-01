@@ -92,6 +92,7 @@ export default function TransferOwnershipForm({
     real_estate_request_no: "",
     electricity_meter_transferred: false,
     driver_room_transferred: false,
+    remaining_payment_due_date: "" as string,
   });
   const [taxExemptionFile, setTaxExemptionFile] = useState<File | null>(null);
   const [checkImageFile, setCheckImageFile] = useState<File | null>(null);
@@ -165,8 +166,18 @@ export default function TransferOwnershipForm({
         (unit as TransferUnit & { driver_room_transferred_with_sale?: boolean }).driver_room_transferred_with_sale != null
           ? !!(unit as TransferUnit & { driver_room_transferred_with_sale?: boolean }).driver_room_transferred_with_sale
           : !!((unit as TransferUnit).driver_room_number && String((unit as TransferUnit).driver_room_number).trim()),
+      remaining_payment_due_date: "",
     });
   }, [unit]);
+
+  useEffect(() => {
+    if (reservation == null || depositIncluded !== true) return;
+    const unitPrice = unit.price != null && Number(unit.price) > 0 ? Number(unit.price) : null;
+    if (unitPrice == null) return;
+    const toNum = (s: string) => { const d = (s || "").replace(/\D/g, ""); return d.length > 0 ? Number(d) : 0; };
+    const paid = (form.payment_methods.includes("cash") ? toNum(form.cash_amount) : 0) + (form.payment_methods.includes("transfer") ? toNum(form.transfer_amount) : 0) + (form.payment_methods.includes("certified_check") ? toNum(form.check_amount) : 0);
+    if (paid >= unitPrice) setDepositIncluded(false);
+  }, [reservation, depositIncluded, form.payment_methods, form.cash_amount, form.transfer_amount, form.check_amount, unit.price]);
 
   const handleSave = async () => {
     if (!form.buyer_name.trim()) return;
@@ -199,6 +210,16 @@ export default function TransferOwnershipForm({
     }
     if (reservation != null && depositIncluded === false && !depositRefundAccount.trim()) {
       setSaveError("أدخل رقم حساب المشتري لتحويل استرداد العربون.");
+      return;
+    }
+    const unitPrice = unit.price != null && Number(unit.price) > 0 ? Number(unit.price) : null;
+    const cashVal = form.payment_methods.includes("cash") ? toNum(form.cash_amount) : null;
+    const transferVal = form.payment_methods.includes("transfer") ? toNum(form.transfer_amount) : null;
+    const checkVal = form.payment_methods.includes("certified_check") ? toNum(form.check_amount) : null;
+    const depositWhenIncluded = reservation != null && depositIncluded === true && reservation.deposit_amount != null ? Number(reservation.deposit_amount) : 0;
+    const totalPaidVal = (cashVal ?? 0) + (transferVal ?? 0) + (checkVal ?? 0) + depositWhenIncluded;
+    if (unitPrice != null && totalPaidVal < unitPrice && !form.remaining_payment_due_date.trim()) {
+      setSaveError("عند وجود مبلغ متبقٍ يرجى إدخال تاريخ استحقاق المبلغ المتبقي.");
       return;
     }
     setSaveError(null);
@@ -278,7 +299,12 @@ export default function TransferOwnershipForm({
       const transferNum = form.payment_methods.includes("transfer") ? toNum(form.transfer_amount) : null;
       const checkNum = form.payment_methods.includes("certified_check") ? toNum(form.check_amount) : null;
       const commissionNum = toNum(form.commission_amount);
-      const salePrice = (cashNum ?? 0) + (transferNum ?? 0) + (checkNum ?? 0);
+      const depositWhenIncluded = reservation != null && depositIncluded === true && reservation.deposit_amount != null ? Number(reservation.deposit_amount) : 0;
+      const totalPaid = (cashNum ?? 0) + (transferNum ?? 0) + (checkNum ?? 0) + depositWhenIncluded;
+      const unitPrice = unit.price != null && Number(unit.price) > 0 ? Number(unit.price) : null;
+      const salePrice = unitPrice ?? totalPaid;
+      const remainingPayment = unitPrice != null && totalPaid < unitPrice ? unitPrice - totalPaid : null;
+      const isPartial = remainingPayment != null && remainingPayment > 0;
       const paymentMethodStorage = form.payment_methods.join(",");
 
       const updateData: Record<string, unknown> = {
@@ -300,7 +326,10 @@ export default function TransferOwnershipForm({
         transfer_real_estate_request_no: form.real_estate_request_no.trim() || null,
         transfer_id_image_url: idImageUrl,
         electricity_meter_transferred_with_sale: form.electricity_meter_transferred,
-        driver_room_transferred_with_sale: form.driver_room_transferred,
+        // سياسة غرفة السائق: تُسجّل "نُقلت مع الوحدة" فقط إذا الوحدة مسجّلة برقم غرفة سائق
+        driver_room_transferred_with_sale: (unit.driver_room_number != null && String(unit.driver_room_number).trim() !== "")
+          ? form.driver_room_transferred
+          : false,
         updated_at: new Date().toISOString(),
       };
 
@@ -324,9 +353,10 @@ export default function TransferOwnershipForm({
           commission_amount: commissionNum,
           payment_method: paymentMethodStorage,
           bank_name: form.payment_methods.includes("transfer") ? (form.bank_name.trim() || null) : null,
-          down_payment: null,
-          remaining_payment: null,
-          payment_status: "completed",
+          down_payment: totalPaid,
+          remaining_payment: isPartial ? remainingPayment : null,
+          remaining_payment_due_date: isPartial && form.remaining_payment_due_date.trim() ? form.remaining_payment_due_date.trim() : null,
+          payment_status: isPartial ? "partial" : "completed",
           notes: "نقل الملكية — إدارة المبيعات",
         })
         .select("id")
@@ -353,10 +383,14 @@ export default function TransferOwnershipForm({
 
       const { data: { user } } = await supabase.auth.getUser();
       const createdByName = (user?.user_metadata?.full_name as string)?.trim() || user?.email || "النظام";
+      const logActionType = isPartial ? "ownership_transferred_partial" : "ownership_transferred";
+      const logDescription = isPartial
+        ? `نقل ملكية (جزئي) الوحدة ${unit.unit_number} — متبقي ${remainingPayment?.toLocaleString("en")} ر.س استحقاق ${form.remaining_payment_due_date || "—"} — ${buildingName}`
+        : `نقل ملكية الوحدة ${unit.unit_number} (دور ${unit.floor}) إلى ${form.buyer_name.trim()} — عمارة ${buildingName}`;
       await supabase.from("activity_logs").insert({
         user_id: user?.id ?? null,
-        action_type: "ownership_transferred",
-        action_description: `نقل ملكية الوحدة ${unit.unit_number} (دور ${unit.floor}) إلى ${form.buyer_name.trim()} — عمارة ${buildingName}`,
+        action_type: logActionType,
+        action_description: logDescription,
         metadata: {
           building_id: buildingId,
           building_name: buildingName,
@@ -365,6 +399,11 @@ export default function TransferOwnershipForm({
           floor: unit.floor,
           buyer_name: form.buyer_name.trim(),
           created_by_name: createdByName,
+          sale_id: saleRow.id,
+          ...(isPartial && remainingPayment != null && {
+            remaining_payment: remainingPayment,
+            remaining_payment_due_date: form.remaining_payment_due_date.trim() || null,
+          }),
         },
       });
 
@@ -389,9 +428,9 @@ export default function TransferOwnershipForm({
         </div>
         <div className="min-w-0">
           <p className="text-sm font-bold text-slate-800">الوحدة {unit.unit_number} · {buildingName}</p>
-          {(unit.price != null && Number(unit.price) > 0) && (
-            <p className="text-sm font-medium text-amber-800/90 mt-0.5 dir-ltr">سعر الوحدة: {Number(unit.price).toLocaleString("en")} ر.س</p>
-          )}
+          <p className="text-sm font-medium text-amber-800/90 mt-0.5 dir-ltr">
+            سعر الوحدة: {unit.price != null && Number(unit.price) > 0 ? `${Number(unit.price).toLocaleString("en")} ر.س` : "—"}
+          </p>
         </div>
       </div>
 
@@ -574,6 +613,32 @@ export default function TransferOwnershipForm({
             </div>
           </div>
         )}
+
+        {(() => {
+          const toNum = (s: string) => { const d = (s || "").replace(/\D/g, ""); return d.length > 0 ? Number(d) : null; };
+          const unitPrice = unit.price != null && Number(unit.price) > 0 ? Number(unit.price) : null;
+          const depositWhenIncluded = reservation != null && depositIncluded === true && reservation.deposit_amount != null ? Number(reservation.deposit_amount) : 0;
+          const paid = ((form.payment_methods.includes("cash") ? toNum(form.cash_amount) : null) ?? 0)
+            + ((form.payment_methods.includes("transfer") ? toNum(form.transfer_amount) : null) ?? 0)
+            + ((form.payment_methods.includes("certified_check") ? toNum(form.check_amount) : null) ?? 0)
+            + depositWhenIncluded;
+          const remaining = unitPrice != null && paid < unitPrice ? unitPrice - paid : 0;
+          if (unitPrice == null || remaining <= 0) return null;
+          return (
+            <div className="pt-4 border-t border-slate-200/80 space-y-3">
+              <p className="text-sm font-semibold text-amber-800">المبلغ المتبقي: <span className="dir-ltr">{remaining.toLocaleString("en")}</span> ر.س</p>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">تاريخ استحقاق المبلغ المتبقي</label>
+                <input
+                  type="date"
+                  value={form.remaining_payment_due_date ?? ""}
+                  onChange={(e) => setForm((p) => ({ ...p, remaining_payment_due_date: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                />
+              </div>
+            </div>
+          );
+        })()}
       </div>
       </section>
 
@@ -601,37 +666,49 @@ export default function TransferOwnershipForm({
             </div>
             <div className="pt-2 border-t border-slate-200/80">
               <label className="block text-sm font-medium text-slate-700 mb-3">هل يشمل العربون مبلغ الشراء؟</label>
-              <div className="flex flex-wrap gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="deposit_included"
-                    checked={depositIncluded === true}
-                    onChange={() => setDepositIncluded(true)}
-                    className="rounded-full border-slate-300 text-amber-600 focus:ring-amber-500"
-                  />
-                  <span className="text-sm text-slate-700">نعم — مشمول في المبلغ</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="deposit_included"
-                    checked={depositIncluded === false}
-                    onChange={() => setDepositIncluded(false)}
-                    className="rounded-full border-slate-300 text-amber-600 focus:ring-amber-500"
-                  />
-                  <span className="text-sm text-slate-700">لا — استرداد</span>
-                </label>
-              </div>
+              {(() => {
+                const toNum = (s: string) => { const d = (s || "").replace(/\D/g, ""); return d.length > 0 ? Number(d) : 0; };
+                const unitPrice = unit.price != null && Number(unit.price) > 0 ? Number(unit.price) : null;
+                const paid = (form.payment_methods.includes("cash") ? toNum(form.cash_amount) : 0) + (form.payment_methods.includes("transfer") ? toNum(form.transfer_amount) : 0) + (form.payment_methods.includes("certified_check") ? toNum(form.check_amount) : 0);
+                const isFullPayment = unitPrice != null && paid >= unitPrice;
+                return (
+                  <>
+                    <div className="flex flex-wrap gap-4">
+                      <label className={`flex items-center gap-2 ${isFullPayment ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
+                        <input
+                          type="radio"
+                          name="deposit_included"
+                          checked={depositIncluded === true}
+                          onChange={() => !isFullPayment && setDepositIncluded(true)}
+                          disabled={isFullPayment}
+                          className="rounded-full border-slate-300 text-amber-600 focus:ring-amber-500 disabled:cursor-not-allowed"
+                        />
+                        <span className="text-sm text-slate-700">نعم — مشمول في المبلغ</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="deposit_included"
+                          checked={depositIncluded === false}
+                          onChange={() => setDepositIncluded(false)}
+                          className="rounded-full border-slate-300 text-amber-600 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-slate-700">لا — استرداد</span>
+                      </label>
+                    </div>
+                    {isFullPayment && <p className="text-xs text-amber-700 mt-2">تم دفع سعر الوحدة بالكامل — العربون للاسترداد فقط</p>}
+                  </>
+                );
+              })()}
             </div>
             {depositIncluded === false && (
               <div className="pt-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">رقم حساب المشتري لتحويل العربون (استرداد)</label>
                 <input
                   type="text"
-                  value={depositRefundAccount}
-                  onChange={(e) => setDepositRefundAccount(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  value={depositRefundAccount ?? ""}
+                  onChange={(e) => setDepositRefundAccount(e.target.value.toUpperCase())}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 uppercase"
                   placeholder="IBAN أو رقم الحساب"
                 />
               </div>
@@ -718,7 +795,8 @@ export default function TransferOwnershipForm({
           <input type="checkbox" checked={!!form.electricity_meter_transferred} onChange={(e) => setForm((p) => ({ ...p, electricity_meter_transferred: e.target.checked }))} className="rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
           <span className="text-sm font-medium text-slate-700">نقل عداد الكهرباء مع الوحدة</span>
         </label>
-        {unit.driver_room_number && String(unit.driver_room_number).trim() ? (
+        {/* سياسة غرفة السائق: الخيار يظهر فقط إذا الوحدة مرتبطة برقم غرفة سائق (من تفاصيل العمارة) */}
+        {unit.driver_room_number != null && String(unit.driver_room_number).trim() !== "" ? (
           <>
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={!!form.driver_room_transferred} onChange={(e) => setForm((p) => ({ ...p, driver_room_transferred: e.target.checked }))} className="rounded border-slate-300 text-amber-600 focus:ring-amber-500" />

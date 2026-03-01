@@ -10,7 +10,6 @@ import { formatReceiptNumberDisplay } from "@/lib/receipt-utils";
 import TransferOwnershipForm, { type TransferUnit } from "@/components/TransferOwnershipForm";
 import {
   LayoutDashboard,
-  DollarSign,
   ArrowRightLeft,
   Building2,
   X,
@@ -21,6 +20,7 @@ import {
   MapPin,
   ClipboardCheck,
 } from "lucide-react";
+import { RiyalIcon } from "@/components/icons/RiyalIcon";
 
 type SaleRow = {
   id: string;
@@ -36,6 +36,8 @@ type SaleRow = {
   bank_name?: string | null;
   down_payment?: number | null;
   remaining_payment?: number | null;
+  remaining_payment_due_date?: string | null;
+  remaining_payment_collected_at?: string | null;
   contract_url?: string | null;
   notes: string | null;
   created_at: string;
@@ -89,11 +91,11 @@ export default function SalesPage() {
   const [transferUnit, setTransferUnit] = useState<TransferUnit | null>(null);
   const [transferBuildingName, setTransferBuildingName] = useState("");
   const [salesPage, setSalesPage] = useState(1);
-  const [salesPageSize, setSalesPageSize] = useState(10);
+  const [salesPageSize, setSalesPageSize] = useState(25);
   const [reservationsPage, setReservationsPage] = useState(1);
   const [reservationsPageSize, setReservationsPageSize] = useState(10);
-  const SALES_PAGE_SIZES = [10, 20, 50] as const;
-  const RESERVATIONS_PAGE_SIZES = [10, 20, 50] as const;
+  const SALES_PAGE_SIZES = [10, 25, 50, 100] as const;
+  const RESERVATIONS_PAGE_SIZES = [6, 10, 25, 50, 100] as const;
 
   const salesTotalPages = Math.max(1, Math.ceil(sales.length / salesPageSize));
   const reservationsTotalPages = Math.max(1, Math.ceil(reservations.length / reservationsPageSize));
@@ -135,6 +137,7 @@ export default function SalesPage() {
   const [saleLinkedReservation, setSaleLinkedReservation] = useState<SaleLinkedReservation | null>(null);
   const [selectedSaleUnit, setSelectedSaleUnit] = useState<Record<string, unknown> | null>(null);
   const [selectedSaleHandover, setSelectedSaleHandover] = useState<{ handover_date: string; status: string } | null>(null);
+  const [confirmingRemaining, setConfirmingRemaining] = useState(false);
 
   useEffect(() => {
     if (!selectedSale?.id) {
@@ -147,7 +150,7 @@ export default function SalesPage() {
     (async () => {
       const [res, unitRes, handoverRes] = await Promise.all([
         supabase.from("reservations").select("marketer_name, marketer_phone, customer_name, customer_phone, customer_email, reservation_date, deposit_amount, receipt_number, deposit_settlement_type, customer_iban_or_account, customer_bank_name, completed_at").eq("sale_id", selectedSale.id).maybeSingle(),
-        selectedSale.unit_id ? supabase.from("units").select("price, owner_name, owner_phone, previous_owner_name, tax_exemption_status, transfer_payment_method, transfer_cash_amount, transfer_bank_name, transfer_amount, transfer_reference_number, transfer_check_amount, transfer_check_bank_name, transfer_check_number, transfer_check_image_url, transfer_real_estate_request_no, electricity_meter_transferred_with_sale, driver_room_transferred_with_sale, driver_room_number").eq("id", selectedSale.unit_id).maybeSingle() : { data: null },
+        selectedSale.unit_id ? supabase.from("units").select("price, owner_name, owner_phone, previous_owner_name, tax_exemption_status, tax_exemption_file_url, transfer_payment_method, transfer_cash_amount, transfer_bank_name, transfer_amount, transfer_reference_number, transfer_check_amount, transfer_check_bank_name, transfer_check_number, transfer_check_image_url, transfer_real_estate_request_no, electricity_meter_transferred_with_sale, driver_room_transferred_with_sale, driver_room_number").eq("id", selectedSale.unit_id).maybeSingle() : { data: null },
         selectedSale.unit_id ? supabase.from("unit_handovers").select("handover_date, status").eq("unit_id", selectedSale.unit_id).maybeSingle() : { data: null },
       ]);
       setSaleLinkedReservation(res.data as SaleLinkedReservation | null);
@@ -159,7 +162,7 @@ export default function SalesPage() {
   async function fetchSalesWithRelations() {
     const { data: salesData, error } = await supabase
       .from("sales")
-      .select("id, buyer_name, buyer_email, buyer_phone, buyer_id_number, sale_date, sale_price, commission_amount, payment_method, payment_status, bank_name, down_payment, remaining_payment, contract_url, notes, created_at, unit_id, building_id")
+      .select("id, buyer_name, buyer_email, buyer_phone, buyer_id_number, sale_date, sale_price, commission_amount, payment_method, payment_status, bank_name, down_payment, remaining_payment, remaining_payment_due_date, remaining_payment_collected_at, contract_url, notes, created_at, unit_id, building_id")
       .order("created_at", { ascending: false });
     if (error) return { error, rows: [] as SaleRow[] };
     const rows = (salesData || []) as (SaleRow & { unit_id: string; building_id: string })[];
@@ -290,6 +293,76 @@ export default function SalesPage() {
     }
   };
 
+  /** تأكيد تحصيل المبلغ المتبقي — تغيير حالة الدفع من جزئي إلى مكتمل (الوحدة تبقى sold، مبلغ البيع والعمولة دون تغيير) */
+  const handleConfirmRemainingCollected = async () => {
+    if (!selectedSale?.id || selectedSale.payment_status !== "partial" || (selectedSale.remaining_payment ?? 0) <= 0) return;
+    setConfirmingRemaining(true);
+    const collectedAt = new Date().toISOString();
+    const dueDate = selectedSale.remaining_payment_due_date ? new Date(selectedSale.remaining_payment_due_date).getTime() : null;
+    const isLate = dueDate != null && new Date(collectedAt).getTime() > dueDate;
+    try {
+      const { error } = await supabase
+        .from("sales")
+        .update({
+          payment_status: "completed",
+          remaining_payment: 0,
+          remaining_payment_collected_at: collectedAt,
+          updated_at: collectedAt,
+        })
+        .eq("id", selectedSale.id);
+      if (error) {
+        showToast(error.message || "تعذر تحديث حالة الدفع", "error");
+        setConfirmingRemaining(false);
+        return;
+      }
+      const { data: user } = await supabase.auth.getUser();
+      const buildingName = (selectedSale as SaleRow & { buildings?: { name: string } | null }).buildings?.name ?? "—";
+      await supabase.from("activity_logs").insert({
+        user_id: user?.data?.user?.id ?? null,
+        action_type: "remaining_payment_collected",
+        action_description: `تأكيد تحصيل المتبقي — بيع ${selectedSale.id} — ${Number(selectedSale.remaining_payment).toLocaleString("en")} ر.س — تحوّل إلى دفع مكتمل`,
+        metadata: {
+          sale_id: selectedSale.id,
+          collected_amount: selectedSale.remaining_payment,
+          due_date: selectedSale.remaining_payment_due_date ?? null,
+          collected_at: collectedAt,
+          building_id: selectedSale.building_id,
+          building_name: buildingName,
+          buyer_name: selectedSale.buyer_name ?? null,
+        },
+      });
+      if (isLate && selectedSale.remaining_payment_due_date) {
+        await supabase.from("activity_logs").insert({
+          user_id: user?.data?.user?.id ?? null,
+          action_type: "remaining_payment_collected_late",
+          action_description: `تأخير في تحصيل المتبقي — كان الاستحقاق ${new Date(selectedSale.remaining_payment_due_date).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })} — تم الدفع في ${new Date(collectedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })} — ${buildingName} — ${Number(selectedSale.remaining_payment).toLocaleString("en")} ر.س`,
+          metadata: {
+            sale_id: selectedSale.id,
+            due_date: selectedSale.remaining_payment_due_date,
+            collected_at: collectedAt,
+            building_id: selectedSale.building_id,
+            building_name: buildingName,
+            buyer_name: selectedSale.buyer_name ?? null,
+            collected_amount: selectedSale.remaining_payment,
+          },
+        });
+      }
+      setSelectedSale({
+        ...selectedSale,
+        payment_status: "completed",
+        remaining_payment: 0,
+        remaining_payment_collected_at: collectedAt,
+      });
+      const { rows } = await fetchSalesWithRelations();
+      setSales(rows);
+      showToast("تم تأكيد التحصيل من النظام. تم تحديث حالة الدفع إلى مكتمل.");
+    } catch {
+      showToast("حدث خطأ أثناء التأكيد", "error");
+    } finally {
+      setConfirmingRemaining(false);
+    }
+  };
+
   const handleTransferSuccess = async () => {
     const unitIdToRemove = transferUnit?.id;
     setTransferUnit(null);
@@ -344,7 +417,7 @@ export default function SalesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-sky-50/40 p-4 sm:p-6 lg:p-8" dir="rtl">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-amber-50/40 p-4 sm:p-6 lg:p-8" dir="rtl">
       <div className="max-w-6xl mx-auto relative">
         {/* هيدر احترافي */}
         <header className="relative rounded-2xl overflow-hidden mb-8 shadow-lg border border-gray-200/90 bg-gradient-to-br from-white to-gray-50">
@@ -353,10 +426,10 @@ export default function SalesPage() {
           <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 sm:p-6">
             <div className="flex items-center gap-3">
               <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/25 ring-2 ring-white/80">
-                <DollarSign className="w-7 h-7 text-white" />
+                <RiyalIcon className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-800 tracking-tight">إدارة المبيعات</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-800 tracking-tight">إدارة التسويق والمبيعات</h1>
                 <p className="text-xs sm:text-sm text-gray-500 mt-0.5">سجل المبيعات وإتمام نقل الملكية — تتبع عمليات البيع والمدفوعات</p>
               </div>
             </div>
@@ -365,7 +438,7 @@ export default function SalesPage() {
                 href="/dashboard/marketing"
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition"
               >
-                إدارة التسويق
+                إدارة التسويق والمبيعات
               </Link>
               <Link
                 href="/dashboard"
@@ -402,255 +475,276 @@ export default function SalesPage() {
         </div>
 
         {tab === "list" && (
-          <section className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-amber-500/15 text-amber-600">
-                  <FileText className="w-5 h-5" />
-                </span>
-                سجل المبيعات
-              </h2>
-            </div>
-      {loading ? (
-              <div className="flex justify-center items-center py-16">
-                <div className="animate-spin w-10 h-10 border-2 border-amber-500 border-t-transparent rounded-full" />
+          <div className="space-y-6">
+            {/* ١ — جدول الحجوزات (أولاً لسهولة إتمام البيع من الحجز) */}
+            <section className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-white">
+                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 flex-wrap">
+                  <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-amber-500/15 text-amber-600">
+                    <ArrowRightLeft className="w-5 h-5" />
+                  </span>
+                  وحدات محجوزة
+                  {reservations.length > 0 && (
+                    <span className="text-sm font-normal text-slate-500 font-mono">— {reservations.length.toLocaleString("en")} حجز</span>
+                  )}
+                </h2>
+                <p className="text-sm text-slate-500 mt-0.5">إتمام البيع أو استلام الوحدة من هنا</p>
               </div>
-            ) : (
-              <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-center border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">#</th>
-                      <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">العمارة</th>
-                      <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">الوحدة</th>
-                      <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">المشتري</th>
-                      <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">جوال</th>
-                      <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">تاريخ البيع</th>
-                      <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">السعر</th>
-                      <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">حالة الدفع</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {salesPaginated.map((s, i) => (
-                      <tr
-                        key={s.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setSelectedSale(s)}
-                        onKeyDown={(e) => e.key === "Enter" && setSelectedSale(s)}
-                        className="border-b border-slate-100 hover:bg-amber-50/30 transition cursor-pointer"
-                      >
-                        <td className="p-3 text-slate-500 text-sm">{(salesPage - 1) * salesPageSize + i + 1}</td>
-                        <td className="p-3 text-slate-800 font-medium">
-                          {s.buildings && typeof s.buildings === "object" && "name" in s.buildings ? String((s.buildings as { name: string }).name) : "—"}
-                        </td>
-                        <td className="p-3 text-slate-700">
-                          {s.units && typeof s.units === "object" && "unit_number" in s.units && "floor" in s.units
-                            ? `د ${(s.units as { floor: number }).floor} — وحدة ${(s.units as { unit_number: string }).unit_number}`
-                            : "—"}
-                        </td>
-                        <td className="p-3 text-slate-800 font-medium">{s.buyer_name}</td>
-                        <td className="p-3 text-slate-600 dir-ltr">{s.buyer_phone || "—"}</td>
-                        <td className="p-3 text-slate-600">{s.sale_date?.slice(0, 10) || "—"}</td>
-                        <td className="p-3 text-slate-800 font-medium dir-ltr">{Number(s.sale_price).toLocaleString("en")}</td>
-                        <td className="p-3">
-                          <span
-                            className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-medium ${
-                              s.payment_status === "completed" ? "bg-emerald-100 text-emerald-700" : s.payment_status === "partial" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"
-                            }`}
-                          >
-                            {s.payment_status === "completed" ? "مكتمل" : s.payment_status === "partial" ? "جزئي" : "قيد الانتظار"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {sales.length > 0 && salesTotalPages > 1 && (
-                  <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50">
-                    <div className="flex items-center gap-2 text-sm text-slate-600">
-                      <span>عرض</span>
-                      <select
-                        value={salesPageSize}
-                        onChange={(e) => { setSalesPageSize(Number(e.target.value)); setSalesPage(1); }}
-                        className="rounded-lg border border-slate-200 px-2 py-1 text-sm"
-                      >
-                        {SALES_PAGE_SIZES.map((n) => (
-                          <option key={n} value={n}>{n}</option>
-                        ))}
-                      </select>
-                      <span>من أصل {sales.length} عملية</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setSalesPage((p) => Math.max(1, p - 1))}
-                        disabled={salesPage <= 1}
-                        className="min-w-[2.5rem] py-1.5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        السابق
-                      </button>
-                      <span className="px-2 py-1.5 text-sm text-slate-600">
-                        {salesPage} / {salesTotalPages}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setSalesPage((p) => Math.min(salesTotalPages, p + 1))}
-                        disabled={salesPage >= salesTotalPages}
-                        className="min-w-[2.5rem] py-1.5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        التالي
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {sales.length === 0 && !loading && (
-                  <div className="text-center py-16 text-slate-500">
-                    <DollarSign className="w-14 h-14 mx-auto mb-3 text-slate-300" />
-                    <p className="font-medium">
-                      {salesError ? "تعذر تحميل سجل المبيعات" : "لا توجد مبيعات مسجلة"}
-                    </p>
-                    <p className="text-sm mt-1">
-                      {salesError ? (
-                        <>
-                          {salesError}
-                          <span className="block mt-2 text-amber-600 font-medium">
-                            إذا كنت موظفاً: نفّذ سكربت fix_sales_rls_employees.sql في Supabase → SQL Editor لتمكين عرض المبيعات.
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          استخدم «إتمام نقل ملكية» أو الوحدات المحجوزة أدناه لتسجيل أول عملية بيع
-                          <span className="block mt-2 text-slate-400 text-xs">
-                            موظف ولا ترى مبيعات موجودة؟ نفّذ fix_sales_rls_employees.sql في Supabase.
-                          </span>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* وحدات محجوزة — إتمام البيع مباشرة (يظهر دائماً في سجل المبيعات) */}
-              <div className="border-t border-slate-100 mt-4">
-                <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-white">
-                  <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                    <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-amber-500/15 text-amber-600">
-                      <ArrowRightLeft className="w-5 h-5" />
-                    </span>
-                    وحدات محجوزة
-                  </h2>
+              {reservationsLoading ? (
+                <div className="flex justify-center py-10">
+                  <div className="animate-spin w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full" />
                 </div>
-                {reservationsLoading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full" />
-                  </div>
-                ) : reservations.length === 0 ? (
-                  <div className="text-center py-10 text-slate-500 text-sm">لا توجد وحدات محجوزة حالياً — يمكن إنشاء حجوزات من إدارة التسويق / الحجوزات</div>
-      ) : (
-        <div className="overflow-x-auto">
-                      <table className="w-full text-center border-collapse">
-            <thead>
-                          <tr className="bg-slate-50 border-b border-slate-200">
-                            <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">العمارة</th>
-                            <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">الوحدة</th>
-                            <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">العميل</th>
-                            <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">جوال</th>
-                            <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">العربون</th>
-                            <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">رقم السند</th>
-                            <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">إجراء</th>
-              </tr>
-            </thead>
-            <tbody>
-                          {reservationsPaginated.map((r) => (
-                            <tr key={r.id} className="border-b border-slate-100 hover:bg-amber-50/30 transition">
-                              <td className="p-3 text-slate-800 font-medium">
-                                {r.building && typeof r.building === "object" && "name" in r.building ? String(r.building.name) : "—"}
-                              </td>
-                              <td className="p-3 text-slate-700">
-                                {r.unit && "unit_number" in r.unit && "floor" in r.unit
-                                  ? `د ${(r.unit as TransferUnit).floor} — وحدة ${(r.unit as TransferUnit).unit_number}`
-                                  : "—"}
-                              </td>
-                              <td className="p-3 text-slate-800 font-medium">{r.customer_name}</td>
-                              <td className="p-3 text-slate-600 dir-ltr">{r.customer_phone || "—"}</td>
-                              <td className="p-3 text-slate-700 dir-ltr">
-                                {r.deposit_amount != null ? Number(r.deposit_amount).toLocaleString("en") : "—"}
-                              </td>
-                              <td className="p-3 text-slate-600 text-sm font-mono">{formatReceiptNumberDisplay(r.receipt_number)}</td>
-                              <td className="p-3">
-                                <div className="flex flex-wrap items-center justify-center gap-2">
-                                  <Link
-                                    href={r.unit && typeof r.unit === "object" && "id" in r.unit ? `/dashboard/sales/handover/${(r.unit as TransferUnit).id}` : "#"}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition"
-                                    title="استلام ومعاينة الوحدة (قبل إتمام البيع)"
-                                  >
-                                    <ClipboardCheck className="w-4 h-4" />
-                                    استلام الوحدة
-                                  </Link>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (r.unit && typeof r.unit === "object" && "id" in r.unit) {
-                                        openTransferForUnit(r.unit as TransferUnit, (r.building && typeof r.building === "object" && "name" in r.building ? String(r.building.name) : "") || "");
-                                      }
-                                    }}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition"
-                                  >
-                                    <ArrowRightLeft className="w-4 h-4" />
-                                    إتمام البيع
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                )}
-                {reservations.length > 0 && reservationsTotalPages > 1 && (
-                  <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-amber-50/30">
-                    <div className="flex items-center gap-2 text-sm text-slate-600">
-                      <span>عرض</span>
-                      <select
-                        value={reservationsPageSize}
-                        onChange={(e) => { setReservationsPageSize(Number(e.target.value)); setReservationsPage(1); }}
-                        className="rounded-lg border border-slate-200 px-2 py-1 text-sm"
-                      >
-                        {RESERVATIONS_PAGE_SIZES.map((n) => (
-                          <option key={n} value={n}>{n}</option>
+              ) : reservations.length === 0 ? (
+                <div className="text-center py-10 text-slate-500 text-sm">لا توجد وحدات محجوزة حالياً — يمكن إنشاء حجوزات من إدارة التسويق والمبيعات / الحجوزات</div>
+              ) : (
+                <>
+                  <div className="overflow-auto max-h-[22rem] border-b border-slate-100" style={{ minHeight: "8rem" }}>
+                    <table className="w-full text-center border-collapse">
+                      <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(0,0,0,0.06)]">
+                        <tr className="border-b border-slate-200">
+                          <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">العمارة</th>
+                          <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">الوحدة</th>
+                          <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">العميل</th>
+                          <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">جوال</th>
+                          <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">العربون</th>
+                          <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">رقم السند</th>
+                          <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">إجراء</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reservationsPaginated.map((r) => (
+                          <tr key={r.id} className="border-b border-slate-100 hover:bg-amber-50/30 transition">
+                            <td className="p-3 text-slate-800 font-medium">
+                              {r.building && typeof r.building === "object" && "name" in r.building ? String(r.building.name) : "—"}
+                            </td>
+                            <td className="p-3 text-slate-700">
+                              {r.unit && "unit_number" in r.unit && "floor" in r.unit
+                                ? `د ${(r.unit as TransferUnit).floor} — وحدة ${(r.unit as TransferUnit).unit_number}`
+                                : "—"}
+                            </td>
+                            <td className="p-3 text-slate-800 font-medium">{r.customer_name}</td>
+                            <td className="p-3 text-slate-600 dir-ltr">{r.customer_phone || "—"}</td>
+                            <td className="p-3 text-slate-700 dir-ltr">
+                              {r.deposit_amount != null ? Number(r.deposit_amount).toLocaleString("en") : "—"}
+                            </td>
+                            <td className="p-3 text-slate-600 text-sm font-mono">{formatReceiptNumberDisplay(r.receipt_number)}</td>
+                            <td className="p-3">
+                              <div className="flex flex-wrap items-center justify-center gap-2">
+                                <Link
+                                  href={r.unit && typeof r.unit === "object" && "id" in r.unit ? `/dashboard/sales/handover/${(r.unit as TransferUnit).id}` : "#"}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition"
+                                  title="استلام ومعاينة الوحدة (قبل إتمام البيع)"
+                                >
+                                  <ClipboardCheck className="w-4 h-4" />
+                                  استلام الوحدة
+                                </Link>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (r.unit && typeof r.unit === "object" && "id" in r.unit) {
+                                      openTransferForUnit(r.unit as TransferUnit, (r.building && typeof r.building === "object" && "name" in r.building ? String(r.building.name) : "") || "");
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition"
+                                >
+                                  <ArrowRightLeft className="w-4 h-4" />
+                                  إتمام البيع
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
                         ))}
-                      </select>
-                      <span>من أصل {reservations.length} حجز</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setReservationsPage((p) => Math.max(1, p - 1))}
-                        disabled={reservationsPage <= 1}
-                        className="min-w-[2.5rem] py-1.5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        السابق
-                      </button>
-                      <span className="px-2 py-1.5 text-sm text-slate-600">
-                        {reservationsPage} / {reservationsTotalPages}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setReservationsPage((p) => Math.min(reservationsTotalPages, p + 1))}
-                        disabled={reservationsPage >= reservationsTotalPages}
-                        className="min-w-[2.5rem] py-1.5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        التالي
-                      </button>
-                    </div>
+                      </tbody>
+                    </table>
                   </div>
-                )}
+                  {reservations.length > 0 && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-amber-50/30">
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                        <span>عرض</span>
+                        <select
+                          value={reservationsPageSize}
+                          onChange={(e) => { setReservationsPageSize(Number(e.target.value)); setReservationsPage(1); }}
+                          className="rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                        >
+                          {RESERVATIONS_PAGE_SIZES.map((n) => (
+                            <option key={n} value={n}>{n}</option>
+                          ))}
+                        </select>
+                        <span className="font-mono">
+                          {((reservationsPage - 1) * reservationsPageSize + 1).toLocaleString("en")}–{Math.min(reservationsPage * reservationsPageSize, reservations.length).toLocaleString("en")} من {reservations.length.toLocaleString("en")}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setReservationsPage((p) => Math.max(1, p - 1))}
+                          disabled={reservationsPage <= 1}
+                          className="min-w-[2.5rem] py-1.5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          السابق
+                        </button>
+                        <span className="px-2 py-1.5 text-sm text-slate-600 font-mono">
+                          ص {reservationsPage.toLocaleString("en")} / {reservationsTotalPages.toLocaleString("en")}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setReservationsPage((p) => Math.min(reservationsTotalPages, p + 1))}
+                          disabled={reservationsPage >= reservationsTotalPages}
+                          className="min-w-[2.5rem] py-1.5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          التالي
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+
+            {/* ٢ — سجل المبيعات */}
+            <section className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 flex-wrap">
+                  <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-amber-500/15 text-amber-600">
+                    <FileText className="w-5 h-5" />
+                  </span>
+                  سجل المبيعات
+                  {sales.length > 0 && (
+                    <span className="text-sm font-normal text-slate-500 font-mono">— {sales.length.toLocaleString("en")} عملية</span>
+                  )}
+                </h2>
+                <p className="text-sm text-slate-500 mt-0.5">عرض وتفاصيل عمليات البيع المكتملة</p>
               </div>
-              </>
-            )}
-          </section>
+              {loading ? (
+                <div className="flex justify-center items-center py-16">
+                  <div className="animate-spin w-10 h-10 border-2 border-amber-500 border-t-transparent rounded-full" />
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-auto max-h-[30rem] border-b border-slate-100" style={{ minHeight: "12rem" }}>
+                    <table className="w-full text-center border-collapse">
+                      <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(0,0,0,0.06)]">
+                        <tr className="border-b border-slate-200">
+                          <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">#</th>
+                          <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">العمارة</th>
+                          <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">الوحدة</th>
+                          <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">المشتري</th>
+                          <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">جوال</th>
+                          <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">تاريخ البيع</th>
+                          <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">السعر</th>
+                          <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">حالة الدفع</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {salesPaginated.map((s, i) => (
+                          <tr
+                            key={s.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setSelectedSale(s)}
+                            onKeyDown={(e) => e.key === "Enter" && setSelectedSale(s)}
+                            className="border-b border-slate-100 hover:bg-amber-50/30 transition cursor-pointer"
+                          >
+                            <td className="p-3 text-slate-500 text-sm">{(salesPage - 1) * salesPageSize + i + 1}</td>
+                            <td className="p-3 text-slate-800 font-medium">
+                              {s.buildings && typeof s.buildings === "object" && "name" in s.buildings ? String((s.buildings as { name: string }).name) : "—"}
+                            </td>
+                            <td className="p-3 text-slate-700">
+                              {s.units && typeof s.units === "object" && "unit_number" in s.units && "floor" in s.units
+                                ? `د ${(s.units as { floor: number }).floor} — وحدة ${(s.units as { unit_number: string }).unit_number}`
+                                : "—"}
+                            </td>
+                            <td className="p-3 text-slate-800 font-medium">{s.buyer_name}</td>
+                            <td className="p-3 text-slate-600 dir-ltr">{s.buyer_phone || "—"}</td>
+                            <td className="p-3 text-slate-600">{s.sale_date?.slice(0, 10) || "—"}</td>
+                            <td className="p-3 text-slate-800 font-medium dir-ltr">{Number(s.sale_price).toLocaleString("en")}</td>
+                            <td className="p-3">
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border shadow-sm ${
+                                    s.payment_status === "completed"
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                      : s.payment_status === "partial"
+                                        ? "bg-amber-50 text-amber-700 border-amber-200"
+                                        : "bg-slate-50 text-slate-600 border-slate-200"
+                                  }`}
+                                >
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                      s.payment_status === "completed" ? "bg-emerald-500" : s.payment_status === "partial" ? "bg-amber-500" : "bg-slate-400"
+                                    }`}
+                                    aria-hidden
+                                  />
+                                  {s.payment_status === "completed" ? "مكتمل" : s.payment_status === "partial" ? "جزئي" : "قيد الانتظار"}
+                                </span>
+                                {s.payment_status === "partial" && s.remaining_payment != null && s.remaining_payment > 0 && (
+                                  <span className="text-[10px] text-amber-700 dir-ltr">
+                                    متبقي {Number(s.remaining_payment).toLocaleString("en")} ر.س
+                                    {s.remaining_payment_due_date ? ` · ${new Date(s.remaining_payment_due_date).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })}` : ""}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {sales.length > 0 && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                        <span>عرض</span>
+                        <select
+                          value={salesPageSize}
+                          onChange={(e) => { setSalesPageSize(Number(e.target.value)); setSalesPage(1); }}
+                          className="rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                        >
+                          {SALES_PAGE_SIZES.map((n) => (
+                            <option key={n} value={n}>{n}</option>
+                          ))}
+                        </select>
+                        <span className="font-mono">
+                          {((salesPage - 1) * salesPageSize + 1).toLocaleString("en")}–{Math.min(salesPage * salesPageSize, sales.length).toLocaleString("en")} من {sales.length.toLocaleString("en")}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setSalesPage((p) => Math.max(1, p - 1))}
+                          disabled={salesPage <= 1}
+                          className="min-w-[2.5rem] py-1.5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          السابق
+                        </button>
+                        <span className="px-2 py-1.5 text-sm text-slate-600 font-mono">
+                          ص {salesPage.toLocaleString("en")} / {salesTotalPages.toLocaleString("en")}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSalesPage((p) => Math.min(salesTotalPages, p + 1))}
+                          disabled={salesPage >= salesTotalPages}
+                          className="min-w-[2.5rem] py-1.5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          التالي
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {sales.length === 0 && !loading && (
+                    <div className="text-center py-16 text-slate-500">
+                      <RiyalIcon className="w-14 h-14 mx-auto mb-3 text-slate-300" />
+                      <p className="font-medium">
+                        {salesError ? "تعذر تحميل سجل المبيعات" : "لا توجد مبيعات مسجلة"}
+                      </p>
+                      <p className="text-sm mt-1">
+                        {salesError ? salesError : "استخدم «إتمام نقل ملكية» أو الوحدات المحجوزة أعلاه لتسجيل أول عملية بيع"}
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+          </div>
         )}
 
         {tab === "transfer" && (
@@ -707,7 +801,8 @@ export default function SalesPage() {
                           <td className="p-3 font-medium text-slate-800">{u.unit_number}</td>
                           <td className="p-3 text-slate-600">{u.floor}</td>
                           <td className="p-3">
-                            <span className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-medium ${u.status === "reserved" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border shadow-sm ${u.status === "reserved" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-emerald-50 text-emerald-700 border-emerald-200"}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${u.status === "reserved" ? "bg-amber-500" : "bg-emerald-500"}`} aria-hidden />
                               {u.status === "reserved" ? "محجوزة" : "متاحة"}
                             </span>
                           </td>
@@ -795,6 +890,14 @@ export default function SalesPage() {
                       <p className="flex justify-between text-sm"><span className="text-slate-500">جوال المشتري</span><span className="font-medium dir-ltr">{selectedSale.buyer_phone || "—"}</span></p>
                       {(selectedSale.buyer_email ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">البريد الإلكتروني</span><span className="font-medium dir-ltr">{selectedSale.buyer_email}</span></p>}
                       {(selectedSale.buyer_id_number ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">رقم هوية المشتري</span><span className="font-medium dir-ltr">{selectedSale.buyer_id_number}</span></p>}
+                      {selectedSaleUnit && (
+                        <>
+                          <p className="flex justify-between text-sm"><span className="text-slate-500">الإعفاء الضريبي</span><span className="font-medium">{selectedSaleUnit.tax_exemption_status === true ? "نعم" : selectedSaleUnit.tax_exemption_status === false ? "لا" : "—"}</span></p>
+                          {(selectedSaleUnit.tax_exemption_file_url ?? "").toString().trim() && (
+                            <p className="flex justify-between text-sm items-center gap-2"><span className="text-slate-500">مرفق الإعفاء الضريبي</span><a href={String(selectedSaleUnit.tax_exemption_file_url)} target="_blank" rel="noopener noreferrer" className="font-medium dir-ltr text-amber-600 hover:underline text-xs break-all">رابط الملف</a></p>
+                          )}
+                        </>
+                      )}
                     </div>
                   </section>
                   {((saleLinkedReservation?.marketer_name ?? saleLinkedReservation?.marketer_phone) || selectedSale.commission_amount != null) && (
@@ -812,7 +915,7 @@ export default function SalesPage() {
                   )}
                   <section>
                     <h2 className="text-sm font-bold text-amber-700 uppercase tracking-wider mb-2 flex items-center gap-2">
-                      <DollarSign className="w-4 h-4" />
+                      <RiyalIcon className="w-4 h-4" />
                       تفاصيل البيع والدفع
                     </h2>
                     <div className="bg-slate-50 rounded-xl p-4 space-y-2">
@@ -826,7 +929,8 @@ export default function SalesPage() {
                       )}
                       {selectedSaleUnit?.transfer_amount != null && Number(selectedSaleUnit.transfer_amount) > 0 && <p className="flex justify-between text-sm"><span className="text-slate-500">مبلغ الحوالة</span><span className="font-medium dir-ltr">{Number(selectedSaleUnit.transfer_amount).toLocaleString("en")} ر.س</span></p>}
                       {(selectedSaleUnit?.transfer_bank_name ?? "").toString().trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">اسم البنك (تحويل)</span><span className="font-medium">{String(selectedSaleUnit.transfer_bank_name)}</span></p>}
-                      {((selectedSaleUnit?.transfer_bank_name ?? "").toString().trim() || (selectedSaleUnit?.transfer_amount != null && Number(selectedSaleUnit.transfer_amount) > 0)) && <div className="border-t border-slate-200/80 my-2" />}
+                      {(selectedSaleUnit?.transfer_reference_number ?? "").toString().trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">رقم الحوالة</span><span className="font-medium dir-ltr">{String(selectedSaleUnit.transfer_reference_number)}</span></p>}
+                      {((selectedSaleUnit?.transfer_bank_name ?? "").toString().trim() || (selectedSaleUnit?.transfer_amount != null && Number(selectedSaleUnit.transfer_amount) > 0) || (selectedSaleUnit?.transfer_reference_number ?? "").toString().trim()) && <div className="border-t border-slate-200/80 my-2" />}
                       {selectedSaleUnit?.transfer_check_amount != null && Number(selectedSaleUnit.transfer_check_amount) > 0 && (
                         <>
                           <p className="flex justify-between text-sm"><span className="text-slate-500">مبلغ الشيك المصدق</span><span className="font-medium dir-ltr">{Number(selectedSaleUnit.transfer_check_amount).toLocaleString("en")} ر.س</span></p>
@@ -834,9 +938,34 @@ export default function SalesPage() {
                           <div className="border-t border-slate-200/80 my-2" />
                         </>
                       )}
-                      {(selectedSale.down_payment != null && selectedSale.down_payment > 0) && <p className="flex justify-between text-sm"><span className="text-slate-500">المقدم</span><span className="font-medium dir-ltr">{Number(selectedSale.down_payment).toLocaleString("en")} ر.س</span></p>}
-                      {(selectedSale.remaining_payment != null && selectedSale.remaining_payment > 0) && <p className="flex justify-between text-sm"><span className="text-slate-500">المتبقي</span><span className="font-medium dir-ltr">{Number(selectedSale.remaining_payment).toLocaleString("en")} ر.س</span></p>}
-                      <p className="flex justify-between text-sm"><span className="text-slate-500">حالة الدفع</span><span className="font-medium">{selectedSale.payment_status === "completed" ? "مكتمل" : selectedSale.payment_status === "partial" ? "جزئي" : "قيد الانتظار"}</span></p>
+                      <p className="flex justify-between text-sm"><span className="text-slate-500">المدفوع</span><span className="font-medium dir-ltr">{Number((selectedSale.sale_price ?? 0) - (selectedSale.remaining_payment ?? 0)).toLocaleString("en")} ر.س</span></p>
+                      {(selectedSale.remaining_payment != null && selectedSale.remaining_payment > 0) && (
+                        <>
+                          <p className="flex justify-between text-sm"><span className="text-slate-500">المبلغ المتبقي</span><span className="font-medium dir-ltr text-amber-700">{Number(selectedSale.remaining_payment).toLocaleString("en")} ر.س</span></p>
+                          {selectedSale.remaining_payment_due_date && <p className="flex justify-between text-sm"><span className="text-slate-500">تاريخ استحقاق المتبقي</span><span className="font-medium dir-ltr">{new Date(selectedSale.remaining_payment_due_date).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })}</span></p>}
+                        </>
+                      )}
+                      {selectedSale.payment_status === "completed" && selectedSale.remaining_payment_collected_at && (
+                        <p className="flex justify-between text-sm"><span className="text-slate-500">تم تحصيل المبلغ المتبقي</span><span className="font-medium dir-ltr text-emerald-700">تم الدفع في {new Date(selectedSale.remaining_payment_collected_at).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })}</span></p>
+                      )}
+                      <p className="flex justify-between items-center gap-2 text-sm"><span className="text-slate-500">حالة الدفع</span>
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border shadow-sm ${selectedSale.payment_status === "completed" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : selectedSale.payment_status === "partial" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-slate-50 text-slate-600 border-slate-200"}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${selectedSale.payment_status === "completed" ? "bg-emerald-500" : selectedSale.payment_status === "partial" ? "bg-amber-500" : "bg-slate-400"}`} aria-hidden />
+                          {selectedSale.payment_status === "completed" ? "مكتمل" : selectedSale.payment_status === "partial" ? "جزئي" : "قيد الانتظار"}
+                        </span></p>
+                      {selectedSale.payment_status === "partial" && (selectedSale.remaining_payment ?? 0) > 0 && (
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={handleConfirmRemainingCollected}
+                            disabled={confirmingRemaining}
+                            className="inline-flex items-center gap-2 w-full justify-center px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                          >
+                            <ClipboardCheck className="w-4 h-4" />
+                            {confirmingRemaining ? "جاري التأكيد..." : "تأكيد تحصيل المتبقي"}
+                          </button>
+                        </div>
+                      )}
                       {(selectedSale.notes ?? "").trim() && <p className="text-sm mt-2"><span className="text-slate-500 block mb-1">ملاحظات</span><span className="font-medium">{(selectedSale.notes ?? "").replace(/نقل ملكية/g, "نقل الملكية")}</span></p>}
                       {(selectedSale.contract_url ?? "").trim() && <p className="text-sm mt-2"><span className="text-slate-500 block mb-1">رابط العقد</span><span className="font-medium break-all dir-ltr text-xs">{selectedSale.contract_url}</span></p>}
                     </div>
@@ -849,10 +978,9 @@ export default function SalesPage() {
                       </h2>
                       <div className="bg-slate-50 rounded-xl p-4 space-y-2">
                         {(selectedSaleUnit?.previous_owner_name ?? "").toString().trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">المالك السابق</span><span className="font-medium">{String(selectedSaleUnit.previous_owner_name)}</span></p>}
-                        {(selectedSaleUnit?.transfer_reference_number ?? "").toString().trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">رقم الحوالة</span><span className="font-medium dir-ltr">{String(selectedSaleUnit.transfer_reference_number)}</span></p>}
                         {selectedSaleUnit && <p className="flex justify-between text-sm"><span className="text-slate-500">نقل عداد الكهرباء مع الوحدة</span><span className="font-medium">{selectedSaleUnit.electricity_meter_transferred_with_sale === true ? "نعم" : "لا"}</span></p>}
                         {selectedSaleUnit && <p className="flex justify-between text-sm"><span className="text-slate-500">حالة غرفة السائق</span><span className="font-medium">{selectedSaleUnit.driver_room_number != null && String(selectedSaleUnit.driver_room_number).trim() ? `رقم ${String(selectedSaleUnit.driver_room_number)} — ${selectedSaleUnit.driver_room_transferred_with_sale === true ? "تم النقل مع الوحدة" : "لم يُنقل مع الوحدة"}` : "غير مسجّلة"}</span></p>}
-                        <p className="flex justify-between text-sm"><span className="text-slate-500">الاستلام</span><span className="font-medium">{selectedSaleHandover ? `تم — ${selectedSaleHandover.handover_date ? new Date(selectedSaleHandover.handover_date).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) : ""}` : "لم يُسجّل استلام بعد"}</span></p>
+                        <p className="flex justify-between text-sm"><span className="text-slate-500">الاستلام</span><span className="font-medium dir-ltr">{selectedSaleHandover ? `تم — ${selectedSaleHandover.handover_date ? new Date(selectedSaleHandover.handover_date).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) : ""}` : "لم يُسجّل استلام بعد"}</span></p>
                       </div>
                     </section>
                   ) : null}
@@ -863,8 +991,8 @@ export default function SalesPage() {
                         الحجز المرتبط (عربون / مخالصة)
                       </h2>
                       <div className="bg-slate-50 rounded-xl p-4 space-y-2">
-                        {saleLinkedReservation.reservation_date && <p className="flex justify-between text-sm"><span className="text-slate-500">تاريخ الحجز</span><span className="font-medium">{saleLinkedReservation.reservation_date.slice(0, 10)}</span></p>}
-                        {saleLinkedReservation.completed_at && <p className="flex justify-between text-sm"><span className="text-slate-500">تاريخ إتمام البيع</span><span className="font-medium">{saleLinkedReservation.completed_at.slice(0, 10)}</span></p>}
+                        {saleLinkedReservation.reservation_date && <p className="flex justify-between text-sm"><span className="text-slate-500">تاريخ الحجز</span><span className="font-medium dir-ltr">{new Date(saleLinkedReservation.reservation_date).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })}</span></p>}
+                        {saleLinkedReservation.completed_at && <p className="flex justify-between text-sm"><span className="text-slate-500">تاريخ إتمام البيع</span><span className="font-medium dir-ltr">{new Date(saleLinkedReservation.completed_at).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })}</span></p>}
                         {saleLinkedReservation.deposit_amount != null && <p className="flex justify-between text-sm"><span className="text-slate-500">مبلغ العربون</span><span className="font-medium dir-ltr">{Number(saleLinkedReservation.deposit_amount).toLocaleString("en")} ر.س</span></p>}
                         {(saleLinkedReservation.receipt_number ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">رقم سند العربون</span><span className="font-medium dir-ltr">{formatReceiptNumberDisplay(saleLinkedReservation.receipt_number)}</span></p>}
                         {(saleLinkedReservation.deposit_settlement_type ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">نوع مخالصة العربون</span><span className="font-medium">تم المخالصة</span></p>}
@@ -874,7 +1002,7 @@ export default function SalesPage() {
                     </section>
                   )}
                 </div>
-                <p className="text-xs text-slate-400 mt-6 text-center">تم الإنشاء من لوحة إدارة المبيعات — {selectedSale.created_at ? new Date(selectedSale.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—"}</p>
+                <p className="text-xs text-slate-400 mt-6 text-center">تم الإنشاء من لوحة إدارة التسويق والمبيعات — <span className="dir-ltr">{selectedSale.created_at ? new Date(selectedSale.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—"}</span></p>
               </div>
               </div>
             </div>

@@ -32,7 +32,6 @@ import {
   Download,
   Upload,
   Search,
-  DollarSign,
   ShoppingCart,
   CheckSquare,
   TrendingDown,
@@ -48,6 +47,7 @@ import {
   User2,
   Crown
 } from 'lucide-react'
+import { RiyalIcon } from '@/components/icons/RiyalIcon'
 import { showToast } from '@/app/dashboard/buildings/details/toast'
 import { useSubscription } from '@/hooks/useSubscription'
 
@@ -78,7 +78,7 @@ interface Unit {
 
 interface Activity {
   id: string
-  type: 'add' | 'edit' | 'delete' | 'booking' | 'sold' | 'reserved' | 'association_end' | 'meter_added' | 'ownership_transferred'
+  type: 'add' | 'edit' | 'delete' | 'booking' | 'sold' | 'reserved' | 'association_end' | 'meter_added' | 'ownership_transferred' | 'remaining_payment_collected' | 'remaining_payment_collected_late'
   building_name: string
   building_id?: string
   user_name: string
@@ -155,6 +155,9 @@ export default function DashboardPage() {
   const [ownershipTransferredLogs, setOwnershipTransferredLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
   const [reservationCancelledLogs, setReservationCancelledLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
   const [depositRefundedLogs, setDepositRefundedLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
+  const [remainingPaymentCollectedLogs, setRemainingPaymentCollectedLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
+  const [remainingPaymentCollectedLateLogs, setRemainingPaymentCollectedLateLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
+  const [salesWithRemaining, setSalesWithRemaining] = useState<Array<{ id: string; building_id: string; remaining_payment: number; remaining_payment_due_date?: string | null; buyer_name?: string | null }>>([])
 
   const router = useRouter()
   const supabase = createClient()
@@ -315,16 +318,19 @@ export default function DashboardPage() {
 
       const buildingIds = (data || []).map(b => b.id)
       if (buildingIds.length > 0) {
-        const [unitsRes, resRes] = await Promise.all([
+        const [unitsRes, resRes, salesPartialRes] = await Promise.all([
           supabase.from('units').select('*').in('building_id', buildingIds),
-          supabase.from('reservations').select('id, unit_id, building_id, created_at, created_by_name, customer_name, status, expiry_date, marketer_name, completed_at, sale_id').in('building_id', buildingIds).order('created_at', { ascending: false })
+          supabase.from('reservations').select('id, unit_id, building_id, created_at, created_by_name, customer_name, status, expiry_date, marketer_name, completed_at, sale_id').in('building_id', buildingIds).order('created_at', { ascending: false }),
+          supabase.from('sales').select('id, building_id, remaining_payment, remaining_payment_due_date, buyer_name').in('building_id', buildingIds).eq('payment_status', 'partial').gt('remaining_payment', 0)
         ])
         if (unitsRes.error) throw unitsRes.error
         setUnits(unitsRes.data || [])
         setReservations(Array.isArray(resRes.data) ? resRes.data : [])
+        setSalesWithRemaining((salesPartialRes.data || []) as Array<{ id: string; building_id: string; remaining_payment: number; remaining_payment_due_date?: string | null; buyer_name?: string | null }>)
       } else {
         setUnits([])
         setReservations([])
+        setSalesWithRemaining([])
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -372,6 +378,34 @@ export default function DashboardPage() {
       setDepositRefundedLogs((refundedRes.data || []) as Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>)
     }
     loadReservationActivityLogs()
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!user) return
+    const loadRemainingPaymentCollectedLogs = async () => {
+      const { data } = await supabase
+        .from('activity_logs')
+        .select('id, action_description, metadata, created_at')
+        .eq('action_type', 'remaining_payment_collected')
+        .order('created_at', { ascending: false })
+        .limit(15)
+      setRemainingPaymentCollectedLogs((data || []) as Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>)
+    }
+    loadRemainingPaymentCollectedLogs()
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!user) return
+    const loadRemainingPaymentCollectedLateLogs = async () => {
+      const { data } = await supabase
+        .from('activity_logs')
+        .select('id, action_description, metadata, created_at')
+        .eq('action_type', 'remaining_payment_collected_late')
+        .order('created_at', { ascending: false })
+        .limit(15)
+      setRemainingPaymentCollectedLateLogs((data || []) as Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>)
+    }
+    loadRemainingPaymentCollectedLateLogs()
   }, [user?.id])
 
   const handleLogout = async () => {
@@ -502,7 +536,13 @@ export default function DashboardPage() {
   }, [can('reservations'), reservationCancelledLogs, depositRefundedLogs])
   const reservationActivityCount = reservationActivityForBell.cancelled.length + reservationActivityForBell.refunded.length
 
-  const notificationsCount = filteredElectricityReminders.length + filteredReservationReminders.length + filteredAssociationEndReminders.length + filteredMissingMeterReminders.length + reservationActivityCount
+  // تنبيهات تأكيد تحصيل المتبقي + تأخير التحصيل + صفقات بمبلغ متبقٍ — للمالك ومن لديه صلاحية المبيعات
+  const filteredRemainingPaymentCollectedLogs = can('sales') ? (remainingPaymentCollectedLogs || []).slice(0, 8) : []
+  const filteredRemainingPaymentCollectedLateLogs = can('sales') ? (remainingPaymentCollectedLateLogs || []).slice(0, 8) : []
+  const filteredSalesWithRemaining = can('sales') ? (salesWithRemaining || []).slice(0, 8) : []
+  const remainingPaymentNotificationsCount = filteredRemainingPaymentCollectedLogs.length + filteredRemainingPaymentCollectedLateLogs.length + filteredSalesWithRemaining.length
+
+  const notificationsCount = filteredElectricityReminders.length + filteredReservationReminders.length + filteredAssociationEndReminders.length + filteredMissingMeterReminders.length + reservationActivityCount + remainingPaymentNotificationsCount
 
   // قائمة معرفات الإشعارات الحالية (لحساب غير المقروءة)
   const currentNotificationIds = useMemo(() => {
@@ -513,8 +553,11 @@ export default function DashboardPage() {
     filteredMissingMeterReminders.forEach(({ buildingId }) => ids.push(`meter-missing-${buildingId}`))
     reservationActivityForBell.cancelled.forEach((log: { id: string }) => ids.push(`activity-cancelled-${log.id}`))
     reservationActivityForBell.refunded.forEach((log: { id: string }) => ids.push(`activity-refund-${log.id}`))
+    filteredRemainingPaymentCollectedLogs.forEach((log: { id: string }) => ids.push(`remaining-collected-${log.id}`))
+    filteredRemainingPaymentCollectedLateLogs.forEach((log: { id: string }) => ids.push(`remaining-collected-late-${log.id}`))
+    filteredSalesWithRemaining.forEach((s: { id: string }) => ids.push(`sale-remaining-${s.id}`))
     return ids
-  }, [filteredAssociationEndReminders, filteredReservationReminders, filteredElectricityReminders, filteredMissingMeterReminders, reservationActivityForBell])
+  }, [filteredAssociationEndReminders, filteredReservationReminders, filteredElectricityReminders, filteredMissingMeterReminders, reservationActivityForBell, filteredRemainingPaymentCollectedLogs, filteredRemainingPaymentCollectedLateLogs, filteredSalesWithRemaining])
 
   const unreadCount = useMemo(() => {
     return currentNotificationIds.filter((id) => !readNotificationIds.has(id)).length
@@ -630,10 +673,26 @@ export default function DashboardPage() {
       timestamp: log.created_at,
       details: log.action_description || 'نقل ملكية'
     }))
-    return [...fromUnits, ...fromReservations, ...fromExpiredReservations, ...fromBuildings, ...fromAssoc, ...fromMeterAdded, ...fromOwnershipTransferred]
+    const fromRemainingPaymentCollected: Activity[] = remainingPaymentCollectedLogs.map(log => ({
+      id: `remaining-${log.id}`,
+      type: 'remaining_payment_collected' as const,
+      building_name: '—',
+      user_name: 'النظام',
+      timestamp: log.created_at,
+      details: log.action_description || 'تم تأكيد تحصيل المبلغ المتبقي'
+    }))
+    const fromRemainingPaymentCollectedLate: Activity[] = remainingPaymentCollectedLateLogs.map(log => ({
+      id: `remaining-late-${log.id}`,
+      type: 'remaining_payment_collected_late' as const,
+      building_name: (log.metadata?.building_name as string) || '—',
+      user_name: 'النظام',
+      timestamp: log.created_at,
+      details: log.action_description || 'تأخير في تحصيل المبلغ المتبقي — تم الدفع بعد تاريخ الاستحقاق'
+    }))
+    return [...fromUnits, ...fromReservations, ...fromExpiredReservations, ...fromBuildings, ...fromAssoc, ...fromMeterAdded, ...fromOwnershipTransferred, ...fromRemainingPaymentCollected, ...fromRemainingPaymentCollectedLate]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 7)
-  }, [units, buildings, reservations, associationEndReminders, meterAddedLogs, ownershipTransferredLogs])
+  }, [units, buildings, reservations, associationEndReminders, meterAddedLogs, ownershipTransferredLogs, remainingPaymentCollectedLogs, remainingPaymentCollectedLateLogs])
 
   // عرض النشاطات حسب الصلاحيات (خاص بلوحة الموظف)
   const filteredActivities = useMemo(() => {
@@ -644,6 +703,8 @@ export default function DashboardPage() {
       if (a.type === 'association_end') return can('details_association')
       if (a.type === 'meter_added') return can('details_electricity')
       if (a.type === 'ownership_transferred') return can('deeds')
+      if (a.type === 'remaining_payment_collected') return can('sales')
+      if (a.type === 'remaining_payment_collected_late') return can('sales')
       return true
     })
   }, [activities, employeePermissions])
@@ -752,7 +813,7 @@ export default function DashboardPage() {
     { icon: Plus, label: 'إضافة عمارة', href: '/dashboard/buildings/new', color: 'blue', gradient: 'from-blue-500 to-cyan-500', permission: 'buildings_create' as const, noPermissionMessage: 'ليس لديك صلاحية إضافة عمارة جديدة. تواصل مع المالك لتفعيل الصلاحية.' },
     { icon: Home, label: 'الوحدات', href: '/dashboard/units', color: 'purple', gradient: 'from-purple-500 to-pink-500', permission: 'units' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول للوحدات.' },
     { icon: BarChart3, label: 'الإحصائيات', href: '/dashboard/statistics', color: 'indigo', gradient: 'from-indigo-500 to-purple-500', permission: 'statistics' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول للإحصائيات.' },
-    { icon: User2, label: 'إدارة التسويق', href: '/dashboard/marketing', color: 'sky', gradient: 'from-sky-500 to-teal-600', permission: 'reservations' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول لإدارة التسويق.' }
+    { icon: User2, label: 'إدارة التسويق والمبيعات', href: '/dashboard/marketing', color: 'amber', gradient: 'from-amber-500 to-orange-600', permission: 'reservations' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول لإدارة التسويق والمبيعات.' }
   ]
 
   const recentBuildings = buildings.slice(0, 3)
@@ -768,6 +829,8 @@ export default function DashboardPage() {
       case 'association_end': return <Users className="w-4 h-4 text-emerald-600" />
       case 'meter_added': return <Zap className="w-4 h-4 text-amber-600" />
       case 'ownership_transferred': return <ArrowRightLeft className="w-4 h-4 text-teal-600" />
+      case 'remaining_payment_collected': return <CheckCircle className="w-4 h-4 text-emerald-600" />
+      case 'remaining_payment_collected_late': return <AlertCircle className="w-4 h-4 text-amber-600" />
       default: return <Activity className="w-4 h-4 text-gray-600" />
     }
   }
@@ -862,7 +925,7 @@ export default function DashboardPage() {
                     )}
                     {can('sales') && (
                       <Link href="/dashboard/sales" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-green-200/70 bg-green-50/90 text-green-700 text-xs font-semibold hover:bg-green-100 transition">
-                        <DollarSign className="w-3.5 h-3.5" />
+                        <RiyalIcon className="w-3.5 h-3.5" />
                         سجل المبيعات
                       </Link>
                     )}
@@ -1040,6 +1103,58 @@ export default function DashboardPage() {
                                 </div>
                               </Link>
                             ))}
+                            {filteredRemainingPaymentCollectedLogs.map((log) => (
+                              <Link
+                                key={`remaining-collected-${log.id}`}
+                                href="/dashboard/sales"
+                                onClick={() => setNotificationsOpen(false)}
+                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-emerald-50/70 transition cursor-pointer"
+                              >
+                                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                                  <CheckCircle className="w-5 h-5" />
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-gray-800">تأكيد تحصيل المتبقي</p>
+                                  <p className="text-xs text-gray-600 mt-0.5">{log.action_description || 'تم تأكيد تحصيل المبلغ المتبقي وتحويل الدفع إلى مكتمل'}</p>
+                                </div>
+                              </Link>
+                            ))}
+                            {filteredRemainingPaymentCollectedLateLogs.map((log) => (
+                              <Link
+                                key={`remaining-collected-late-${log.id}`}
+                                href="/dashboard/sales"
+                                onClick={() => setNotificationsOpen(false)}
+                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-amber-50/70 transition cursor-pointer"
+                              >
+                                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
+                                  <AlertCircle className="w-5 h-5" />
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-gray-800">تأخير في تحصيل المتبقي</p>
+                                  <p className="text-xs text-gray-600 mt-0.5">{log.action_description || 'تم دفع المبلغ المتبقي بعد تاريخ الاستحقاق'}</p>
+                                </div>
+                              </Link>
+                            ))}
+                            {filteredSalesWithRemaining.map((s) => {
+                              const bName = buildings.find(b => b.id === s.building_id)?.name || '—'
+                              return (
+                                <Link
+                                  key={`sale-remaining-${s.id}`}
+                                  href="/dashboard/sales"
+                                  onClick={() => setNotificationsOpen(false)}
+                                  className="flex items-start gap-3 px-4 py-3.5 hover:bg-amber-50/70 transition cursor-pointer"
+                                >
+                                  <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
+                                    <RiyalIcon className="w-5 h-5" />
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold text-gray-800">مبلغ متبقٍ على عميل</p>
+                                    <p className="text-xs text-gray-600 mt-0.5 dir-ltr">{Number(s.remaining_payment).toLocaleString('en')} ر.س — {bName}{s.buyer_name ? ` · ${String(s.buyer_name).trim()}` : ''}</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">سجل المبيعات ← تأكيد التحصيل</p>
+                                  </div>
+                                </Link>
+                              )
+                            })}
                           </div>
                         )}
                       </div>
@@ -1222,7 +1337,7 @@ export default function DashboardPage() {
                   href={action.href}
                   className="group relative bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 p-6 border border-gray-200 hover:border-transparent overflow-hidden hover:-translate-y-2 cursor-pointer"
                 >
-                  <div className={`absolute inset-0 bg-gradient-to-br ${action.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
+                  <div className={`absolute inset-0 top-[-1px] bg-gradient-to-br ${action.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
                   <div className="relative z-10 text-center">
                     <div className={`w-14 h-14 bg-gradient-to-br ${action.gradient} rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-500`}>
                       <action.icon className="w-7 h-7 text-white" />
@@ -1242,7 +1357,7 @@ export default function DashboardPage() {
                 onClick={() => showToast(action.noPermissionMessage, 'error')}
                 className="group relative bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 p-6 border border-gray-200 overflow-hidden cursor-pointer w-full text-right opacity-90 hover:opacity-100"
               >
-                <div className={`absolute inset-0 bg-gradient-to-br ${action.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
+                <div className={`absolute inset-0 top-[-1px] bg-gradient-to-br ${action.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
                 <div className="relative z-10 text-center">
                   <div className={`w-14 h-14 bg-gradient-to-br ${action.gradient} rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg`}>
                     <action.icon className="w-7 h-7 text-white" />
@@ -1295,6 +1410,8 @@ export default function DashboardPage() {
                       activity.type === 'association_end' ? 'from-emerald-100 to-teal-200' :
                       activity.type === 'meter_added' ? 'from-amber-100 to-yellow-200' :
                       activity.type === 'ownership_transferred' ? 'from-teal-100 to-emerald-200' :
+                      activity.type === 'remaining_payment_collected' ? 'from-emerald-100 to-green-200' :
+                      activity.type === 'remaining_payment_collected_late' ? 'from-amber-100 to-orange-200' :
                       'from-gray-100 to-slate-200'
                     } rounded-xl flex items-center justify-center shadow-sm`}>
                       {getActivityIcon(activity.type)}

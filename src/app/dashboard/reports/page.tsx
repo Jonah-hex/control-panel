@@ -11,7 +11,6 @@ import {
   Download,
   Calendar,
   TrendingUp,
-  DollarSign,
   BarChart3,
   Printer,
   Users,
@@ -21,6 +20,7 @@ import {
   Percent,
   LayoutDashboard
 } from 'lucide-react'
+import { RiyalIcon } from '@/components/icons/RiyalIcon'
 
 interface Building {
   id: string
@@ -286,7 +286,7 @@ export default function ReportsPage() {
 
           <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300">
             <div className="flex items-center justify-between mb-3">
-              <DollarSign className="w-8 h-8 opacity-90" />
+              <RiyalIcon className="w-8 h-8 opacity-90" />
               <span className="text-sm font-semibold opacity-90">إجمالي الإيرادات</span>
             </div>
             <p className="text-2xl font-black">{reportData.totalRevenue.toLocaleString()} ر.س</p>

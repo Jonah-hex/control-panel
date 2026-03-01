@@ -299,7 +299,7 @@ export default function UnitHandoverPage() {
         <div className="max-w-lg mx-auto text-center">
           <p className="text-slate-600 mb-4">{error || "الوحدة غير موجودة."}</p>
           <Link href="/dashboard/sales" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 text-white font-medium hover:bg-amber-600">
-            <ArrowRight className="w-4 h-4" /> العودة لإدارة المبيعات
+            <ArrowRight className="w-4 h-4" /> العودة لإدارة التسويق والمبيعات
           </Link>
         </div>
       </main>
@@ -319,7 +319,7 @@ export default function UnitHandoverPage() {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 print:hidden"
             >
               <ArrowRight className="w-4 h-4" />
-              إدارة المبيعات
+              إدارة التسويق والمبيعات
             </Link>
             <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
               <ClipboardCheck className="w-6 h-6 text-amber-600" />

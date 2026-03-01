@@ -20,7 +20,6 @@ import {
   Edit,
   X,
   Maximize2,
-  DollarSign,
   Bed,
   Bath,
   Sofa,
@@ -33,6 +32,7 @@ import {
   DoorOpen,
   LayoutDashboard
 } from 'lucide-react'
+import { RiyalIcon } from '@/components/icons/RiyalIcon'
 
 interface Building {
   id: string
@@ -638,7 +638,7 @@ function UnitsFilterContent() {
                   </div>
                   <div className="space-y-1">
                     <span className="text-xs font-semibold text-gray-500 flex items-center gap-1">
-                      <DollarSign className="w-4 h-4 text-green-500/70" />
+                      <RiyalIcon className="w-4 h-4 text-green-500/70" />
                       السعر (ر.س)
                     </span>
                     <p className="text-gray-900 font-semibold">

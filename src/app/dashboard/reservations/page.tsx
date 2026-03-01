@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -169,21 +169,94 @@ export default function ReservationsPage() {
     customer_name: "",
     customer_email: "",
     customer_phone: "",
+    marketer_id: "" as string,
     marketer_name: "",
     marketer_phone: "",
     deposit_amount: "",
     deposit_paid: false,
     expiry_days: "7",
+    deposit_receipt_method: "cash" as "cash" | "transfer",
     customer_iban_or_account: "",
     customer_bank_name: "",
     notes: "",
   });
+  const [marketersList, setMarketersList] = useState<Array<{ id: string; name: string; phone: string | null }>>([]);
+  const [marketerSearch, setMarketerSearch] = useState("");
+  const [marketerDropdownOpen, setMarketerDropdownOpen] = useState(false);
+  const marketerDropdownRef = useRef<HTMLDivElement>(null);
 
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
   const buildingIdFromUrl = searchParams.get("buildingId") || "";
+  const marketerIdFromUrl = searchParams.get("marketerId") || "";
   const { can, ready, effectiveOwnerId } = useDashboardAuth();
+
+  const fetchMarketers = useCallback(async () => {
+    if (!effectiveOwnerId) return;
+    const { data } = await supabase
+      .from("reservation_marketers")
+      .select("id, name, phone")
+      .eq("owner_id", effectiveOwnerId)
+      .order("name", { ascending: true });
+    setMarketersList((data as Array<{ id: string; name: string; phone: string | null }>) || []);
+  }, [effectiveOwnerId, supabase]);
+
+  useEffect(() => {
+    if (effectiveOwnerId) fetchMarketers();
+  }, [effectiveOwnerId, fetchMarketers]);
+
+  useEffect(() => {
+    if (!createOpen || !marketerIdFromUrl || marketersList.length === 0) return;
+    const m = marketersList.find((x) => x.id === marketerIdFromUrl);
+    if (m) {
+      setCreateForm((f) => ({
+        ...f,
+        marketer_id: m.id,
+        marketer_name: m.name,
+        marketer_phone: m.phone || "",
+      }));
+    }
+  }, [createOpen, marketerIdFromUrl, marketersList]);
+
+  const filteredMarketers = useMemo(() => {
+    const searchRaw = marketerSearch.trim();
+    if (!searchRaw) return marketersList;
+    const searchNorm = normalizeSearchText(searchRaw).replace(/\s+/g, "");
+    const searchDigits = searchRaw.replace(/\D/g, "");
+    const selectedId = createForm.marketer_id?.trim() || null;
+    const matched = marketersList.filter((m) => {
+      const name = m.name || "";
+      const phone = (m.phone || "").replace(/\D/g, "");
+      const nameNorm = normalizeSearchText(name).replace(/\s+/g, "");
+      const nameMatch = nameNorm.includes(searchNorm) || name.toLowerCase().includes(searchRaw.toLowerCase());
+      const phoneMatch = searchDigits.length > 0 && phone.includes(searchDigits);
+      return nameMatch || phoneMatch;
+    });
+    if (selectedId && !matched.some((m) => m.id === selectedId)) {
+      const selected = marketersList.find((m) => m.id === selectedId);
+      if (selected) return [selected, ...matched];
+    }
+    return matched;
+  }, [marketersList, marketerSearch, createForm.marketer_id]);
+
+  useEffect(() => {
+    if (!createOpen) {
+      setMarketerSearch("");
+      setMarketerDropdownOpen(false);
+    }
+  }, [createOpen]);
+
+  useEffect(() => {
+    if (!marketerDropdownOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (marketerDropdownRef.current && !marketerDropdownRef.current.contains(e.target as Node)) {
+        setMarketerDropdownOpen(false);
+      }
+    };
+    document.addEventListener("click", onDocClick);
+    return () => document.removeEventListener("click", onDocClick);
+  }, [marketerDropdownOpen]);
   const handleBack = () => {
     if (typeof window !== "undefined" && window.history.length > 1) {
       router.back();
@@ -458,32 +531,64 @@ export default function ReservationsPage() {
 
     const { data: { user } } = await supabase.auth.getUser();
     const createdByName = (user?.user_metadata?.full_name as string)?.trim() || (user?.email as string) || "صاحب الحساب";
-    const { error: insertErr } = await supabase.from("reservations").insert({
-      unit_id: createForm.unit_id,
-      building_id,
-      customer_name: createForm.customer_name.trim(),
-      customer_email: createForm.customer_email?.trim() || null,
-      customer_phone: customerPhoneDigits,
-      marketer_id: null,
-      marketer_name: finalMarketerName,
-      marketer_phone: finalMarketerPhone,
-      deposit_amount: createForm.deposit_amount ? parseFloat(createForm.deposit_amount) : null,
-      deposit_paid: createForm.deposit_paid,
-      deposit_paid_date: createForm.deposit_paid ? new Date().toISOString() : null,
-      expiry_date: expiryDate.toISOString(),
-      status: "active",
-      receipt_number: receiptNumber,
-      customer_iban_or_account: createForm.customer_iban_or_account?.trim() || null,
-      customer_bank_name: createForm.customer_bank_name?.trim() || null,
-      notes: createForm.notes?.trim() || null,
-      created_by: user?.id || null,
-      created_by_name: createdByName,
-    });
+    const marketerIdFromForm = createForm.marketer_id?.trim() || null;
+    const { data: insertedRow, error: insertErr } = await supabase
+      .from("reservations")
+      .insert({
+        unit_id: createForm.unit_id,
+        building_id,
+        customer_name: createForm.customer_name.trim(),
+        customer_email: createForm.customer_email?.trim() || null,
+        customer_phone: customerPhoneDigits,
+        marketer_id: marketerIdFromForm,
+        marketer_name: finalMarketerName,
+        marketer_phone: finalMarketerPhone,
+        deposit_amount: createForm.deposit_amount ? parseFloat(createForm.deposit_amount) : null,
+        deposit_paid: createForm.deposit_paid,
+        deposit_paid_date: createForm.deposit_paid ? new Date().toISOString() : null,
+        expiry_date: expiryDate.toISOString(),
+        status: "active",
+        receipt_number: receiptNumber,
+        customer_iban_or_account: createForm.deposit_receipt_method === "transfer" ? (createForm.customer_iban_or_account?.trim() || null) : null,
+        customer_bank_name: createForm.deposit_receipt_method === "transfer" ? (createForm.customer_bank_name?.trim() || null) : null,
+        notes: createForm.notes?.trim() || null,
+        created_by: user?.id || null,
+        created_by_name: createdByName,
+      })
+      .select("id")
+      .single();
 
     if (insertErr) {
       showToast(insertErr.message || "فشل إنشاء الحجز.", "error");
       setSaving(false);
       return;
+    }
+
+    const reservationId = insertedRow?.id;
+    if (reservationId && !marketerIdFromForm && effectiveOwnerId && finalMarketerName && finalMarketerPhone) {
+      const { data: existing } = await supabase
+        .from("reservation_marketers")
+        .select("id")
+        .eq("owner_id", effectiveOwnerId)
+        .eq("phone", finalMarketerPhone)
+        .limit(1)
+        .maybeSingle();
+      let linkedMarketerId: string | null = existing?.id ?? null;
+      if (!linkedMarketerId) {
+        const { data: newMarketer } = await supabase
+          .from("reservation_marketers")
+          .insert({
+            owner_id: effectiveOwnerId,
+            name: finalMarketerName,
+            phone: finalMarketerPhone,
+          })
+          .select("id")
+          .single();
+        linkedMarketerId = newMarketer?.id ?? null;
+      }
+      if (linkedMarketerId) {
+        await supabase.from("reservations").update({ marketer_id: linkedMarketerId, updated_at: new Date().toISOString() }).eq("id", reservationId);
+      }
     }
 
     await supabase
@@ -499,11 +604,13 @@ export default function ReservationsPage() {
       customer_name: "",
       customer_email: "",
       customer_phone: "",
+      marketer_id: "",
       marketer_name: "",
       marketer_phone: "",
       deposit_amount: "",
       deposit_paid: false,
       expiry_days: "7",
+      deposit_receipt_method: "cash",
       customer_iban_or_account: "",
       customer_bank_name: "",
       notes: "",
@@ -626,14 +733,14 @@ export default function ReservationsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">إدارة الحجوزات</h1>
-            <p className="text-sm text-gray-500 mt-1">سجل الحجوزات (مع عربون أو بدونه) — إلغاء الحجز — إتمام البيع من إدارة المبيعات</p>
+            <p className="text-sm text-gray-500 mt-1">سجل الحجوزات (مع عربون أو بدونه) — إلغاء الحجز — إتمام البيع من إدارة التسويق والمبيعات</p>
           </div>
           {can("reservations") && (
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={handleBack}
-                className="inline-flex items-center justify-center w-10 h-10 bg-white border border-indigo-200 text-indigo-700 rounded-xl hover:bg-indigo-50 transition"
+                className="inline-flex items-center justify-center w-10 h-10 bg-white border border-amber-200 text-amber-700 rounded-xl hover:bg-amber-50 transition"
                 title="رجوع"
                 aria-label="رجوع للصفحة السابقة"
               >
@@ -642,7 +749,7 @@ export default function ReservationsPage() {
               <button
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition shadow-lg"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-medium hover:from-amber-600 hover:to-orange-700 transition shadow-lg shadow-amber-500/25"
               >
                 <Plus className="w-5 h-5" />
                 حجز وحدة جديدة
@@ -661,6 +768,7 @@ export default function ReservationsPage() {
             <li>الحجز يُلزم الوحدة حتى تاريخ الانتهاء أو إلغاء الحجز أو إتمام البيع.</li>
             <li>سند العربون يُصدر تلقائياً عند إنشاء الحجز ويرتبط برقم فريد.</li>
             <li>إلغاء الحجز يحرّر الوحدة فوراً.</li>
+            <li>الحجز لا يُعتبر بيعاً تاماً؛ وقد تتغيّر بيانات المشتري المعتمدة وفقاً لحالة البيع والإفراغ النهائي.</li>
           </ul>
         </div>
 
@@ -970,6 +1078,88 @@ export default function ReservationsPage() {
                   />
                 </div>
               </div>
+              <div className="relative" ref={marketerDropdownRef}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">المسوق</label>
+                {marketersList.length > 0 ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setMarketerDropdownOpen((o) => !o); }}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-right flex items-center justify-between gap-2 focus:ring-2 focus:ring-amber-200 focus:border-amber-400 bg-white min-h-[44px]"
+                    >
+                      <span className="text-gray-700 truncate">
+                        {createForm.marketer_id
+                          ? (() => {
+                              const m = marketersList.find((x) => x.id === createForm.marketer_id);
+                              return m ? `${m.name}${m.phone ? ` — ${m.phone}` : ""}` : "اسم وجوال المسوق";
+                            })()
+                          : "اسم وجوال المسوق"}
+                      </span>
+                      <span className="text-gray-400 shrink-0" aria-hidden>{marketerDropdownOpen ? "▲" : "▼"}</span>
+                    </button>
+                    {marketerDropdownOpen && (
+                      <div
+                        className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="text"
+                          value={marketerSearch}
+                          onChange={(e) => setMarketerSearch(e.target.value)}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          placeholder="بحث برقم أو اسم المسوق"
+                          className="w-full border-0 border-b border-gray-100 px-3 py-2.5 text-sm focus:ring-0 focus:outline-none placeholder:text-gray-400"
+                          autoFocus
+                          aria-label="بحث في قائمة المسوقين"
+                        />
+                        {marketerSearch.trim() && (
+                          <p className="px-3 py-1.5 text-xs text-slate-500 border-b border-gray-100">
+                            نتيجة البحث: {filteredMarketers.length} مسوق
+                          </p>
+                        )}
+                        <div className="max-h-48 overflow-y-auto py-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCreateForm((f) => ({ ...f, marketer_id: "", marketer_name: "", marketer_phone: "" }));
+                              setMarketerDropdownOpen(false);
+                            }}
+                            className={`w-full text-right px-3 py-2.5 text-sm hover:bg-amber-50 ${!createForm.marketer_id ? "bg-amber-50/70 font-medium" : "text-gray-700"}`}
+                          >
+                            اسم وجوال المسوق
+                          </button>
+                          {filteredMarketers.length === 0 && marketerSearch.trim() ? (
+                            <p className="px-3 py-3 text-sm text-slate-500 text-center">لا توجد نتائج لـ «{marketerSearch.trim()}»</p>
+                          ) : (
+                            filteredMarketers.map((m) => (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => {
+                                  setCreateForm((f) => ({
+                                    ...f,
+                                    marketer_id: m.id,
+                                    marketer_name: m.name,
+                                    marketer_phone: m.phone || "",
+                                  }));
+                                  setMarketerDropdownOpen(false);
+                                }}
+                                className={`w-full text-right px-3 py-2.5 text-sm hover:bg-amber-50 ${createForm.marketer_id === m.id ? "bg-amber-50/70 font-medium" : "text-gray-700"}`}
+                              >
+                                {m.name} {m.phone ? `— ${m.phone}` : ""}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-500 bg-gray-50">
+                    أضف مسوقين من قسم المسوقين لاختيارهم من القائمة
+                  </div>
+                )}
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">اسم المسوق *</label>
@@ -977,8 +1167,8 @@ export default function ReservationsPage() {
                     type="text"
                     required
                     value={createForm.marketer_name}
-                    onChange={(e) => setCreateForm((f) => ({ ...f, marketer_name: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+                    onChange={(e) => setCreateForm((f) => ({ ...f, marketer_name: e.target.value, marketer_id: "" }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-amber-200 focus:border-amber-400"
                     placeholder="أدخل اسم المسوق"
                   />
                 </div>
@@ -990,8 +1180,8 @@ export default function ReservationsPage() {
                     maxLength={10}
                     required
                     value={createForm.marketer_phone}
-                    onChange={(e) => setCreateForm((f) => ({ ...f, marketer_phone: phoneDigitsOnly(e.target.value) }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+                    onChange={(e) => setCreateForm((f) => ({ ...f, marketer_phone: phoneDigitsOnly(e.target.value), marketer_id: "" }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-amber-200 focus:border-amber-400 dir-ltr"
                     placeholder="05xxxxxxxx"
                   />
                 </div>
@@ -1036,28 +1226,55 @@ export default function ReservationsPage() {
                   </label>
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">رقم حساب أو آيبان العميل</label>
-                  <input
-                    type="text"
-                    value={createForm.customer_iban_or_account}
-                    onChange={(e) => setCreateForm((f) => ({ ...f, customer_iban_or_account: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2"
-                    placeholder="IBAN أو رقم الحساب"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">اسم البنك</label>
-                  <input
-                    type="text"
-                    value={createForm.customer_bank_name}
-                    onChange={(e) => setCreateForm((f) => ({ ...f, customer_bank_name: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2"
-                    placeholder="اسم البنك"
-                  />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">طريقة استلام العربون</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="deposit_receipt_method"
+                      checked={createForm.deposit_receipt_method === "cash"}
+                      onChange={() => setCreateForm((f) => ({ ...f, deposit_receipt_method: "cash", customer_iban_or_account: "", customer_bank_name: "" }))}
+                      className="rounded-full"
+                    />
+                    <span className="text-sm font-medium text-gray-700">كاش</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="deposit_receipt_method"
+                      checked={createForm.deposit_receipt_method === "transfer"}
+                      onChange={() => setCreateForm((f) => ({ ...f, deposit_receipt_method: "transfer" }))}
+                      className="rounded-full"
+                    />
+                    <span className="text-sm font-medium text-gray-700">تحويل</span>
+                  </label>
                 </div>
               </div>
+              {createForm.deposit_receipt_method === "transfer" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">رقم حساب أو آيبان العميل</label>
+                    <input
+                      type="text"
+                      value={createForm.customer_iban_or_account}
+                      onChange={(e) => setCreateForm((f) => ({ ...f, customer_iban_or_account: e.target.value.toUpperCase() }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 uppercase"
+                      placeholder="IBAN أو رقم الحساب"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">اسم البنك</label>
+                    <input
+                      type="text"
+                      value={createForm.customer_bank_name}
+                      onChange={(e) => setCreateForm((f) => ({ ...f, customer_bank_name: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2"
+                      placeholder="اسم البنك"
+                    />
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
                 <textarea
@@ -1072,7 +1289,7 @@ export default function ReservationsPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 disabled:opacity-50"
+                  className="flex-1 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-medium hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 shadow-amber-500/25"
                 >
                   {saving ? "جاري الحفظ..." : "إنشاء الحجز وإصدار سند العربون"}
                 </button>
@@ -1151,7 +1368,11 @@ export default function ReservationsPage() {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><span className="text-slate-500">تاريخ الحجز</span><p className="font-medium">{refundOpen.reservation_date ? formatDateNumeric(refundOpen.reservation_date) : "—"}</p></div>
                 <div><span className="text-slate-500">تاريخ الانتهاء</span><p className="font-medium">{refundOpen.expiry_date ? formatDateNumeric(refundOpen.expiry_date) : "—"}</p></div>
-                <div><span className="text-slate-500">مدة الحجز</span><p className="font-medium">{refundOpen.reservation_date && refundOpen.expiry_date ? Math.max(0, Math.ceil((new Date(refundOpen.expiry_date).getTime() - new Date(refundOpen.reservation_date).getTime()) / (24 * 60 * 60 * 1000))) + " يوم" : "—"}</p></div>
+                <div>
+                  <span className="text-slate-500">مدة الحجز</span>
+                  <p className="font-medium">{refundOpen.reservation_date && refundOpen.expiry_date ? Math.max(0, Math.ceil((new Date(refundOpen.expiry_date).getTime() - new Date(refundOpen.reservation_date).getTime()) / (24 * 60 * 60 * 1000))) + " يوم" : "—"}</p>
+                  <p className="text-xs text-slate-500 mt-5">طريقة دفع العربون: {(refundOpen.customer_iban_or_account?.trim() || refundOpen.customer_bank_name?.trim()) ? "تحويل" : "كاش"}</p>
+                </div>
                 <div><span className="text-slate-500">مبلغ العربون</span><p className="font-medium dir-ltr">{refundOpen.deposit_amount != null ? `${Number(refundOpen.deposit_amount).toLocaleString("en")} ${RIYAL_SYMBOL}` : "—"}</p></div>
               </div>
             </div>
@@ -1175,7 +1396,7 @@ export default function ReservationsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">رقم الحساب / آيبان</label>
-                    <input type="text" value={refundIban} onChange={(e) => setRefundIban(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 dir-ltr" placeholder="IBAN أو رقم الحساب" />
+                    <input type="text" value={refundIban} onChange={(e) => setRefundIban(e.target.value.toUpperCase())} className="w-full border border-gray-200 rounded-xl px-3 py-2 dir-ltr uppercase" placeholder="IBAN أو رقم الحساب" />
                   </div>
                 </div>
               )}
@@ -1190,22 +1411,33 @@ export default function ReservationsPage() {
         </div>
       )}
 
-      {/* معاينة سند العربون — تصميم واحد للمعاينة والطباعة */}
+      {/* معاينة سند العربون — التنسيق للطباعة في globals.css (طباعة صفحة واحدة، بدون ختم مائي، نصوص مناسبة) */}
       {receiptPreview && (
-        <div className="receipt-modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 print:bg-transparent print:p-0" onClick={() => setReceiptPreview(null)}>
-          <div
-            className="relative bg-white rounded-2xl shadow-xl w-full max-w-[420px] print:max-w-[210mm] p-6 border border-gray-200 print:shadow-none print:border-0 print:rounded-none receipt-unified"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {receiptPreview.status === "cancelled" && (
-              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center overflow-hidden rounded-2xl print:rounded-none">
-                <span className={`text-5xl font-black uppercase tracking-widest -rotate-[-20deg] select-none print:text-6xl ${
-                  receiptPreview.deposit_refunded ? "text-emerald-500/40 print:text-emerald-500/30" : "text-red-400/40 print:text-red-500/30"
-                }`}>
-                  {receiptPreview.deposit_refunded ? "مُسْتَرَد" : "مُلْغَى"}
-                </span>
-              </div>
-            )}
+          <div className="receipt-modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 print:bg-transparent print:p-0 print:block" onClick={() => setReceiptPreview(null)}>
+            <div
+              className="relative bg-white rounded-2xl shadow-xl w-full max-w-[420px] print:max-w-[210mm] p-6 print:p-4 border border-gray-200 print:shadow-none print:border-0 print:rounded-none receipt-unified print:break-inside-avoid"
+              onClick={(e) => e.stopPropagation()}
+            >
+            {(() => {
+              const showWatermark = receiptPreview.status === "cancelled" || receiptPreview.status === "completed";
+              if (!showWatermark) return null;
+              let label: string;
+              let colorClass: string;
+              if (receiptPreview.status === "cancelled") {
+                label = receiptPreview.deposit_refunded ? "مُسْتَرَد" : "مُلْغَى";
+                colorClass = receiptPreview.deposit_refunded ? "text-emerald-500/40" : "text-red-400/40";
+              } else {
+                label = receiptPreview.deposit_settlement_type === "refund" ? "مُسْتَرَد" : "مُخَالَصَة";
+                colorClass = receiptPreview.deposit_settlement_type === "refund" ? "text-emerald-500/40" : "text-slate-400/40";
+              }
+              return (
+                <div className="receipt-watermark pointer-events-none absolute inset-0 z-10 flex items-center justify-center overflow-hidden rounded-2xl print:rounded-none">
+                  <span className={`text-5xl font-black uppercase tracking-widest -rotate-[-20deg] select-none ${colorClass}`}>
+                    {label}
+                  </span>
+                </div>
+              );
+            })()}
             <div className="print:hidden flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <Receipt className="w-5 h-5" />
@@ -1215,35 +1447,47 @@ export default function ReservationsPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="w-full text-right receipt-body border-b-2 border-slate-700 pb-3 mb-4" dir="rtl">
-              <h1 className="text-xl font-bold text-slate-800">سند عربون حجز</h1>
+            <div className="w-full text-right receipt-body border-b-2 border-slate-700 pb-3 mb-4 print:pb-2 print:mb-2" dir="rtl">
+              <h1 className="text-xl font-bold text-slate-800 print:text-lg">سند عربون حجز</h1>
             </div>
-            <table className="w-full text-sm border-collapse relative">
-              <tbody className="[&>tr]:border-b [&>tr]:border-slate-100">
+            <table className="w-full text-sm border-collapse relative print:text-xs">
+              <tbody className="[&>tr]:border-b [&>tr]:border-slate-100 print:[&>tr>td]:py-1">
                 <tr><td className="py-2 text-slate-500 w-32">رقم السند</td><td className="py-2 font-mono font-semibold">{formatReceiptNumberDisplay(receiptPreview.receipt_number)}</td></tr>
                 <tr><td className="py-2 text-slate-500">الوحدة</td><td className="py-2">{(getUnit(receiptPreview)?.unit_number ?? "—")} — الطابق {getUnit(receiptPreview)?.floor ?? "—"}</td></tr>
                 <tr><td className="py-2 text-slate-500">العمارة</td><td className="py-2">{getBuilding(receiptPreview)?.name ?? "—"}</td></tr>
                 <tr><td className="py-2 text-slate-500">العميل</td><td className="py-2">{receiptPreview.customer_name} — {receiptPreview.customer_phone}</td></tr>
-                <tr><td className="py-2 text-slate-500">مبلغ العربون</td><td className="py-2">{receiptPreview.deposit_amount != null ? `${receiptPreview.deposit_amount} ${RIYAL_SYMBOL}` : "—"} {receiptPreview.deposit_refunded ? "(مسترد)" : receiptPreview.deposit_paid ? "(مدفوع)" : "(غير مدفوع)"}</td></tr>
+                <tr><td className="py-2 text-slate-500">مبلغ العربون</td><td className="py-2">{receiptPreview.deposit_amount != null ? `${receiptPreview.deposit_amount} ${RIYAL_SYMBOL}` : "—"}</td></tr>
                 <tr><td className="py-2 text-slate-500">تاريخ الحجز</td><td className="py-2">{formatDateEn(receiptPreview.reservation_date)}</td></tr>
                 {receiptPreview.status === "cancelled" ? (
                   <>
                     <tr><td className="py-2 text-slate-500">تاريخ الإلغاء</td><td className="py-2">{formatDateEn(receiptPreview.cancelled_at)}</td></tr>
-                    <tr><td className="py-2 text-slate-500">حالة العربون</td><td className="py-2 font-medium">{receiptPreview.deposit_refunded ? "مسترد" : "ملغي بدون استرداد العربون"}</td></tr>
+                    <tr>
+                      <td className="py-2 text-slate-500">حالة العربون</td>
+                      <td className="py-2 font-medium">
+                        {receiptPreview.deposit_refunded
+                          ? (receiptPreview.deposit_refund_method === "transfer" ? "مسترد — تحويل" : "مسترد — كاش")
+                          : "ملغي بدون استرداد العربون"}
+                      </td>
+                    </tr>
                   </>
                 ) : (
                   <tr><td className="py-2 text-slate-500">صلاحية حتى</td><td className="py-2">{formatDateEn(receiptPreview.expiry_date)}</td></tr>
                 )}
-                {(receiptPreview.customer_iban_or_account ?? receiptPreview.customer_bank_name) && (
-                  <>
-                    {receiptPreview.customer_iban_or_account?.trim() && (
-                      <tr><td className="py-2 text-slate-500">رقم الحساب / آيبان</td><td className="py-2 font-mono text-gray-700">{receiptPreview.customer_iban_or_account.trim()}</td></tr>
-                    )}
-                    {receiptPreview.customer_bank_name?.trim() && (
-                      <tr><td className="py-2 text-slate-500">اسم البنك</td><td className="py-2 text-gray-700">{receiptPreview.customer_bank_name.trim()}</td></tr>
-                    )}
-                  </>
-                )}
+                {(() => {
+                  const showAccountBank = (receiptPreview.customer_iban_or_account ?? receiptPreview.customer_bank_name) &&
+                    (!receiptPreview.deposit_refunded || receiptPreview.deposit_refund_method === "transfer");
+                  if (!showAccountBank) return null;
+                  return (
+                    <>
+                      {receiptPreview.customer_iban_or_account?.trim() && (
+                        <tr><td className="py-2 text-slate-500">رقم الحساب / آيبان</td><td className="py-2 font-mono text-gray-700 dir-ltr">{receiptPreview.customer_iban_or_account.trim()}</td></tr>
+                      )}
+                      {receiptPreview.customer_bank_name?.trim() && (
+                        <tr><td className="py-2 text-slate-500">اسم البنك</td><td className="py-2 text-gray-700">{receiptPreview.customer_bank_name.trim()}</td></tr>
+                      )}
+                    </>
+                  );
+                })()}
                 {receiptPreview.notes?.trim() && (
                   <tr><td className="py-2 text-slate-500">الملاحظات</td><td className="py-2 text-gray-700">{receiptPreview.notes.trim()}</td></tr>
                 )}
