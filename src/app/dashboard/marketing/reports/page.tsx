@@ -358,6 +358,7 @@ export default function MarketingReportsPage() {
   const [unitsStatusCounts, setUnitsStatusCounts] = useState<{ available: number; reserved: number; sold: number }>({ available: 0, reserved: 0, sold: 0 });
   const [customDateFrom, setCustomDateFrom] = useState("");
   const [customDateTo, setCustomDateTo] = useState("");
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [reservationsTableExpanded, setReservationsTableExpanded] = useState(false);
   const [remainingTableExpanded, setRemainingTableExpanded] = useState(false);
   const [salesTableExpanded, setSalesTableExpanded] = useState(false);
@@ -379,14 +380,16 @@ export default function MarketingReportsPage() {
   );
 
   const filteredReservations = useMemo(() => {
-    if (period === "all") return reservations;
-    return reservations.filter((r) => isInPeriod(r.reservation_date));
-  }, [reservations, period, isInPeriod]);
+    let list = period === "all" ? reservations : reservations.filter((r) => isInPeriod(r.reservation_date));
+    if (selectedBuildingId) list = list.filter((r) => r.building_id === selectedBuildingId);
+    return list;
+  }, [reservations, period, isInPeriod, selectedBuildingId]);
 
   const filteredSales = useMemo(() => {
-    if (period === "all") return sales;
-    return sales.filter((s) => isInPeriod(s.sale_date));
-  }, [sales, period, isInPeriod]);
+    let list = period === "all" ? sales : sales.filter((s) => isInPeriod(s.sale_date));
+    if (selectedBuildingId) list = list.filter((s) => s.building_id === selectedBuildingId);
+    return list;
+  }, [sales, period, isInPeriod, selectedBuildingId]);
 
   /** صفقات لديها مبلغ متبقٍ فقط — لجدول تقرير المبالغ المتبقية */
   const salesWithRemaining = useMemo(
@@ -736,6 +739,30 @@ export default function MarketingReportsPage() {
           )}
         </div>
 
+        {/* Building filter — لا يؤثر على نمط الفترة (شهري/ربعي/سنوي) */}
+        <div className="mb-6 flex flex-wrap items-center gap-3 print:hidden">
+          <span className="text-sm font-medium text-slate-600">العمارة:</span>
+          <select
+            value={selectedBuildingId ?? ""}
+            onChange={(e) => setSelectedBuildingId(e.target.value ? e.target.value : null)}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/20 min-w-[180px]"
+          >
+            <option value="">كل العماير</option>
+            {Object.entries(buildingsMap).map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
+            ))}
+          </select>
+          {selectedBuildingId && (
+            <button
+              type="button"
+              onClick={() => setSelectedBuildingId(null)}
+              className="text-xs text-slate-500 hover:text-amber-600 underline"
+            >
+              إظهار الكل
+            </button>
+          )}
+        </div>
+
         {fetchError && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-red-800">{fetchError}</p>
@@ -757,10 +784,18 @@ export default function MarketingReportsPage() {
           <>
             {/* Executive summary */}
             <section className="mb-8">
-              <h2 className="text-lg font-extrabold text-slate-900 mb-4 flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-l from-amber-50/40 to-transparent">
-                <BarChart3 className="w-5 h-5 text-amber-600" />
-                الملخص التنفيذي
-              </h2>
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-l from-amber-50/40 to-transparent">
+                  <BarChart3 className="w-5 h-5 text-amber-600" />
+                  الملخص التنفيذي
+                </h2>
+                {selectedBuildingId && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 text-sm font-medium border border-slate-200">
+                    <Building2 className="w-4 h-4 text-slate-500" />
+                    عرض التقرير لعمارة: {buildingsMap[selectedBuildingId] ?? "—"}
+                  </span>
+                )}
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition">
                   <div className="flex items-center justify-between mb-2">
