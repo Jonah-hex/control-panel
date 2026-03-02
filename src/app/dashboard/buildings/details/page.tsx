@@ -11,7 +11,7 @@ import { phoneDigitsOnly, isValidPhone10Digits } from "@/lib/validation-utils";
 import ImagesGallery from "../images-gallery";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, LayoutDashboard, ArrowRight, Building2, Pencil, X, Check, FileText, Ruler, MoveVertical } from "lucide-react";
+import { ChevronDown, LayoutDashboard, ArrowRight, Building2, Pencil, X, Check, FileText, Ruler, MoveVertical, Shield } from "lucide-react";
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
 
 // مفتاح الكارد -> صلاحية العرض (معاينة)
@@ -26,6 +26,7 @@ const CARD_PERMISSION_MAP: Record<string, 'details_basic' | 'details_building' |
   electricity: 'details_electricity',
   driver_rooms: 'details_driver_rooms',
   elevators_maintenance: 'details_elevators_maintenance',
+  warranties: 'details_elevators_maintenance',
 };
 
 // مفتاح الكارد -> صلاحية التعديل
@@ -40,6 +41,7 @@ const CARD_EDIT_PERMISSION_MAP: Record<string, 'details_basic_edit' | 'details_b
   electricity: 'details_electricity_edit',
   driver_rooms: 'details_driver_rooms_edit',
   elevators_maintenance: 'details_elevators_maintenance_edit',
+  warranties: 'details_elevators_maintenance_edit',
 };
 
 // تعريف أنواع البيانات
@@ -91,6 +93,9 @@ interface Building {
   elevator_installation_contact_name?: string | null;
   maintenance_contract_date?: string | null;
   warranty_months?: number | null;
+  structural_warranty_years?: number | null;
+  plumbing_electrical_warranty_years?: number | null;
+  outlets_circuits_warranty_years?: number | null;
 }
 
 function DetailsContent() {
@@ -195,7 +200,7 @@ function DetailsContent() {
 
   const canEditBuilding = can('buildings_edit');
   const canEditCard = (cardKey: string) => (CARD_EDIT_PERMISSION_MAP[cardKey] ? can(CARD_EDIT_PERMISSION_MAP[cardKey]) : false);
-  const allowedCardKeys = (['basic', 'building', 'facilities', 'guard', 'location', 'association', 'engineering', 'electricity', 'driver_rooms', 'elevators_maintenance'] as const).filter(
+  const allowedCardKeys = (['basic', 'building', 'facilities', 'guard', 'location', 'association', 'engineering', 'electricity', 'driver_rooms', 'elevators_maintenance', 'warranties'] as const).filter(
     (key) => can(CARD_PERMISSION_MAP[key])
   );
 
@@ -239,6 +244,12 @@ function DetailsContent() {
     elevator_emergency_phone: '',
     elevator_installation_contact_name: '',
   });
+  const [isEditingWarrantiesCard, setIsEditingWarrantiesCard] = useState(false);
+  const [warrantiesEdit, setWarrantiesEdit] = useState({
+    structural_warranty_years: '' as string | number,
+    plumbing_electrical_warranty_years: '' as string | number,
+    outlets_circuits_warranty_years: '' as string | number,
+  });
 
   // تعريف بيانات اتحاد الملاك خارج JSX
   // حالة بيانات اتحاد الملاك قابلة للتعديل
@@ -272,6 +283,7 @@ function DetailsContent() {
         .eq("id", buildingId)
         .single();
       if (!error) {
+        let buildingData: typeof data = data;
         // تحديث تلقائي إذا لم يوجد unitsperfloor
         if (!data.unitsperfloor) {
           let inferred = '';
@@ -281,13 +293,19 @@ function DetailsContent() {
           }
           if (inferred) {
             await supabase.from("buildings").update({ unitsperfloor: inferred }).eq("id", buildingId);
-            setBuilding({ ...data, unitsperfloor: inferred });
-          } else {
-            setBuilding(data);
+            buildingData = { ...data, unitsperfloor: inferred };
           }
-        } else {
-          setBuilding(data);
         }
+        // جلب الضمانات من جدول building_warranties
+        const { data: warrantiesRow } = await supabase
+          .from("building_warranties")
+          .select("structural_warranty_years, plumbing_electrical_warranty_years, outlets_circuits_warranty_years")
+          .eq("building_id", buildingId)
+          .maybeSingle();
+        if (warrantiesRow) {
+          buildingData = { ...buildingData, ...warrantiesRow };
+        }
+        setBuilding(buildingData);
         // Parse owner_association JSON and set associationEdit state
         if (data.owner_association) {
           let assocObj: Record<string, unknown> = {};
@@ -320,41 +338,26 @@ function DetailsContent() {
     fetchData();
   }, [searchParams]);
 
-  // فتح كارد اتحاد الملاك عند القدوم من رابط يحتوي على #card-association (مثل تنبيهات اللوحة)
+  // عند فتح الصفحة برابط يحتوي على #card-xxx (مثل الضمانات أو الصيانة من صفحة الملاك) نفتح الكارد ونمرّر إليه
   useEffect(() => {
-    if (typeof window === 'undefined' || !building?.id) return;
-    if (window.location.hash === '#card-association') {
-      setOpenCard('association');
-      setTimeout(() => document.getElementById('card-association')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+    if (typeof window === "undefined" || !building?.id) return;
+    const hash = window.location.hash;
+    if (!hash || !hash.startsWith("#card-")) return;
+    const id = hash.slice(1);
+    const map: Record<string, string> = {
+      "card-association": "association",
+      "card-location": "location",
+      "card-engineering": "engineering",
+      "card-electricity": "electricity",
+      "card-warranties": "warranties",
+      "card-elevators-maintenance": "elevators_maintenance",
+    };
+    const key = map[id];
+    if (key) {
+      setOpenCard(key);
+      setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
     }
   }, [building?.id]);
-
-  // التوجيه التلقائي لكارد الموقع والصور عند الرجوع من المعرض (#card-location)
-  useEffect(() => {
-    if (typeof window === 'undefined' || !building?.id) return;
-    if (window.location.hash === '#card-location' || searchParams.get('scroll') === 'location') {
-      setOpenCard('location');
-      setTimeout(() => document.getElementById('card-location')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
-    }
-  }, [building?.id, searchParams]);
-
-  // التوجيه التلقائي لكارد المكتب الهندسي عند الرجوع من الصكوك (#card-engineering)
-  useEffect(() => {
-    if (typeof window === 'undefined' || !building?.id) return;
-    if (window.location.hash === '#card-engineering' || searchParams.get('scroll') === 'engineering') {
-      setOpenCard('engineering');
-      setTimeout(() => document.getElementById('card-engineering')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
-    }
-  }, [building?.id, searchParams]);
-
-  // التوجيه التلقائي لكارد عدادات الكهرباء عند القدوم من تنبيهات اللوحة (#card-electricity)
-  useEffect(() => {
-    if (typeof window === 'undefined' || !building?.id) return;
-    if (window.location.hash === '#card-electricity' || searchParams.get('scroll') === 'electricity') {
-      setOpenCard('electricity');
-      setTimeout(() => document.getElementById('card-electricity')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
-    }
-  }, [building?.id, searchParams]);
 
   // جلب وحدات المبنى عند فتح كارد عدادات الكهرباء أو غرف السائق
   useEffect(() => {
@@ -437,6 +440,15 @@ function DetailsContent() {
       });
     }
   }, [building?.id, openCard, building?.elevator_type, building?.maintenance_company, building?.maintenance_contract_number, building?.maintenance_contract_date, building?.warranty_months, building?.last_maintenance_date, building?.elevator_emergency_phone, building?.elevator_installation_contact_name]);
+  React.useEffect(() => {
+    if (building && openCard === 'warranties') {
+      setWarrantiesEdit({
+        structural_warranty_years: building.structural_warranty_years ?? '',
+        plumbing_electrical_warranty_years: building.plumbing_electrical_warranty_years ?? '',
+        outlets_circuits_warranty_years: building.outlets_circuits_warranty_years ?? '',
+      });
+    }
+  }, [building?.id, openCard, building?.structural_warranty_years, building?.plumbing_electrical_warranty_years, building?.outlets_circuits_warranty_years]);
 
   const saveUnitMeter = async (unitId: string, value: string) => {
     const raw = value.trim();
@@ -523,6 +535,31 @@ function DetailsContent() {
     } else showToast("فشل الحفظ");
   };
 
+  const saveWarranties = async () => {
+    if (!building?.id) return;
+    const toNum = (v: string | number) => (v !== '' && v != null && !Number.isNaN(Number(v)) ? Number(v) : null);
+    const payload = {
+      building_id: building.id,
+      structural_warranty_years: toNum(warrantiesEdit.structural_warranty_years),
+      plumbing_electrical_warranty_years: toNum(warrantiesEdit.plumbing_electrical_warranty_years),
+      outlets_circuits_warranty_years: toNum(warrantiesEdit.outlets_circuits_warranty_years),
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabase
+      .from("building_warranties")
+      .upsert(payload, { onConflict: "building_id" });
+    if (!error) {
+      setBuilding({
+        ...building,
+        structural_warranty_years: payload.structural_warranty_years,
+        plumbing_electrical_warranty_years: payload.plumbing_electrical_warranty_years,
+        outlets_circuits_warranty_years: payload.outlets_circuits_warranty_years,
+      });
+      setIsEditingWarrantiesCard(false);
+      showToast("تم حفظ بيانات الضمانات");
+    } else showToast("فشل الحفظ");
+  };
+
   const saveGuardPhoto = async (dataUrl: string) => {
     if (!building?.id) return;
     setSavingGuardPhoto(true);
@@ -604,10 +641,11 @@ function DetailsContent() {
                         { id: "card-guard", key: "guard", label: "بيانات الحارس", icon: FaUserShield },
                         { id: "card-location", key: "location", label: "الموقع والصور", icon: FaMapMarkerAlt },
                         { id: "card-association", key: "association", label: "اتحاد الملاك", icon: FaUsers },
-                        { id: "card-engineering", key: "engineering", label: "المكتب الهندسي", icon: FaTools },
+                        { id: "card-engineering", key: "engineering", label: "أوراق ومستندات المبنى", icon: FaTools },
                         { id: "card-electricity", key: "electricity", label: "عدادات الكهرباء", icon: FaBolt },
                         { id: "card-driver-rooms", key: "driver_rooms", label: "غرف السائق", icon: FaCar },
                         { id: "card-elevators-maintenance", key: "elevators_maintenance", label: "المصاعد والصيانة", icon: MoveVertical },
+                        { id: "card-warranties", key: "warranties", label: "الضمانات", icon: Shield },
                       ]
                         .filter(({ key }) => allowedCardKeys.includes(key as (typeof allowedCardKeys)[number]))
                         .map(({ id, key, label, icon: Icon }) => (
@@ -1512,7 +1550,7 @@ function DetailsContent() {
 
         {/* كارد اتحاد الملاك قابل للطي */}
         {can('details_association') && (
-        <div id="card-association" className="rounded-2xl mb-8 overflow-hidden border border-indigo-200/60 shadow-xl shadow-indigo-900/5 bg-gradient-to-b from-white to-indigo-50/30">
+        <div id="card-association" className="rounded-2xl mb-8 overflow-hidden border border-sky-200/60 shadow-xl shadow-sky-900/5 bg-gradient-to-b from-white to-sky-50/30">
           <div className="relative">
             <button
               type="button"
@@ -1520,15 +1558,15 @@ function DetailsContent() {
               onClick={() => setOpenCard(openCard === 'association' ? null : 'association')}
               aria-expanded={openCard === 'association'}
             >
-              <span className="flex items-center justify-center rounded-full h-16 w-16 bg-gradient-to-br from-indigo-400 to-indigo-600 shadow-lg shadow-indigo-500/25 mb-2 ring-4 ring-indigo-100">
+              <span className="flex items-center justify-center rounded-full h-16 w-16 bg-gradient-to-br from-sky-400 to-sky-600 shadow-lg shadow-sky-500/25 mb-2 ring-4 ring-sky-100">
                 <FaUsers className="text-white text-3xl" />
               </span>
-              <span className="text-xl font-bold bg-gradient-to-l from-indigo-700 to-indigo-600 bg-clip-text text-transparent">اتحاد الملاك</span>
-              <span className="mt-2 text-indigo-500">{openCard === 'association' ? <FaChevronUp className="text-indigo-500" /> : <FaChevronDown className="text-indigo-500" />}</span>
+              <span className="text-xl font-bold bg-gradient-to-l from-sky-700 to-sky-600 bg-clip-text text-transparent">اتحاد الملاك</span>
+              <span className="mt-2 text-sky-500">{openCard === 'association' ? <FaChevronUp className="text-sky-500" /> : <FaChevronDown className="text-sky-500" />}</span>
             </button>
             {openCard === 'association' && canEditCard('association') && (
               <button
-                className="absolute top-4 left-4 bg-indigo-100 text-indigo-700 rounded-full p-2 border border-indigo-300 hover:bg-indigo-200 transition"
+                className="absolute top-4 left-4 bg-sky-100 text-sky-700 rounded-full p-2 border border-sky-300 hover:bg-sky-200 transition"
                 onClick={() => setIsEditingAssociationCard(v => !v)}
                 title={isEditingAssociationCard ? 'إغلاق التعديل' : 'تعديل اتحاد الملاك'}
               >
@@ -1538,8 +1576,8 @@ function DetailsContent() {
           </div>
           {openCard === 'association' && building && (
             <div className="px-5 pb-5">
-              <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-3 shadow-sm mb-4">
-                <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-2">حالة الاتحاد</p>
+              <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-3 shadow-sm mb-4">
+                <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-2">حالة الاتحاد</p>
                 <div className="flex items-center gap-3">
                   <div className={`relative w-14 h-7 rounded-full transition-colors cursor-pointer ${associationEdit.hasAssociation ? 'bg-amber-600' : 'bg-gray-200'}`} onClick={() => { const next = !associationEdit.hasAssociation; setAssociationEdit({ ...associationEdit, hasAssociation: next }); if (next) setIsEditingAssociationCard(true); }}>
                     <div className="absolute top-0.5 right-0.5 bg-white border border-gray-300 rounded-full h-6 w-6 transition-transform" style={{ transform: associationEdit.hasAssociation ? 'translateX(-28px)' : 'translateX(0)' }} />
@@ -1547,90 +1585,90 @@ function DetailsContent() {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">اسم مسؤول الاتحاد</p>
+                <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">اسم مسؤول الاتحاد</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="text" value={associationEdit.managerName ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, managerName: e.target.value })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" type="text" value={associationEdit.managerName ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, managerName: e.target.value })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.managerName || '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">رقم تسجيل الاتحاد</p>
+                <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">رقم تسجيل الاتحاد</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="text" value={associationEdit.registrationNumber ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, registrationNumber: e.target.value })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" type="text" value={associationEdit.registrationNumber ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, registrationNumber: e.target.value })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.registrationNumber || '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">رقم الحساب</p>
+                <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">رقم الحساب</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="text" value={associationEdit.accountNumber ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, accountNumber: e.target.value })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" type="text" value={associationEdit.accountNumber ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, accountNumber: e.target.value })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.accountNumber || '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">رقم IBAN</p>
+                <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">رقم IBAN</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="text" value={associationEdit.iban ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, iban: e.target.value })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" type="text" value={associationEdit.iban ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, iban: e.target.value })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.iban || '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">رقم التواصل</p>
+                <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">رقم التواصل</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="text" value={associationEdit.contactNumber ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, contactNumber: e.target.value })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" type="text" value={associationEdit.contactNumber ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, contactNumber: e.target.value })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.contactNumber || '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">عدد الوحدات المسجلة</p>
+                <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">عدد الوحدات المسجلة</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="number" value={associationEdit.registeredUnitsCount ?? 0} onChange={e => setAssociationEdit({ ...associationEdit, registeredUnitsCount: Number(e.target.value) })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" type="number" value={associationEdit.registeredUnitsCount ?? 0} onChange={e => setAssociationEdit({ ...associationEdit, registeredUnitsCount: Number(e.target.value) })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.registeredUnitsCount ?? '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">تاريخ البداية</p>
+                <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">تاريخ البداية</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="date" value={associationEdit.startDate ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, startDate: e.target.value })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" type="date" value={associationEdit.startDate ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, startDate: e.target.value })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.startDate || '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">تاريخ النهاية</p>
+                <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">تاريخ النهاية</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="date" value={associationEdit.endDate ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, endDate: e.target.value })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" type="date" value={associationEdit.endDate ?? ''} onChange={e => setAssociationEdit({ ...associationEdit, endDate: e.target.value })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.endDate || '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm">
-                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">الرسوم الشهرية</p>
+                <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm">
+                  <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-1">الرسوم الشهرية</p>
                   {isEditingAssociationCard ? (
-                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-indigo-500 rounded-none" type="number" value={associationEdit.monthlyFee ?? 0} onChange={e => setAssociationEdit({ ...associationEdit, monthlyFee: Number(e.target.value) })} />
+                    <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-sky-500 rounded-none" type="number" value={associationEdit.monthlyFee ?? 0} onChange={e => setAssociationEdit({ ...associationEdit, monthlyFee: Number(e.target.value) })} />
                   ) : (
                     <p className="text-gray-800 font-medium">{associationEdit.monthlyFee ?? '—'}</p>
                   )}
                 </div>
-                <div className="rounded-xl bg-white/90 border border-indigo-100 px-4 py-2 shadow-sm col-span-2">
-                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-2">يشمل الماء / يشمل الكهرباء</p>
+                <div className="rounded-xl bg-white/90 border border-sky-100 px-4 py-2 shadow-sm col-span-2">
+                  <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-2">يشمل الماء / يشمل الكهرباء</p>
                   <div className="flex items-center gap-6">
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-700">يشمل الماء</span>
-                      <div className={`relative w-14 h-7 rounded-full transition-colors cursor-pointer ${associationEdit.includesWater ? 'bg-indigo-600' : 'bg-gray-200'}`} onClick={() => setAssociationEdit({ ...associationEdit, includesWater: !associationEdit.includesWater })}>
+                      <div className={`relative w-14 h-7 rounded-full transition-colors cursor-pointer ${associationEdit.includesWater ? 'bg-sky-600' : 'bg-gray-200'}`} onClick={() => setAssociationEdit({ ...associationEdit, includesWater: !associationEdit.includesWater })}>
                         <div className="absolute top-0.5 right-0.5 bg-white border border-gray-300 rounded-full h-6 w-6 transition-transform" style={{ transform: associationEdit.includesWater ? 'translateX(-28px)' : 'translateX(0)' }} />
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-700">يشمل الكهرباء</span>
-                      <div className={`relative w-14 h-7 rounded-full transition-colors cursor-pointer ${associationEdit.includesElectricity ? 'bg-indigo-600' : 'bg-gray-200'}`} onClick={() => setAssociationEdit({ ...associationEdit, includesElectricity: !associationEdit.includesElectricity })}>
+                      <div className={`relative w-14 h-7 rounded-full transition-colors cursor-pointer ${associationEdit.includesElectricity ? 'bg-sky-600' : 'bg-gray-200'}`} onClick={() => setAssociationEdit({ ...associationEdit, includesElectricity: !associationEdit.includesElectricity })}>
                         <div className="absolute top-0.5 right-0.5 bg-white border border-gray-300 rounded-full h-6 w-6 transition-transform" style={{ transform: associationEdit.includesElectricity ? 'translateX(-28px)' : 'translateX(0)' }} />
                       </div>
                     </div>
@@ -1640,7 +1678,7 @@ function DetailsContent() {
                 {isEditingAssociationCard && (
                   <div className="col-span-2 flex gap-4 mt-2">
                   <button
-                    className="px-5 py-2 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white rounded-xl shadow-lg hover:from-indigo-600 hover:to-indigo-800 transition text-sm font-bold border-0"
+                    className="px-5 py-2 bg-gradient-to-br from-sky-500 to-sky-700 text-white rounded-xl shadow-lg hover:from-sky-600 hover:to-sky-800 transition text-sm font-bold border-0"
                     onClick={async () => {
                       const { error } = await supabase
                         .from('buildings')
@@ -1680,7 +1718,7 @@ function DetailsContent() {
               <span className="flex items-center justify-center rounded-full h-16 w-16 bg-gradient-to-br from-teal-400 to-teal-600 shadow-lg shadow-teal-500/25 mb-2 ring-4 ring-teal-100">
                 <FaTools className="text-white text-3xl" />
               </span>
-              <span className="text-xl font-bold bg-gradient-to-l from-teal-700 to-teal-600 bg-clip-text text-transparent">المكتب الهندسي</span>
+              <span className="text-xl font-bold bg-gradient-to-l from-teal-700 to-teal-600 bg-clip-text text-transparent">أوراق ومستندات المبنى</span>
               <span className="mt-2 text-teal-500">{openCard === 'engineering' ? <FaChevronUp className="text-teal-500" /> : <FaChevronDown className="text-teal-500" />}</span>
             </button>
           </div>
@@ -2070,6 +2108,113 @@ function DetailsContent() {
             </div>
             );
           })()}
+        </div>
+        )}
+
+        {/* كارد الضمانات */}
+        {can('details_elevators_maintenance') && (
+        <div id="card-warranties" className="rounded-2xl mb-8 overflow-hidden border border-amber-200/60 shadow-xl shadow-amber-900/5 bg-gradient-to-b from-white to-amber-50/30">
+          <div className="relative">
+            <button
+              type="button"
+              className="flex flex-col items-center w-full focus:outline-none pt-5 pb-3 cursor-pointer select-none hover:opacity-95 transition-opacity"
+              onClick={() => setOpenCard(openCard === 'warranties' ? null : 'warranties')}
+              aria-expanded={openCard === 'warranties'}
+            >
+              <span className="flex items-center justify-center rounded-full h-16 w-16 bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/25 mb-2 ring-4 ring-amber-100">
+                <Shield className="text-white w-8 h-8" />
+              </span>
+              <span className="text-xl font-bold bg-gradient-to-l from-amber-700 to-amber-600 bg-clip-text text-transparent">الضمانات</span>
+              <span className="mt-2 text-amber-500">{openCard === 'warranties' ? <FaChevronUp className="text-amber-500" /> : <FaChevronDown className="text-amber-500" />}</span>
+            </button>
+            {openCard === 'warranties' && canEditCard('warranties') && (
+              <button
+                className="absolute left-4 top-4 text-amber-500 hover:text-amber-700 bg-amber-50 rounded-full p-2 shadow"
+                title={isEditingWarrantiesCard ? "إلغاء" : "تعديل"}
+                onClick={() => {
+                  if (!isEditingWarrantiesCard && building) {
+                    setWarrantiesEdit({
+                      structural_warranty_years: building.structural_warranty_years ?? '',
+                      plumbing_electrical_warranty_years: building.plumbing_electrical_warranty_years ?? '',
+                      outlets_circuits_warranty_years: building.outlets_circuits_warranty_years ?? '',
+                    });
+                  }
+                  setIsEditingWarrantiesCard(v => !v);
+                }}
+              >
+                {isEditingWarrantiesCard ? <FaChevronUp /> : <FaTools />}
+              </button>
+            )}
+          </div>
+          {openCard === 'warranties' && building && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 px-5 pb-5">
+              <div className="rounded-xl bg-white/90 border border-amber-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-1">ضمان الهيكل الإنشائي (سنة)</p>
+                {isEditingWarrantiesCard ? (
+                  <input
+                    className="w-full bg-transparent border-0 border-b border-dashed border-slate-300 text-slate-800 text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-amber-500 rounded-none"
+                    type="number"
+                    min={0}
+                    placeholder="عدد السنوات"
+                    value={warrantiesEdit.structural_warranty_years === '' ? '' : warrantiesEdit.structural_warranty_years}
+                    onChange={e => setWarrantiesEdit({ ...warrantiesEdit, structural_warranty_years: e.target.value === '' ? '' : Number(e.target.value) })}
+                  />
+                ) : (
+                  <p className="text-slate-800 text-sm">{building.structural_warranty_years != null ? `${building.structural_warranty_years} سنة` : "—"}</p>
+                )}
+              </div>
+              <div className="rounded-xl bg-white/90 border border-amber-100 px-4 py-2 shadow-sm">
+                <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-1">ضمان تأسيس السباكة والكهرباء (سنة)</p>
+                {isEditingWarrantiesCard ? (
+                  <input
+                    className="w-full bg-transparent border-0 border-b border-dashed border-slate-300 text-slate-800 text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-amber-500 rounded-none"
+                    type="number"
+                    min={0}
+                    placeholder="عدد السنوات"
+                    value={warrantiesEdit.plumbing_electrical_warranty_years === '' ? '' : warrantiesEdit.plumbing_electrical_warranty_years}
+                    onChange={e => setWarrantiesEdit({ ...warrantiesEdit, plumbing_electrical_warranty_years: e.target.value === '' ? '' : Number(e.target.value) })}
+                  />
+                ) : (
+                  <p className="text-slate-800 text-sm">{building.plumbing_electrical_warranty_years != null ? `${building.plumbing_electrical_warranty_years} سنة` : "—"}</p>
+                )}
+              </div>
+              <div className="rounded-xl bg-white/90 border border-amber-100 px-4 py-2 shadow-sm md:col-span-2">
+                <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-1">ضمان الأفيش والقواطع (سنة)</p>
+                {isEditingWarrantiesCard ? (
+                  <input
+                    className="w-full bg-transparent border-0 border-b border-dashed border-slate-300 text-slate-800 text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-amber-500 rounded-none"
+                    type="number"
+                    min={0}
+                    placeholder="عدد السنوات"
+                    value={warrantiesEdit.outlets_circuits_warranty_years === '' ? '' : warrantiesEdit.outlets_circuits_warranty_years}
+                    onChange={e => setWarrantiesEdit({ ...warrantiesEdit, outlets_circuits_warranty_years: e.target.value === '' ? '' : Number(e.target.value) })}
+                  />
+                ) : (
+                  <p className="text-slate-800 text-sm">{building.outlets_circuits_warranty_years != null ? `${building.outlets_circuits_warranty_years} سنة` : "—"}</p>
+                )}
+              </div>
+              {isEditingWarrantiesCard && (
+                <div className="md:col-span-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={saveWarranties}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 text-white text-sm font-medium shadow hover:bg-amber-600"
+                  >
+                    <Check className="w-4 h-4" />
+                    حفظ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingWarrantiesCard(false)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm hover:bg-slate-50"
+                  >
+                    <X className="w-4 h-4" />
+                    إلغاء
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         )}
 

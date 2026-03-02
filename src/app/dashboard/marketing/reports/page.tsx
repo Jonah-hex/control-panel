@@ -578,7 +578,7 @@ export default function MarketingReportsPage() {
 
   useEffect(() => {
     if (!ready) return;
-    if (!can("reservations")) {
+    if (!can("marketing_view")) {
       router.replace("/dashboard");
       return;
     }
