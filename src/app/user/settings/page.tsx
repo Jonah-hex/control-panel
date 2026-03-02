@@ -69,9 +69,17 @@ export type PermissionKey =
   | 'reports'
   | 'reservations'
   | 'sales'
+  | 'marketing_view'
+  | 'marketing_edit'
   | 'marketing_cancel_reservation'
   | 'marketing_complete_sale'
   | 'marketing_building_details'
+  | 'owners_investors_view'
+  | 'owners_investors_edit'
+  | 'owners_view'
+  | 'owners_edit'
+  | 'investors_view'
+  | 'investors_edit'
   | 'documents_edit_folders'
   | 'security'
   | 'settings'
@@ -112,9 +120,17 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   reports: 'التقارير',
   reservations: 'سجل الحجوزات',
   sales: 'سجل المبيعات',
+  marketing_view: 'معاينة إدارة التسويق والمبيعات',
+  marketing_edit: 'تعديل في إدارة التسويق والمبيعات',
   marketing_cancel_reservation: 'زر: إلغاء الحجز (في الحجوزات)',
   marketing_complete_sale: 'زر: إتمام البيع (في الحجوزات)',
   marketing_building_details: 'زر: تفاصيل المبنى (في الحجوزات)',
+  owners_investors_view: 'معاينة إدارة الملاك والمستثمرين',
+  owners_investors_edit: 'تعديل في إدارة الملاك والمستثمرين',
+  owners_view: 'معاينة الملاك',
+  owners_edit: 'تعديل في الملاك',
+  investors_view: 'معاينة المستثمرين',
+  investors_edit: 'تعديل في المستثمرين',
   security: 'الأمان',
   settings: 'الإعدادات المتقدمة',
 }
@@ -123,7 +139,9 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
 const PERMISSION_GROUPS: { title: string; keys: PermissionKey[] }[] = [
   { title: 'العماير', keys: ['buildings', 'building_details', 'buildings_create', 'buildings_edit', 'buildings_delete'] },
   { title: 'الوحدات', keys: ['units', 'units_edit'] },
-  { title: 'التسويق والحجوزات', keys: ['reservations', 'sales', 'marketing_cancel_reservation', 'marketing_complete_sale', 'marketing_building_details'] },
+  { title: 'إدارة التسويق والمبيعات', keys: ['marketing_view', 'marketing_edit', 'reservations', 'sales', 'marketing_cancel_reservation', 'marketing_complete_sale', 'marketing_building_details'] },
+  { title: 'الملاك', keys: ['owners_view', 'owners_edit'] },
+  { title: 'المستثمرين', keys: ['investors_view', 'investors_edit'] },
   { title: 'التقارير والإحصائيات', keys: ['statistics', 'activities', 'reports'] },
   { title: 'الأمان والإعدادات', keys: ['security', 'settings'] },
 ]
@@ -187,9 +205,17 @@ const DEFAULT_PERMISSIONS: Record<PermissionKey, boolean> = {
   reports: true,
   reservations: true,
   sales: true,
+  marketing_view: true,
+  marketing_edit: true,
   marketing_cancel_reservation: true,
   marketing_complete_sale: true,
   marketing_building_details: true,
+  owners_investors_view: true,
+  owners_investors_edit: true,
+  owners_view: true,
+  owners_edit: true,
+  investors_view: true,
+  investors_edit: true,
   documents_edit_folders: true,
   security: false,
   settings: false,

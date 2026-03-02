@@ -42,9 +42,17 @@ export type PermissionKey =
   | 'reports'
   | 'reservations'
   | 'sales'
+  | 'marketing_view'
+  | 'marketing_edit'
   | 'marketing_cancel_reservation'
   | 'marketing_complete_sale'
   | 'marketing_building_details'
+  | 'owners_investors_view'
+  | 'owners_investors_edit'
+  | 'owners_view'
+  | 'owners_edit'
+  | 'investors_view'
+  | 'investors_edit'
   | 'security'
   | 'settings'
 
@@ -117,6 +125,14 @@ export function useDashboardAuth(): UseDashboardAuthResult {
       if (typeof value === 'boolean') return value
       // الصلاحيات الجديدة تُعامل كـ true افتراضياً للسجلات القديمة التي لا تحتوي المفتاح بعد.
       if (key === 'marketing_cancel_reservation' || key === 'marketing_complete_sale' || key === 'marketing_building_details') return true
+      if (key === 'marketing_view') return (employeePermissions as Partial<Record<PermissionKey, boolean>>)['reservations'] === true
+      if (key === 'marketing_edit') return (employeePermissions as Partial<Record<PermissionKey, boolean>>)['sales'] === true
+      if (key === 'owners_investors_view') return (employeePermissions as Partial<Record<PermissionKey, boolean>>)['units'] === true
+      if (key === 'owners_investors_edit') return (employeePermissions as Partial<Record<PermissionKey, boolean>>)['units_edit'] === true
+      if (key === 'owners_view') return (employeePermissions as Partial<Record<PermissionKey, boolean>>)['owners_investors_view'] === true || (employeePermissions as Partial<Record<PermissionKey, boolean>>)['units'] === true
+      if (key === 'owners_edit') return (employeePermissions as Partial<Record<PermissionKey, boolean>>)['owners_investors_edit'] === true || (employeePermissions as Partial<Record<PermissionKey, boolean>>)['units_edit'] === true
+      if (key === 'investors_view') return (employeePermissions as Partial<Record<PermissionKey, boolean>>)['owners_investors_view'] === true || (employeePermissions as Partial<Record<PermissionKey, boolean>>)['units'] === true
+      if (key === 'investors_edit') return (employeePermissions as Partial<Record<PermissionKey, boolean>>)['owners_investors_edit'] === true || (employeePermissions as Partial<Record<PermissionKey, boolean>>)['units_edit'] === true
       if (key === 'documents_upload' || key === 'documents_create_folder' || key === 'documents_delete' || key === 'documents_edit_folders') return true
       return false
     },

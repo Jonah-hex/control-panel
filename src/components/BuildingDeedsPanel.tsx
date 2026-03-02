@@ -26,6 +26,7 @@ interface Unit {
   transfer_real_estate_request_no?: string | null;
   transfer_id_image_url?: string | null;
   electricity_meter_transferred_with_sale?: boolean | null;
+  water_meter_transferred_with_sale?: boolean | null;
   driver_room_transferred_with_sale?: boolean | null;
   driver_room?: boolean | null;
   driver_room_number?: string | null;
@@ -73,6 +74,7 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [viewOwnerUnit, setViewOwnerUnit] = useState<Unit | null>(null);
+  const [viewOwnerHandoverDate, setViewOwnerHandoverDate] = useState<string | null>(null);
 
   useEffect(() => {
     if (!buildingId) {
@@ -132,6 +134,20 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
     if (!openTransferUnitId || !buildingId) return;
     router.replace(`/dashboard/sales?action=transfer&buildingId=${buildingId}&unitId=${openTransferUnitId}`);
   }, [openTransferUnitId, buildingId, router]);
+
+  useEffect(() => {
+    if (!viewOwnerUnit?.id) {
+      setViewOwnerHandoverDate(null);
+      return;
+    }
+    const supabase = createClient();
+    supabase
+      .from("unit_handovers")
+      .select("handover_date")
+      .eq("unit_id", viewOwnerUnit.id)
+      .maybeSingle()
+      .then(({ data }) => setViewOwnerHandoverDate(data?.handover_date ?? null));
+  }, [viewOwnerUnit?.id]);
 
   const statusLabel = (s?: string) => {
     if (!s) return "-";
@@ -526,7 +542,7 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
 
       {/* نافذة معاينة بيانات المالك */}
       {viewOwnerUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer" onClick={() => setViewOwnerUnit(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer" onClick={() => { setViewOwnerUnit(null); setViewOwnerHandoverDate(null); }}>
           <div
             className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6"
             onClick={(e) => e.stopPropagation()}
@@ -538,14 +554,14 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
                   بيانات المالك — الوحدة {viewOwnerUnit.unit_number}
                 </span>
               </h3>
-              <button onClick={() => setViewOwnerUnit(null)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500">
+              <button onClick={() => { setViewOwnerUnit(null); setViewOwnerHandoverDate(null); }} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
                 <span className="text-slate-600 shrink-0">اسم المالك الأول</span>
-                <span className="font-medium text-slate-800 text-left">{viewOwnerUnit.previous_owner_name || "—"}</span>
+                <span className="font-medium text-slate-800 text-left">{building?.owner_name || viewOwnerUnit.previous_owner_name || "—"}</span>
               </div>
               <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
                 <span className="text-slate-600 shrink-0">اسم المالك الجديد</span>
@@ -556,21 +572,8 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
                 <span className="font-medium text-slate-800 dir-ltr text-left">{viewOwnerUnit.owner_phone || "—"}</span>
               </div>
               <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
-                <span className="text-slate-600 shrink-0">الإعفاء الضريبي</span>
-                <span className="font-medium text-left inline-flex items-center gap-1.5 flex-row-reverse">
-                  {viewOwnerUnit.tax_exemption_status ? "نعم" : "لا"}
-                  {viewOwnerUnit.tax_exemption_file_url && (
-                    <a
-                      href={viewOwnerUnit.tax_exemption_file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1 rounded-lg text-teal-600 hover:text-teal-700 hover:bg-teal-50"
-                      title="معاينة ملف الإعفاء"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </a>
-                  )}
-                </span>
+                <span className="text-slate-600 shrink-0">تاريخ الإفراغ</span>
+                <span className="font-medium text-slate-800 text-left dir-ltr">{viewOwnerHandoverDate ? (() => { const d = new Date(viewOwnerHandoverDate); const day = String(d.getDate()).padStart(2, "0"); const month = String(d.getMonth() + 1).padStart(2, "0"); const year = d.getFullYear(); return `${day}/${month}/${year}`; })() : "—"}</span>
               </div>
               {viewOwnerUnit.transfer_real_estate_request_no && (
                 <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
@@ -583,23 +586,13 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
                 <span className="font-medium text-left">{viewOwnerUnit.electricity_meter_transferred_with_sale ? "نعم" : "لا"}</span>
               </div>
               <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
+                <span className="text-slate-600 shrink-0">تم نقل عداد المياه مع الوحدة</span>
+                <span className="font-medium text-left">{viewOwnerUnit.water_meter_transferred_with_sale ? "نعم" : "لا"}</span>
+              </div>
+              <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
                 <span className="text-slate-600 shrink-0">تم نقل غرفة السائق مع الوحدة</span>
                 <span className="font-medium text-left">{viewOwnerUnit.driver_room_transferred_with_sale ? "نعم" : "لا"}</span>
               </div>
-              {viewOwnerUnit.transfer_id_image_url && (
-                <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
-                  <span className="text-slate-600 shrink-0">صورة الهوية</span>
-                  <a
-                    href={viewOwnerUnit.transfer_id_image_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-1 rounded-lg text-teal-600 hover:text-teal-700 hover:bg-teal-50"
-                    title="معاينة صورة الهوية"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </a>
-                </div>
-              )}
               {viewOwnerUnit.transfer_check_image_url && (
                 <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
                   <span className="text-slate-600 shrink-0">
@@ -616,11 +609,6 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
                   </a>
                 </div>
               )}
-              <div className="pt-3 border-t border-slate-100">
-                <button type="button" disabled className="w-full py-2 rounded-xl border border-dashed border-slate-200 text-slate-400 text-sm font-medium cursor-not-allowed">
-                  معاينة استلام الوحدة (قريباً)
-                </button>
-              </div>
             </div>
           </div>
         </div>

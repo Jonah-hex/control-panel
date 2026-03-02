@@ -117,6 +117,9 @@ type PermissionKey =
   | 'reports'
   | 'reservations'
   | 'sales'
+  | 'marketing_view'
+  | 'owners_view'
+  | 'investors_view'
   | 'security'
   | 'settings'
 
@@ -563,6 +566,81 @@ export default function DashboardPage() {
     return currentNotificationIds.filter((id) => !readNotificationIds.has(id)).length
   }, [currentNotificationIds, readNotificationIds])
 
+  /** تنسيق وقت التنبيه لعرضه بجانب كل تنبيه (أحدث أولاً) */
+  const formatNotificationTime = (isoDate: string) => {
+    const d = new Date(isoDate)
+    const now = new Date()
+    const diffMs = now.getTime() - d.getTime()
+    if (diffMs < 0) {
+      // تاريخ مستقبلي (مثلاً انتهاء اتحاد الملاك)
+      return d.toLocaleDateString('ar-SA', { day: 'numeric', month: 'short', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined })
+    }
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+    if (diffMins < 1) return 'الآن'
+    if (diffMins < 60) return `منذ ${diffMins} د`
+    if (diffHours < 24) return `منذ ${diffHours} س`
+    if (diffDays === 1) return 'أمس'
+    if (diffDays < 7) return `منذ ${diffDays} أيام`
+    return d.toLocaleDateString('ar-SA', { day: 'numeric', month: 'short', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined })
+  }
+
+  /** قائمة موحدة لجميع التنبيهات مرتبة من الأحدث إلى الأقدم */
+  type NotificationItem =
+    | { type: 'assoc'; sortTime: string; key: string; buildingId: string; buildingName: string; endDate: string; daysLeft: number }
+    | { type: 'res-expired'; sortTime: string; key: string; reservation: (typeof reservations)[0]; unit: Unit | undefined; buildingName: string }
+    | { type: 'elec'; sortTime: string; key: string; unit: Unit; buildingName: string }
+    | { type: 'meter-missing'; sortTime: string; key: string; buildingId: string; buildingName: string; needsComplete: boolean }
+    | { type: 'cancelled'; sortTime: string; key: string; log: (typeof reservationCancelledLogs)[0] }
+    | { type: 'refunded'; sortTime: string; key: string; log: (typeof depositRefundedLogs)[0] }
+    | { type: 'remaining-collected'; sortTime: string; key: string; log: (typeof remainingPaymentCollectedLogs)[0] }
+    | { type: 'remaining-late'; sortTime: string; key: string; log: (typeof remainingPaymentCollectedLateLogs)[0] }
+    | { type: 'sale-remaining'; sortTime: string; key: string; sale: (typeof salesWithRemaining)[0] }
+  const sortedNotifications = useMemo((): NotificationItem[] => {
+    const fallbackTime = '1970-01-01T00:00:00Z' // تنبيهات بدون تاريخ تُعرض في النهاية
+    const items: NotificationItem[] = []
+    filteredAssociationEndReminders.forEach(({ buildingId, buildingName, endDate, daysLeft }) => {
+      items.push({ type: 'assoc', sortTime: endDate, key: `assoc-${buildingId}-${daysLeft}`, buildingId, buildingName, endDate, daysLeft })
+    })
+    filteredReservationReminders.forEach(({ reservation, unit, buildingName }) => {
+      const sortTime = reservation.expiry_date || reservation.created_at
+      items.push({ type: 'res-expired', sortTime, key: `res-expired-${reservation.id}`, reservation, unit, buildingName })
+    })
+    filteredElectricityReminders.forEach(({ unit, buildingName }) => {
+      items.push({ type: 'elec', sortTime: unit.updated_at || unit.created_at || fallbackTime, key: `elec-${unit.id}`, unit, buildingName })
+    })
+    filteredMissingMeterReminders.forEach(({ buildingId, buildingName, needsComplete }) => {
+      items.push({ type: 'meter-missing', sortTime: fallbackTime, key: `meter-missing-${buildingId}`, buildingId, buildingName, needsComplete })
+    })
+    ;(reservationActivityForBell.cancelled || []).forEach((log) => {
+      items.push({ type: 'cancelled', sortTime: log.created_at, key: `activity-cancelled-${log.id}`, log })
+    })
+    ;(reservationActivityForBell.refunded || []).forEach((log) => {
+      items.push({ type: 'refunded', sortTime: log.created_at, key: `activity-refund-${log.id}`, log })
+    })
+    ;(filteredRemainingPaymentCollectedLogs || []).forEach((log) => {
+      items.push({ type: 'remaining-collected', sortTime: log.created_at, key: `remaining-collected-${log.id}`, log })
+    })
+    ;(filteredRemainingPaymentCollectedLateLogs || []).forEach((log) => {
+      items.push({ type: 'remaining-late', sortTime: log.created_at, key: `remaining-collected-late-${log.id}`, log })
+    })
+    ;(filteredSalesWithRemaining || []).forEach((s) => {
+      items.push({ type: 'sale-remaining', sortTime: (s as { created_at?: string }).created_at || fallbackTime, key: `sale-remaining-${s.id}`, sale: s })
+    })
+    return items.sort((a, b) => new Date(b.sortTime).getTime() - new Date(a.sortTime).getTime())
+  }, [
+    filteredAssociationEndReminders,
+    filteredReservationReminders,
+    filteredElectricityReminders,
+    filteredMissingMeterReminders,
+    reservationActivityForBell,
+    filteredRemainingPaymentCollectedLogs,
+    filteredRemainingPaymentCollectedLateLogs,
+    filteredSalesWithRemaining,
+    reservations,
+  ])
+
   const markAllNotificationsRead = () => {
     setReadNotificationIds((prev) => {
       const next = new Set(prev)
@@ -813,7 +891,8 @@ export default function DashboardPage() {
     { icon: Plus, label: 'إضافة عمارة', href: '/dashboard/buildings/new', color: 'blue', gradient: 'from-blue-500 to-cyan-500', permission: 'buildings_create' as const, noPermissionMessage: 'ليس لديك صلاحية إضافة عمارة جديدة. تواصل مع المالك لتفعيل الصلاحية.' },
     { icon: Home, label: 'الوحدات', href: '/dashboard/units', color: 'purple', gradient: 'from-purple-500 to-pink-500', permission: 'units' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول للوحدات.' },
     { icon: BarChart3, label: 'الإحصائيات', href: '/dashboard/statistics', color: 'indigo', gradient: 'from-indigo-500 to-purple-500', permission: 'statistics' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول للإحصائيات.' },
-    { icon: User2, label: 'إدارة التسويق والمبيعات', href: '/dashboard/marketing', color: 'amber', gradient: 'from-amber-500 to-orange-600', permission: 'reservations' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول لإدارة التسويق والمبيعات.' }
+    { icon: User2, label: 'إدارة التسويق والمبيعات', href: '/dashboard/marketing', color: 'amber', gradient: 'from-amber-500 to-orange-600', permission: 'marketing_view' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول لإدارة التسويق والمبيعات.' },
+    { icon: Users, label: 'إدارة الملاك والمستثمرين', href: '/dashboard/owners-investors', color: 'teal', gradient: 'from-teal-500 to-cyan-600', permission: 'owners_view' as const, permissionAlt: 'investors_view' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول لإدارة الملاك أو المستثمرين.' }
   ]
 
   const recentBuildings = buildings.slice(0, 3)
@@ -997,162 +1076,104 @@ export default function DashboardPage() {
                           </div>
                         ) : (
                           <div className="divide-y divide-gray-100">
-                            {filteredAssociationEndReminders.map(({ buildingId, buildingName, endDate, daysLeft }) => (
-                              <Link
-                                key={`assoc-${buildingId}-${daysLeft}`}
-                                href={`/dashboard/buildings/details?buildingId=${buildingId}#card-association`}
-                                onClick={() => setNotificationsOpen(false)}
-                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-emerald-50/70 transition cursor-pointer"
-                              >
-                                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
-                                  <Users className="w-5 h-5" />
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-gray-800">
-                                    {daysLeft === 0
-                                      ? 'انتهت مدة اتحاد الملاك اليوم'
-                                      : `تنتهي خلال ${daysLeft} أيام`}
-                                  </p>
-                                  <p className="text-xs text-gray-600 mt-0.5">{buildingName}</p>
-                                  <p className="text-xs text-gray-400 mt-0.5">النهاية: {endDate}</p>
-                                </div>
-                              </Link>
-                            ))}
-                            {filteredReservationReminders.map(({ reservation, unit, buildingName }) => (
-                              <Link
-                                key={`res-expired-${reservation.id}`}
-                                href={`/dashboard/reservations?buildingId=${reservation.building_id}`}
-                                onClick={() => setNotificationsOpen(false)}
-                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-amber-50/70 transition cursor-pointer"
-                              >
-                                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
-                                  <Calendar className="w-5 h-5" />
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-gray-800">انتهت مدة الحجز — راجع وألغِ الحجز</p>
-                                  <p className="text-xs text-gray-600 mt-0.5">
-                                    {unit ? `الوحدة ${unit.unit_number} (د${unit.floor})` : 'وحدة محجوزة'} — {buildingName}
-                                  </p>
-                                </div>
-                              </Link>
-                            ))}
-                            {filteredElectricityReminders.map(({ unit, buildingName }) => (
-                              <Link
-                                key={`elec-${unit.id}`}
-                                href={`/dashboard/buildings/details?buildingId=${unit.building_id}#card-electricity`}
-                                onClick={() => setNotificationsOpen(false)}
-                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-amber-50/70 transition cursor-pointer"
-                              >
-                                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
-                                  <Zap className="w-5 h-5" />
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-gray-800">فاتورة كهرباء</p>
-                                  <p className="text-xs text-gray-600 mt-0.5 font-mono text-amber-700">{unit.electricity_meter_number}</p>
-                                  <p className="text-xs text-gray-400 mt-0.5">{buildingName} — وحدة {unit.unit_number}</p>
-                                </div>
-                              </Link>
-                            ))}
-                            {filteredMissingMeterReminders.map(({ buildingId, buildingName, needsComplete }) => (
-                              <Link
-                                key={`meter-missing-${buildingId}`}
-                                href={`/dashboard/buildings/details?buildingId=${buildingId}#card-electricity`}
-                                onClick={() => setNotificationsOpen(false)}
-                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-amber-50/70 transition cursor-pointer"
-                              >
-                                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
-                                  <AlertCircle className="w-5 h-5" />
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-gray-800">
-                                    {needsComplete ? 'الرجاء إكمال إضافة عدادات عمارة' : 'الرجاء إضافة عدادات عمارة'}
-                                  </p>
-                                  <p className="text-xs text-gray-600 mt-0.5">{buildingName}</p>
-                                </div>
-                              </Link>
-                            ))}
-                            {reservationActivityForBell.cancelled.map((log) => (
-                              <Link
-                                key={`activity-cancelled-${log.id}`}
-                                href={`/dashboard/reservations${(log.metadata?.building_id as string) ? `?buildingId=${log.metadata.building_id}` : ''}`}
-                                onClick={() => setNotificationsOpen(false)}
-                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-red-50/70 transition cursor-pointer"
-                              >
-                                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-red-600">
-                                  <Trash2 className="w-5 h-5" />
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-gray-800">إلغاء حجز</p>
-                                  <p className="text-xs text-gray-600 mt-0.5">{log.action_description || 'تم إلغاء حجز'}</p>
-                                </div>
-                              </Link>
-                            ))}
-                            {reservationActivityForBell.refunded.map((log) => (
-                              <Link
-                                key={`activity-refund-${log.id}`}
-                                href={`/dashboard/reservations${(log.metadata?.building_id as string) ? `?buildingId=${log.metadata.building_id}` : ''}`}
-                                onClick={() => setNotificationsOpen(false)}
-                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-emerald-50/70 transition cursor-pointer"
-                              >
-                                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
-                                  <ArrowRightLeft className="w-5 h-5" />
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-gray-800">استرداد عربون</p>
-                                  <p className="text-xs text-gray-600 mt-0.5">{log.action_description || 'تم استرداد العربون'}</p>
-                                </div>
-                              </Link>
-                            ))}
-                            {filteredRemainingPaymentCollectedLogs.map((log) => (
-                              <Link
-                                key={`remaining-collected-${log.id}`}
-                                href="/dashboard/sales"
-                                onClick={() => setNotificationsOpen(false)}
-                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-emerald-50/70 transition cursor-pointer"
-                              >
-                                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
-                                  <CheckCircle className="w-5 h-5" />
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-gray-800">تأكيد تحصيل المتبقي</p>
-                                  <p className="text-xs text-gray-600 mt-0.5">{log.action_description || 'تم تأكيد تحصيل المبلغ المتبقي وتحويل الدفع إلى مكتمل'}</p>
-                                </div>
-                              </Link>
-                            ))}
-                            {filteredRemainingPaymentCollectedLateLogs.map((log) => (
-                              <Link
-                                key={`remaining-collected-late-${log.id}`}
-                                href="/dashboard/sales"
-                                onClick={() => setNotificationsOpen(false)}
-                                className="flex items-start gap-3 px-4 py-3.5 hover:bg-amber-50/70 transition cursor-pointer"
-                              >
-                                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
-                                  <AlertCircle className="w-5 h-5" />
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-gray-800">تأخير في تحصيل المتبقي</p>
-                                  <p className="text-xs text-gray-600 mt-0.5">{log.action_description || 'تم دفع المبلغ المتبقي بعد تاريخ الاستحقاق'}</p>
-                                </div>
-                              </Link>
-                            ))}
-                            {filteredSalesWithRemaining.map((s) => {
-                              const bName = buildings.find(b => b.id === s.building_id)?.name || '—'
+                            {sortedNotifications.map((item) => {
+                              const timeLabel = item.type === 'assoc' ? item.endDate : item.type === 'res-expired' ? (item.reservation.expiry_date || item.reservation.created_at) : item.type === 'elec' ? (item.unit.updated_at || item.unit.created_at) : item.type === 'meter-missing' ? null : item.type === 'sale-remaining' ? (item.sale as { created_at?: string }).created_at : (item as { log?: { created_at: string } }).log?.created_at
+                              const displayTime = timeLabel ? formatNotificationTime(timeLabel) : null
                               return (
-                                <Link
-                                  key={`sale-remaining-${s.id}`}
-                                  href="/dashboard/sales"
-                                  onClick={() => setNotificationsOpen(false)}
-                                  className="flex items-start gap-3 px-4 py-3.5 hover:bg-amber-50/70 transition cursor-pointer"
-                                >
-                                  <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
-                                    <RiyalIcon className="w-5 h-5" />
-                                  </span>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-gray-800">مبلغ متبقٍ على عميل</p>
-                                    <p className="text-xs text-gray-600 mt-0.5 dir-ltr">{Number(s.remaining_payment).toLocaleString('en')} ر.س — {bName}{s.buyer_name ? ` · ${String(s.buyer_name).trim()}` : ''}</p>
-                                    <p className="text-xs text-gray-400 mt-0.5">سجل المبيعات ← تأكيد التحصيل</p>
-                                  </div>
-                                </Link>
+                                <div key={item.key} className="flex items-start gap-3 px-4 py-3.5 hover:bg-gray-50/70 transition">
+                                  {item.type === 'assoc' && (
+                                    <Link href={`/dashboard/buildings/details?buildingId=${item.buildingId}#card-association`} onClick={() => setNotificationsOpen(false)} className="flex items-start gap-3 flex-1 min-w-0">
+                                      <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600"><Users className="w-5 h-5" /></span>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800">{item.daysLeft === 0 ? 'انتهت مدة اتحاد الملاك اليوم' : `تنتهي خلال ${item.daysLeft} أيام`}</p>
+                                        <p className="text-xs text-gray-600 mt-0.5">{item.buildingName}</p>
+                                        <p className="text-xs text-gray-400 mt-0.5">النهاية: {item.endDate}</p>
+                                        {displayTime && <p className="text-[11px] text-gray-400 mt-1">{displayTime}</p>}
+                                      </div>
+                                    </Link>
+                                  )}
+                                  {item.type === 'res-expired' && (
+                                    <Link href={`/dashboard/reservations?buildingId=${item.reservation.building_id}`} onClick={() => setNotificationsOpen(false)} className="flex items-start gap-3 flex-1 min-w-0">
+                                      <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600"><Calendar className="w-5 h-5" /></span>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800">انتهت مدة الحجز — راجع وألغِ الحجز</p>
+                                        <p className="text-xs text-gray-600 mt-0.5">{item.unit ? `الوحدة ${item.unit.unit_number} (د${item.unit.floor})` : 'وحدة محجوزة'} — {item.buildingName}</p>
+                                        {displayTime && <p className="text-[11px] text-gray-400 mt-1">{displayTime}</p>}
+                                      </div>
+                                    </Link>
+                                  )}
+                                  {item.type === 'elec' && (
+                                    <Link href={`/dashboard/buildings/details?buildingId=${item.unit.building_id}#card-electricity`} onClick={() => setNotificationsOpen(false)} className="flex items-start gap-3 flex-1 min-w-0">
+                                      <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600"><Zap className="w-5 h-5" /></span>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800">فاتورة كهرباء</p>
+                                        <p className="text-xs text-gray-600 mt-0.5 font-mono text-amber-700">{item.unit.electricity_meter_number}</p>
+                                        <p className="text-xs text-gray-400 mt-0.5">{item.buildingName} — وحدة {item.unit.unit_number}</p>
+                                        {displayTime && <p className="text-[11px] text-gray-400 mt-1">{displayTime}</p>}
+                                      </div>
+                                    </Link>
+                                  )}
+                                  {item.type === 'meter-missing' && (
+                                    <Link href={`/dashboard/buildings/details?buildingId=${item.buildingId}#card-electricity`} onClick={() => setNotificationsOpen(false)} className="flex items-start gap-3 flex-1 min-w-0">
+                                      <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600"><AlertCircle className="w-5 h-5" /></span>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800">{item.needsComplete ? 'الرجاء إكمال إضافة عدادات عمارة' : 'الرجاء إضافة عدادات عمارة'}</p>
+                                        <p className="text-xs text-gray-600 mt-0.5">{item.buildingName}</p>
+                                      </div>
+                                    </Link>
+                                  )}
+                                  {item.type === 'cancelled' && (
+                                    <Link href={`/dashboard/reservations${(item.log.metadata?.building_id as string) ? `?buildingId=${item.log.metadata.building_id}` : ''}`} onClick={() => setNotificationsOpen(false)} className="flex items-start gap-3 flex-1 min-w-0">
+                                      <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-red-600"><Trash2 className="w-5 h-5" /></span>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800">إلغاء حجز</p>
+                                        <p className="text-xs text-gray-600 mt-0.5">{item.log.action_description || 'تم إلغاء حجز'}</p>
+                                        {displayTime && <p className="text-[11px] text-gray-400 mt-1">{displayTime}</p>}
+                                      </div>
+                                    </Link>
+                                  )}
+                                  {item.type === 'refunded' && (
+                                    <Link href={`/dashboard/reservations${(item.log.metadata?.building_id as string) ? `?buildingId=${item.log.metadata.building_id}` : ''}`} onClick={() => setNotificationsOpen(false)} className="flex items-start gap-3 flex-1 min-w-0">
+                                      <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600"><ArrowRightLeft className="w-5 h-5" /></span>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800">استرداد عربون</p>
+                                        <p className="text-xs text-gray-600 mt-0.5">{item.log.action_description || 'تم استرداد العربون'}</p>
+                                        {displayTime && <p className="text-[11px] text-gray-400 mt-1">{displayTime}</p>}
+                                      </div>
+                                    </Link>
+                                  )}
+                                  {item.type === 'remaining-collected' && (
+                                    <Link href="/dashboard/sales" onClick={() => setNotificationsOpen(false)} className="flex items-start gap-3 flex-1 min-w-0">
+                                      <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600"><CheckCircle className="w-5 h-5" /></span>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800">تأكيد تحصيل المتبقي</p>
+                                        <p className="text-xs text-gray-600 mt-0.5">{item.log.action_description || 'تم تأكيد تحصيل المبلغ المتبقي وتحويل الدفع إلى مكتمل'}</p>
+                                        {displayTime && <p className="text-[11px] text-gray-400 mt-1">{displayTime}</p>}
+                                      </div>
+                                    </Link>
+                                  )}
+                                  {item.type === 'remaining-late' && (
+                                    <Link href="/dashboard/sales" onClick={() => setNotificationsOpen(false)} className="flex items-start gap-3 flex-1 min-w-0">
+                                      <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600"><AlertCircle className="w-5 h-5" /></span>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800">تأخير في تحصيل المتبقي</p>
+                                        <p className="text-xs text-gray-600 mt-0.5">{item.log.action_description || 'تم دفع المبلغ المتبقي بعد تاريخ الاستحقاق'}</p>
+                                        {displayTime && <p className="text-[11px] text-gray-400 mt-1">{displayTime}</p>}
+                                      </div>
+                                    </Link>
+                                  )}
+                                  {item.type === 'sale-remaining' && (
+                                    <Link href="/dashboard/sales" onClick={() => setNotificationsOpen(false)} className="flex items-start gap-3 flex-1 min-w-0">
+                                      <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600"><RiyalIcon className="w-5 h-5" /></span>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800">مبلغ متبقٍ على عميل</p>
+                                        <p className="text-xs text-gray-600 mt-0.5 dir-ltr">{Number(item.sale.remaining_payment).toLocaleString('en')} ر.س — {buildings.find(b => b.id === item.sale.building_id)?.name || '—'}{item.sale.buyer_name ? ` · ${String(item.sale.buyer_name).trim()}` : ''}</p>
+                                        <p className="text-xs text-gray-400 mt-0.5">سجل المبيعات ← تأكيد التحصيل</p>
+                                        {displayTime && <p className="text-[11px] text-gray-400 mt-1">{displayTime}</p>}
+                                      </div>
+                                    </Link>
+                                  )}
+                                </div>
                               )
                             })}
                           </div>
@@ -1233,7 +1254,7 @@ export default function DashboardPage() {
             </div>
             <div className="p-4">
               {quickActions.map((action, index) => {
-                const allowed = can(action.permission)
+                const allowed = can(action.permission) || ('permissionAlt' in action && action.permissionAlt && can(action.permissionAlt))
                 const showWithoutPermission = action.permission === 'buildings_create' || action.permission === 'statistics'
                 if (!allowed && !showWithoutPermission) return null
                 if (allowed) {
@@ -1327,7 +1348,7 @@ export default function DashboardPage() {
         {/* إجراءات سريعة */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
           {quickActions.map((action, index) => {
-            const allowed = can(action.permission)
+            const allowed = can(action.permission) || ('permissionAlt' in action && action.permissionAlt && can(action.permissionAlt))
             const showWithoutPermission = action.permission === 'buildings_create' || action.permission === 'statistics'
             if (!allowed && !showWithoutPermission) return null
             if (allowed) {
