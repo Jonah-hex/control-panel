@@ -164,6 +164,7 @@ export default function DashboardPage() {
   const [remainingPaymentCollectedLateLogs, setRemainingPaymentCollectedLateLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
   const [salesWithRemaining, setSalesWithRemaining] = useState<Array<{ id: string; building_id: string; remaining_payment: number; remaining_payment_due_date?: string | null; buyer_name?: string | null }>>([])
   const [buildingInvestorsWithDueDate, setBuildingInvestorsWithDueDate] = useState<Array<{ id: string; building_id: string; investor_name: string; investment_due_date: string }>>([])
+  const [upcomingAppointments, setUpcomingAppointments] = useState<Array<{ id: string; title: string; scheduled_at: string; type: string; buildings?: { name: string } | null }>>([])
 
   const router = useRouter()
   const supabase = createClient()
