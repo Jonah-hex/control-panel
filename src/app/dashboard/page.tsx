@@ -82,6 +82,8 @@ interface Activity {
   building_name: string
   building_id?: string
   user_name: string
+  /** توضيح دور الشخص: مسوق، موظف، صاحب الحساب، عميل، إلخ */
+  user_role_label?: string
   timestamp: string
   details: string
   /** لتنسيق العرض في تنبيهات اتحاد الملاك (تاريخ نهاية المدة) */
@@ -161,6 +163,7 @@ export default function DashboardPage() {
   const [remainingPaymentCollectedLogs, setRemainingPaymentCollectedLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
   const [remainingPaymentCollectedLateLogs, setRemainingPaymentCollectedLateLogs] = useState<Array<{ id: string; action_description: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
   const [salesWithRemaining, setSalesWithRemaining] = useState<Array<{ id: string; building_id: string; remaining_payment: number; remaining_payment_due_date?: string | null; buyer_name?: string | null }>>([])
+  const [buildingInvestorsWithDueDate, setBuildingInvestorsWithDueDate] = useState<Array<{ id: string; building_id: string; investor_name: string; investment_due_date: string }>>([])
 
   const router = useRouter()
   const supabase = createClient()
@@ -321,19 +324,22 @@ export default function DashboardPage() {
 
       const buildingIds = (data || []).map(b => b.id)
       if (buildingIds.length > 0) {
-        const [unitsRes, resRes, salesPartialRes] = await Promise.all([
+        const [unitsRes, resRes, salesPartialRes, investorsDueRes] = await Promise.all([
           supabase.from('units').select('*').in('building_id', buildingIds),
           supabase.from('reservations').select('id, unit_id, building_id, created_at, created_by_name, customer_name, status, expiry_date, marketer_name, completed_at, sale_id').in('building_id', buildingIds).order('created_at', { ascending: false }),
-          supabase.from('sales').select('id, building_id, remaining_payment, remaining_payment_due_date, buyer_name').in('building_id', buildingIds).eq('payment_status', 'partial').gt('remaining_payment', 0)
+          supabase.from('sales').select('id, building_id, remaining_payment, remaining_payment_due_date, buyer_name').in('building_id', buildingIds).eq('payment_status', 'partial').gt('remaining_payment', 0),
+          supabase.from('building_investors').select('id, building_id, investor_name, investment_due_date').eq('owner_id', ownerId).not('investment_due_date', 'is', null)
         ])
         if (unitsRes.error) throw unitsRes.error
         setUnits(unitsRes.data || [])
         setReservations(Array.isArray(resRes.data) ? resRes.data : [])
         setSalesWithRemaining((salesPartialRes.data || []) as Array<{ id: string; building_id: string; remaining_payment: number; remaining_payment_due_date?: string | null; buyer_name?: string | null }>)
+        setBuildingInvestorsWithDueDate((investorsDueRes.data || []) as Array<{ id: string; building_id: string; investor_name: string; investment_due_date: string }>)
       } else {
         setUnits([])
         setReservations([])
         setSalesWithRemaining([])
+        setBuildingInvestorsWithDueDate([])
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -440,13 +446,20 @@ export default function DashboardPage() {
   const reservedUnits = units.filter(u => u.status === 'reserved').length
   const soldUnits = units.filter(u => u.status === 'sold').length
 
-  // تنبيهات فواتير الكهرباء — وحدات لها عداد مسجل (فواتير شركة الكهرباء السعودية تصدر 26 من كل شهر)
-  const electricityReminders = units
-    .filter(u => u.electricity_meter_number && String(u.electricity_meter_number).trim())
-    .map(u => ({
-      unit: u,
-      buildingName: buildings.find(b => b.id === u.building_id)?.name || '—'
-    }))
+  // تنبيهات فواتير الكهرباء — فقط خلال فترة صدور الفاتورة من الشركة السعودية للكهرباء (تصدر 26 من كل شهر، وتُعرض التنبيهات من 26 حتى 10 من الشهر التالي)
+  const isElectricityBillPeriod = (() => {
+    const today = new Date()
+    const day = today.getDate()
+    return day >= 26 || day <= 10
+  })()
+  const electricityReminders = isElectricityBillPeriod
+    ? units
+        .filter(u => u.electricity_meter_number && String(u.electricity_meter_number).trim())
+        .map(u => ({
+          unit: u,
+          buildingName: buildings.find(b => b.id === u.building_id)?.name || '—'
+        }))
+    : []
 
   // تنبيهات عمارة بدون عدادات كاملة — تنبيه واحد لكل عمارة (بالاسم فقط)
   const buildingsMissingMeters = useMemo(() => {
@@ -489,6 +502,30 @@ export default function DashboardPage() {
       }
     })
 
+  // تنبيهات اقتراب انتهاء عقد الاستثمار — قبل 30 يوم ثم كل 10 أيام (30، 20، 10، 0) — للمالك أو من لديه صلاحية المستثمرين
+  const INV_DUE_ALERT_DAYS = [30, 20, 10, 0]
+  const investmentEndReminders = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const out: { investorId: string; buildingId: string; buildingName: string; investorName: string; dueDate: string; daysLeft: number }[] = []
+    for (const inv of buildingInvestorsWithDueDate) {
+      const dueDate = new Date(inv.investment_due_date)
+      dueDate.setHours(0, 0, 0, 0)
+      const daysLeft = Math.ceil((dueDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000))
+      if (INV_DUE_ALERT_DAYS.includes(daysLeft) && daysLeft >= 0) {
+        out.push({
+          investorId: inv.id,
+          buildingId: inv.building_id,
+          buildingName: buildings.find(b => b.id === inv.building_id)?.name || '—',
+          investorName: inv.investor_name,
+          dueDate: inv.investment_due_date,
+          daysLeft
+        })
+      }
+    }
+    return out
+  }, [buildingInvestorsWithDueDate, buildings])
+
   // تنبيهات انتهاء مدة اتحاد الملاك — قبل 10، 5، 3 أيام وعند الانتهاء
   const ASSOC_ALERT_DAYS = [10, 5, 3, 0]
   const associationEndReminders = useMemo(() => {
@@ -525,10 +562,12 @@ export default function DashboardPage() {
 
   // تنبيهات معروضة حسب الصلاحيات (خاصة بلوحة الموظف حسب عمله)
   // تنبيهات الحجز والإلغاء والبيع تظهر للمالك فقط وليس للموظف
+  // تنبيهات اقتراب انتهاء عقد الاستثمار — للمالك فقط أو من لديه صلاحية المستثمرين
   const filteredAssociationEndReminders = can('details_association') ? associationEndReminders : []
   const filteredReservationReminders = employeePermissions === null && can('reservations') ? reservationReminders : []
   const filteredElectricityReminders = can('details_electricity') ? electricityReminders : []
   const filteredMissingMeterReminders = can('details_electricity') ? buildingsMissingMeters : []
+  const filteredInvestmentEndReminders = can('investors_view') ? investmentEndReminders : []
 
   // إجراءات حجوزات (إلغاء حجز / استرداد عربون) تظهر في الجرس لأصحاب صلاحية الحجوزات
   const reservationActivityForBell = useMemo(() => {
@@ -545,12 +584,13 @@ export default function DashboardPage() {
   const filteredSalesWithRemaining = can('sales') ? (salesWithRemaining || []).slice(0, 8) : []
   const remainingPaymentNotificationsCount = filteredRemainingPaymentCollectedLogs.length + filteredRemainingPaymentCollectedLateLogs.length + filteredSalesWithRemaining.length
 
-  const notificationsCount = filteredElectricityReminders.length + filteredReservationReminders.length + filteredAssociationEndReminders.length + filteredMissingMeterReminders.length + reservationActivityCount + remainingPaymentNotificationsCount
+  const notificationsCount = filteredElectricityReminders.length + filteredReservationReminders.length + filteredAssociationEndReminders.length + filteredMissingMeterReminders.length + filteredInvestmentEndReminders.length + reservationActivityCount + remainingPaymentNotificationsCount
 
   // قائمة معرفات الإشعارات الحالية (لحساب غير المقروءة)
   const currentNotificationIds = useMemo(() => {
     const ids: string[] = []
     filteredAssociationEndReminders.forEach(({ buildingId, daysLeft }) => ids.push(`assoc-${buildingId}-${daysLeft}`))
+    filteredInvestmentEndReminders.forEach(({ investorId, daysLeft }) => ids.push(`inv-due-${investorId}-${daysLeft}`))
     filteredReservationReminders.forEach(({ reservation }) => ids.push(`res-expired-${reservation.id}`))
     filteredElectricityReminders.forEach(({ unit }) => ids.push(`elec-${unit.id}`))
     filteredMissingMeterReminders.forEach(({ buildingId }) => ids.push(`meter-missing-${buildingId}`))
@@ -560,7 +600,7 @@ export default function DashboardPage() {
     filteredRemainingPaymentCollectedLateLogs.forEach((log: { id: string }) => ids.push(`remaining-collected-late-${log.id}`))
     filteredSalesWithRemaining.forEach((s: { id: string }) => ids.push(`sale-remaining-${s.id}`))
     return ids
-  }, [filteredAssociationEndReminders, filteredReservationReminders, filteredElectricityReminders, filteredMissingMeterReminders, reservationActivityForBell, filteredRemainingPaymentCollectedLogs, filteredRemainingPaymentCollectedLateLogs, filteredSalesWithRemaining])
+  }, [filteredAssociationEndReminders, filteredInvestmentEndReminders, filteredReservationReminders, filteredElectricityReminders, filteredMissingMeterReminders, reservationActivityForBell, filteredRemainingPaymentCollectedLogs, filteredRemainingPaymentCollectedLateLogs, filteredSalesWithRemaining])
 
   const unreadCount = useMemo(() => {
     return currentNotificationIds.filter((id) => !readNotificationIds.has(id)).length
@@ -589,6 +629,7 @@ export default function DashboardPage() {
   /** قائمة موحدة لجميع التنبيهات مرتبة من الأحدث إلى الأقدم */
   type NotificationItem =
     | { type: 'assoc'; sortTime: string; key: string; buildingId: string; buildingName: string; endDate: string; daysLeft: number }
+    | { type: 'inv-due'; sortTime: string; key: string; investorId: string; buildingId: string; buildingName: string; investorName: string; dueDate: string; daysLeft: number }
     | { type: 'res-expired'; sortTime: string; key: string; reservation: (typeof reservations)[0]; unit: Unit | undefined; buildingName: string }
     | { type: 'elec'; sortTime: string; key: string; unit: Unit; buildingName: string }
     | { type: 'meter-missing'; sortTime: string; key: string; buildingId: string; buildingName: string; needsComplete: boolean }
@@ -602,6 +643,9 @@ export default function DashboardPage() {
     const items: NotificationItem[] = []
     filteredAssociationEndReminders.forEach(({ buildingId, buildingName, endDate, daysLeft }) => {
       items.push({ type: 'assoc', sortTime: endDate, key: `assoc-${buildingId}-${daysLeft}`, buildingId, buildingName, endDate, daysLeft })
+    })
+    filteredInvestmentEndReminders.forEach(({ investorId, buildingId, buildingName, investorName, dueDate, daysLeft }) => {
+      items.push({ type: 'inv-due', sortTime: dueDate, key: `inv-due-${investorId}-${daysLeft}`, investorId, buildingId, buildingName, investorName, dueDate, daysLeft })
     })
     filteredReservationReminders.forEach(({ reservation, unit, buildingName }) => {
       const sortTime = reservation.expiry_date || reservation.created_at
@@ -631,6 +675,7 @@ export default function DashboardPage() {
     return items.sort((a, b) => new Date(b.sortTime).getTime() - new Date(a.sortTime).getTime())
   }, [
     filteredAssociationEndReminders,
+    filteredInvestmentEndReminders,
     filteredReservationReminders,
     filteredElectricityReminders,
     filteredMissingMeterReminders,
@@ -667,6 +712,7 @@ export default function DashboardPage() {
           building_name: bName,
           building_id: u.building_id,
           user_name: byName,
+          user_role_label: 'مسوق',
           timestamp: u.updated_at || u.created_at,
           details: `تم بيع الوحدة ${u.unit_number} (الدور ${u.floor})`
         })
@@ -682,6 +728,7 @@ export default function DashboardPage() {
         building_name: bName,
         building_id: r.building_id,
         user_name: (r.created_by_name && String(r.created_by_name).trim()) || 'مدير الحجوزات',
+        user_role_label: 'موظف',
         timestamp: r.created_at,
         details: `تم حجز ${unitLabel} — عميل: ${r.customer_name || '—'}`
       }
@@ -699,6 +746,7 @@ export default function DashboardPage() {
           building_name: bName,
           building_id: r.building_id,
           user_name: (r.created_by_name && String(r.created_by_name).trim()) || 'مدير الحجوزات',
+          user_role_label: 'موظف',
           timestamp: r.expiry_date || r.created_at,
           details: `انتهت مدة الحجز — يرجى مراجعة وإلغاء حجز ${unitLabel}`
         }
@@ -709,6 +757,7 @@ export default function DashboardPage() {
       building_name: b.name || 'عمارة جديدة',
       building_id: b.id,
       user_name: b.created_by_name?.trim() || b.owner_name?.trim() || 'صاحب الحساب',
+      user_role_label: b.created_by_name?.trim() ? 'موظف' : 'صاحب الحساب',
       timestamp: b.created_at,
       details: 'تم إضافة عمارة جديدة'
     }))
@@ -722,6 +771,7 @@ export default function DashboardPage() {
         building_name: r.buildingName,
         building_id: r.buildingId,
         user_name: ownerName,
+        user_role_label: 'صاحب الحساب',
         timestamp: sortTime,
         details: r.daysLeft === 0
           ? 'انتهت مدة اتحاد الملاك اليوم'
@@ -739,6 +789,7 @@ export default function DashboardPage() {
       building_name: (log.metadata?.building_name as string) || '—',
       building_id: (log.metadata?.building_id as string) || undefined,
       user_name: (log.metadata?.created_by_name as string)?.trim() || 'صاحب الحساب',
+      user_role_label: (log.metadata?.created_by_name as string)?.trim() ? 'موظف' : 'صاحب الحساب',
       timestamp: log.created_at,
       details: log.action_description || 'تم إضافة عداد'
     }))
@@ -748,6 +799,7 @@ export default function DashboardPage() {
       building_name: (log.metadata?.building_name as string) || '—',
       building_id: (log.metadata?.building_id as string) || undefined,
       user_name: (log.metadata?.created_by_name as string)?.trim() || 'صاحب الحساب',
+      user_role_label: (log.metadata?.created_by_name as string)?.trim() ? 'موظف' : 'صاحب الحساب',
       timestamp: log.created_at,
       details: log.action_description || 'نقل ملكية'
     }))
@@ -756,6 +808,7 @@ export default function DashboardPage() {
       type: 'remaining_payment_collected' as const,
       building_name: '—',
       user_name: 'النظام',
+      user_role_label: 'النظام',
       timestamp: log.created_at,
       details: log.action_description || 'تم تأكيد تحصيل المبلغ المتبقي'
     }))
@@ -764,6 +817,7 @@ export default function DashboardPage() {
       type: 'remaining_payment_collected_late' as const,
       building_name: (log.metadata?.building_name as string) || '—',
       user_name: 'النظام',
+      user_role_label: 'النظام',
       timestamp: log.created_at,
       details: log.action_description || 'تأخير في تحصيل المبلغ المتبقي — تم الدفع بعد تاريخ الاستحقاق'
     }))
@@ -1077,7 +1131,7 @@ export default function DashboardPage() {
                         ) : (
                           <div className="divide-y divide-gray-100">
                             {sortedNotifications.map((item) => {
-                              const timeLabel = item.type === 'assoc' ? item.endDate : item.type === 'res-expired' ? (item.reservation.expiry_date || item.reservation.created_at) : item.type === 'elec' ? (item.unit.updated_at || item.unit.created_at) : item.type === 'meter-missing' ? null : item.type === 'sale-remaining' ? (item.sale as { created_at?: string }).created_at : (item as { log?: { created_at: string } }).log?.created_at
+                              const timeLabel = item.type === 'assoc' ? item.endDate : item.type === 'inv-due' ? item.dueDate : item.type === 'res-expired' ? (item.reservation.expiry_date || item.reservation.created_at) : item.type === 'elec' ? (item.unit.updated_at || item.unit.created_at) : item.type === 'meter-missing' ? null : item.type === 'sale-remaining' ? (item.sale as { created_at?: string }).created_at : (item as { log?: { created_at: string } }).log?.created_at
                               const displayTime = timeLabel ? formatNotificationTime(timeLabel) : null
                               return (
                                 <div key={item.key} className="flex items-start gap-3 px-4 py-3.5 hover:bg-gray-50/70 transition">
@@ -1088,6 +1142,17 @@ export default function DashboardPage() {
                                         <p className="text-sm font-semibold text-gray-800">{item.daysLeft === 0 ? 'انتهت مدة اتحاد الملاك اليوم' : `تنتهي خلال ${item.daysLeft} أيام`}</p>
                                         <p className="text-xs text-gray-600 mt-0.5">{item.buildingName}</p>
                                         <p className="text-xs text-gray-400 mt-0.5">النهاية: {item.endDate}</p>
+                                        {displayTime && <p className="text-[11px] text-gray-400 mt-1">{displayTime}</p>}
+                                      </div>
+                                    </Link>
+                                  )}
+                                  {item.type === 'inv-due' && (
+                                    <Link href="/dashboard/owners-investors/investors" onClick={() => setNotificationsOpen(false)} className="flex items-start gap-3 flex-1 min-w-0">
+                                      <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center text-teal-600"><TrendingUp className="w-5 h-5" /></span>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800">{item.daysLeft === 0 ? 'ينتهي عقد الاستثمار اليوم' : `اقتراب انتهاء عقد الاستثمار — ${item.daysLeft} يوم`}</p>
+                                        <p className="text-xs text-gray-600 mt-0.5">{item.investorName} — {item.buildingName}</p>
+                                        <p className="text-xs text-gray-400 mt-0.5">استحقاق المبلغ: {item.dueDate}</p>
                                         {displayTime && <p className="text-[11px] text-gray-400 mt-1">{displayTime}</p>}
                                       </div>
                                     </Link>
@@ -1454,7 +1519,23 @@ export default function DashboardPage() {
                         <div className="w-5 h-5 bg-gradient-to-br from-blue-400 to-purple-400 rounded-full flex items-center justify-center text-white text-xs font-bold">
                           {activity.user_name.charAt(0).toUpperCase()}
                         </div>
-                        <p className="text-xs text-gray-500">بواسطة <span className="font-semibold text-gray-700">{activity.user_name}</span></p>
+                        <p className="text-xs text-gray-500">
+                          {(() => {
+                            const isCurrentUserSystemAdmin = employeePermissions === null && user?.id === effectiveOwnerId
+                            const ownerName = buildings[0]?.owner_name?.trim()
+                            const isActorTheOwner = ownerName && activity.user_name === ownerName
+                            const isActorCurrentUserByMetadata = activity.user_name === (user?.user_metadata?.full_name as string) || activity.user_name === user?.email
+                            const isActorFallbackOwner = activity.user_name === 'صاحب الحساب'
+                            const displayRole = (isCurrentUserSystemAdmin && (isActorTheOwner || isActorCurrentUserByMetadata || isActorFallbackOwner))
+                              ? 'مدير النظام'
+                              : activity.user_role_label
+                            return displayRole ? (
+                              <><span className="font-medium text-gray-600">{displayRole}:</span> <span className="font-semibold text-gray-700">{activity.user_name}</span></>
+                            ) : (
+                              <>بواسطة <span className="font-semibold text-gray-700">{activity.user_name}</span></>
+                            )
+                          })()}
+                        </p>
                       </div>
                     </div>
                   </div>
