@@ -507,7 +507,7 @@ export default function OwnersPage() {
                   {viewOwnerUnit.sale?.remaining_payment_collected_at && (
                     <div className="flex justify-between items-center gap-3 py-1.5">
                       <span className="text-slate-600 shrink-0">تاريخ تحصيل المتبقي</span>
-                      <span className="font-medium text-slate-800 text-left">{new Date(viewOwnerUnit.sale.remaining_payment_collected_at).toLocaleDateString("ar-SA", { dateStyle: "medium" })}</span>
+                      <span className="font-medium text-slate-800 text-left">{new Date(viewOwnerUnit.sale.remaining_payment_collected_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
                     </div>
                   )}
                 </div>
@@ -588,7 +588,7 @@ export default function OwnersPage() {
                         <span className="text-slate-600 shrink-0">ضمان عقد المصاعد</span>
                         <span className="font-medium text-slate-800 text-left">
                           {months != null ? `${months} شهر` : "—"}
-                          {warrantyEndDate && ` · ينتهي ${new Date(warrantyEndDate).toLocaleDateString("ar-SA", { dateStyle: "short" })}`}
+                          {warrantyEndDate && ` · ينتهي ${new Date(warrantyEndDate).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })}`}
                         </span>
                       </div>
                       {(warrantyExpired || warrantyExpiringSoon) && (
@@ -655,7 +655,7 @@ export default function OwnersPage() {
                     <span className="text-amber-700">
                       مبلغ متبقٍ: {(viewOwnerUnit.sale.remaining_payment ?? 0).toLocaleString("en")} ر.س
                       {viewOwnerUnit.sale?.remaining_payment_due_date && (
-                        <span className="block text-xs text-slate-500 mt-0.5">استحقاق: {new Date(viewOwnerUnit.sale.remaining_payment_due_date).toLocaleDateString("ar-SA")}</span>
+                        <span className="block text-xs text-slate-500 mt-0.5">استحقاق: {new Date(viewOwnerUnit.sale.remaining_payment_due_date).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
                       )}
                     </span>
                   ) : (

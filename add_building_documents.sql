@@ -39,6 +39,7 @@ ALTER TABLE building_documents ENABLE ROW LEVEL SECURITY;
 
 -- مساعد: المستخدم يملك المبنى أو موظف تابع للمالك
 CREATE OR REPLACE FUNCTION building_docs_can_access(bid UUID)
+SET search_path = public
 RETURNS BOOLEAN AS $$
   SELECT EXISTS(
     SELECT 1 FROM buildings b WHERE b.id = bid AND b.owner_id = auth.uid()

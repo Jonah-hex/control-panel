@@ -860,7 +860,7 @@ export default function TransferOwnershipForm({
             <table className="w-full text-sm border-collapse">
               <tbody className="[&>tr]:border-b [&>tr]:border-slate-100">
                 <tr><td className="py-2 text-slate-500 w-32">رقم السند</td><td className="py-2 font-mono font-semibold">{formatReceiptNumberDisplay(reservation.receipt_number)}</td></tr>
-                <tr><td className="py-2 text-slate-500">الوحدة</td><td className="py-2">وحدة {unit.unit_number} — الطابق {unit.floor}</td></tr>
+                <tr><td className="py-2 text-slate-500">الوحدة</td><td className="py-2">وحدة {unit.unit_number} — الدور {unit.floor}</td></tr>
                 <tr><td className="py-2 text-slate-500">العمارة</td><td className="py-2">{buildingName}</td></tr>
                 <tr><td className="py-2 text-slate-500">العميل</td><td className="py-2">{reservation.customer_name} — <span className="dir-ltr">{reservation.customer_phone}</span></td></tr>
                 <tr><td className="py-2 text-slate-500">مبلغ العربون</td><td className="py-2">{reservation.deposit_amount != null ? `${Number(reservation.deposit_amount).toLocaleString("en")} ر.س` : "—"}</td></tr>

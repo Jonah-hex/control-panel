@@ -184,7 +184,7 @@ export default function ReportsPage() {
       stats.available,
       stats.reserved,
       stats.sold,
-      `${stats.revenue.toLocaleString()} ر.س`,
+      `${stats.revenue.toLocaleString('en')} ر.س`,
       `${stats.occupancyRate.toFixed(1)}%`
     ])
 
@@ -289,7 +289,7 @@ export default function ReportsPage() {
               <RiyalIcon className="w-8 h-8 opacity-90" />
               <span className="text-sm font-semibold opacity-90">إجمالي الإيرادات</span>
             </div>
-            <p className="text-2xl font-black">{reportData.totalRevenue.toLocaleString()} ر.س</p>
+            <p className="text-2xl font-black">{reportData.totalRevenue.toLocaleString('en')} ر.س</p>
           </div>
 
           <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300">
@@ -394,7 +394,7 @@ export default function ReportsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-4 text-sm font-bold text-emerald-700">
-                      {stats.revenue.toLocaleString()} ر.س
+                      {stats.revenue.toLocaleString('en')} ر.س
                     </td>
                     <td className="px-4 py-4 text-sm text-center">
                       <div className="flex items-center justify-center gap-2">
@@ -423,7 +423,7 @@ export default function ReportsPage() {
               </div>
               <h3 className="text-lg font-bold text-gray-800">متوسط السعر</h3>
             </div>
-            <p className="text-3xl font-black text-cyan-700">{reportData.averagePrice.toLocaleString()} ر.س</p>
+            <p className="text-3xl font-black text-cyan-700">{reportData.averagePrice.toLocaleString('en')} ر.س</p>
             <p className="text-sm text-gray-600 mt-2">للوحدة الواحدة</p>
           </div>
 

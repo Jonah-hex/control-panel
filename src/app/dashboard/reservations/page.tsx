@@ -127,13 +127,17 @@ function dateSearchTokens(value: string | null): string[] {
   if (Number.isNaN(date.getTime())) return [value];
   const iso = date.toISOString().slice(0, 10);
   const gb = date.toLocaleDateString("en-GB");
-  const ar = date.toLocaleDateString("ar-SA");
+  const ar = date.toLocaleDateString("en-GB");
   const readable = date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
   return [iso, gb, ar, readable];
 }
 
 /** رمز الريال السعودي الجديد */
 const RIYAL_SYMBOL = "\uFDFC";
+
+/** مصطلح الدور واختصاره (د = دور) — معتمد في المنصة */
+const FLOOR_TERM = "الدور";
+const FLOOR_ABBR = "د";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "قيد الحجز",
@@ -715,7 +719,7 @@ export default function ReservationsPage() {
     setRefundSaving(false);
   };
 
-  const formatDate = (s: string | null) => (s ? new Date(s).toLocaleDateString("ar-SA", { dateStyle: "short" }) : "—");
+  const formatDate = (s: string | null) => (s ? new Date(s).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—");
   const formatDateEn = (s: string | null) => (s ? new Date(s).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—");
   const formatDateNumeric = (s: string | null) => (s ? new Date(s).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "/") : "—");
 
@@ -733,7 +737,7 @@ export default function ReservationsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">إدارة الحجوزات</h1>
-            <p className="text-sm text-gray-500 mt-1">سجل الحجوزات (مع عربون أو بدونه) — إلغاء الحجز — إتمام البيع من إدارة التسويق والمبيعات</p>
+            <p className="text-sm text-gray-500 mt-1">سجل الحجوزات — إلغاء الحجز — استرداد العرابين — إتمام البيع من إدارة التسويق والمبيعات</p>
           </div>
           {can("reservations") && (
             <div className="flex flex-wrap items-center gap-2">
@@ -1047,11 +1051,15 @@ export default function ReservationsPage() {
                   disabled={!createForm.building_id}
                 >
                   <option value="">اختر الوحدة</option>
-                  {units.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.unit_number} — الطابق {u.floor}
-                    </option>
-                  ))}
+                  {units.map((u) => {
+                    const lastFloor = units.length ? Math.max(...units.map((x) => Number(x.floor) ?? 0)) : 0;
+                    const isLastFloor = Number(u.floor) === lastFloor;
+                    return (
+                      <option key={u.id} value={u.id}>
+                        {isLastFloor ? "ملحق" : "شقة"} {u.unit_number} - د{u.floor}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1453,7 +1461,7 @@ export default function ReservationsPage() {
             <table className="w-full text-sm border-collapse relative print:text-xs">
               <tbody className="[&>tr]:border-b [&>tr]:border-slate-100 print:[&>tr>td]:py-1">
                 <tr><td className="py-2 text-slate-500 w-32">رقم السند</td><td className="py-2 font-mono font-semibold">{formatReceiptNumberDisplay(receiptPreview.receipt_number)}</td></tr>
-                <tr><td className="py-2 text-slate-500">الوحدة</td><td className="py-2">{(getUnit(receiptPreview)?.unit_number ?? "—")} — الطابق {getUnit(receiptPreview)?.floor ?? "—"}</td></tr>
+                <tr><td className="py-2 text-slate-500">الوحدة</td><td className="py-2">{(getUnit(receiptPreview)?.unit_number ?? "—")} — {FLOOR_TERM} {getUnit(receiptPreview)?.floor ?? "—"}</td></tr>
                 <tr><td className="py-2 text-slate-500">العمارة</td><td className="py-2">{getBuilding(receiptPreview)?.name ?? "—"}</td></tr>
                 <tr><td className="py-2 text-slate-500">العميل</td><td className="py-2">{receiptPreview.customer_name} — {receiptPreview.customer_phone}</td></tr>
                 <tr><td className="py-2 text-slate-500">مبلغ العربون</td><td className="py-2">{receiptPreview.deposit_amount != null ? `${receiptPreview.deposit_amount} ${RIYAL_SYMBOL}` : "—"}</td></tr>

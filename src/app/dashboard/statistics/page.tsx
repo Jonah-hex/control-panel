@@ -291,7 +291,7 @@ export default function StatisticsPage() {
               <TrendingUp className="w-5 h-5 opacity-80" />
             </div>
             <span className="text-sm font-semibold opacity-90">إجمالي الإيرادات</span>
-            <p className="text-3xl font-black mt-2">{stats.totalRevenue.toLocaleString()} ر.س</p>
+            <p className="text-3xl font-black mt-2">{stats.totalRevenue.toLocaleString('en')} ر.س</p>
           </div>
 
           <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300">
@@ -385,7 +385,7 @@ export default function StatisticsPage() {
                 <p className="text-xs text-gray-500">المتوسط الحسابي</p>
               </div>
             </div>
-            <p className="text-4xl font-black text-cyan-700">{stats.averagePrice.toLocaleString()} ر.س</p>
+            <p className="text-4xl font-black text-cyan-700">{stats.averagePrice.toLocaleString('en')} ر.س</p>
           </div>
 
           <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-white/20 p-6">

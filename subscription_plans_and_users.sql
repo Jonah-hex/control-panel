@@ -99,6 +99,7 @@ CREATE TRIGGER user_subscriptions_updated
 
 -- ========== اختياري: تطبيق حد العماير عند الإدراج (طبقة أمان إضافية) ==========
 CREATE OR REPLACE FUNCTION check_building_subscription_limit()
+SET search_path = public
 RETURNS TRIGGER AS $$
 DECLARE
   plan_max_buildings INT;

@@ -812,7 +812,7 @@ export default function BuildingPage({ params }: { params: PageParams }) {
                       <td className="px-3 py-2">{unit.status === 'available' ? 'متاحة' : unit.status === 'reserved' ? 'محجوزة' : 'مباعة'}</td>
                       <td className="px-3 py-2">{unit.type === 'apartment' ? 'شقة' : unit.type === 'studio' ? 'ملحق' : unit.type === 'duplex' ? 'دوبلكس' : unit.type === 'penthouse' ? 'بنتهاوس' : unit.type}</td>
                       <td className="px-3 py-2">{unit.area ?? '-'}</td>
-                      <td className="px-3 py-2">{unit.price ? unit.price.toLocaleString('ar-EG') : '-'}</td>
+                      <td className="px-3 py-2">{unit.price ? Number(unit.price).toLocaleString('en') : '-'}</td>
                       <td className="px-3 py-2">
                         <div className="flex gap-2">
                           <button title=" تعديل" className="p-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
