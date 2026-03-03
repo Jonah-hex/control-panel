@@ -423,7 +423,7 @@ function EditUnitPageContent() {
             )}
             <Link
               href="/dashboard/units"
-              className={`inline-flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition ${form.status === "sold" ? "flex-1" : ""}`}
+              className={`inline-flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition ${form.status === "sold" ? "flex-1" : ""}`}
             >
               <ArrowRight className="w-4 h-4" />
               {form.status === "sold" ? "رجوع لقائمة الوحدات" : "إلغاء"}
@@ -432,8 +432,8 @@ function EditUnitPageContent() {
         </form>
 
         <div className="mt-6 pt-6 border-t border-gray-100 text-xs text-gray-500">
-          <div>تاريخ الإضافة: {unit?.created_at ? new Date(String(unit.created_at)).toLocaleString("ar-SA") : "—"}</div>
-          <div>آخر تعديل: {unit?.updated_at ? new Date(String(unit.updated_at)).toLocaleString("ar-SA") : "—"}</div>
+          <div>تاريخ الإضافة: {unit?.created_at ? new Date(String(unit.created_at)).toLocaleString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</div>
+          <div>آخر تعديل: {unit?.updated_at ? new Date(String(unit.updated_at)).toLocaleString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</div>
         </div>
       </div>
     </div>

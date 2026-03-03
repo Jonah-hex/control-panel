@@ -531,23 +531,30 @@ export default function NewBuildingPage() {
   const addUnit = (floorNumber: number) => {
     const updatedFloors = floors.map(floor => {
       if (floor.number === floorNumber) {
-        const newUnit: Unit = {
-          unitNumber: '', // سيتم تعيينها بعد إعادة الترقيم
-          floor: floorNumber,
-          type: 'apartment',
-          facing: 'front',
-          area: 0,
-          rooms: 1,
-          bathrooms: 1,
-          livingRooms: 1,
-          kitchens: 1,
-          maidRoom: false,
-          driverRoom: false,
-          entrances: 1,
-          acType: 'split',
-          status: 'available',
-          price: 0
-        }
+        const lastUnit = floor.units[floor.units.length - 1]
+        const newUnit: Unit = lastUnit
+          ? {
+              ...lastUnit,
+              unitNumber: '', // سيتم تعيينها بعد إعادة الترقيم
+              floor: floorNumber
+            }
+          : {
+              unitNumber: '',
+              floor: floorNumber,
+              type: 'apartment',
+              facing: 'front',
+              area: 0,
+              rooms: 1,
+              bathrooms: 1,
+              livingRooms: 1,
+              kitchens: 1,
+              maidRoom: false,
+              driverRoom: false,
+              entrances: 1,
+              acType: 'split',
+              status: 'available',
+              price: 0
+            }
         return {
           ...floor,
           units: [...floor.units, newUnit]
@@ -1371,7 +1378,7 @@ export default function NewBuildingPage() {
                         onChange={(e) => setFormData({...formData, ownerName: e.target.value})}
                         required
                         className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition text-lg"
-                        placeholder="مثال: مؤسسة أحمد العتيبي"
+                        placeholder="مثال: اسم الشركة / المؤسسة / فرد"
                       />
                     </div>
                   </div>
@@ -1431,7 +1438,7 @@ export default function NewBuildingPage() {
                         onChange={(e) => setFormData({...formData, neighborhood: e.target.value})}
                         required
                         className="w-full pr-14 pl-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                        placeholder="مثال: حي النزهة"
+                        placeholder="مثال: حي الصفا"
                       />
                     </div>
                   </div>
@@ -2023,7 +2030,7 @@ export default function NewBuildingPage() {
                               <div className="flex flex-col items-center justify-center p-2 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200 min-h-[4.5rem]">
                                 <span className="inline-flex items-center justify-center w-4 h-4 text-[15px] font-medium text-gray-600 mb-1 flex-shrink-0" title="الريال السعودي">&#x20C1;</span>
                                 <span className="text-xs text-gray-600 font-medium">السعر</span>
-                                <span className="text-sm font-bold text-gray-700">{unit.price ? unit.price.toLocaleString() : '—'} ر.س</span>
+                                <span className="text-sm font-bold text-gray-700">{unit.price ? Number(unit.price).toLocaleString('en') : '—'} ر.س</span>
                               </div>
                               <div className="flex flex-col items-center justify-center p-2 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200 min-h-[4.5rem]">
                                 <Bed className="w-4 h-4 text-gray-600 mb-1 flex-shrink-0" />

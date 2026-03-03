@@ -539,7 +539,7 @@ function UnitsFilterContent() {
                       <td className="px-4 py-4 text-center">{unit.rooms ?? '-'}</td>
                       <td className="px-4 py-4 text-center">{unit.bathrooms ?? '-'}</td>
                       <td className="px-4 py-4 text-center font-semibold text-gray-800">
-                        {unit.price ? `${unit.price.toLocaleString('ar-SA')} ر.س` : '-'}
+                        {unit.price ? `${Number(unit.price).toLocaleString('en')} ر.س` : '-'}
                       </td>
                       <td className="px-4 py-4 text-center">
                         <UnitStatusBadge status={unit.status} />
@@ -635,7 +635,7 @@ function UnitsFilterContent() {
                       السعر (ر.س)
                     </span>
                     <p className="text-gray-900 font-semibold">
-                      {selectedUnit.price != null ? selectedUnit.price.toLocaleString('ar-SA') : '—'}
+                      {selectedUnit.price != null ? Number(selectedUnit.price).toLocaleString('en') : '—'}
                     </p>
                   </div>
                   <div className="space-y-1">

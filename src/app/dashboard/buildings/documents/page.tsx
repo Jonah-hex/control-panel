@@ -891,7 +891,7 @@ path.unshift(stripNumbering(f.name));
         {/* Files */}
         <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
           <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 font-medium text-slate-700">
-            الملفات
+            ملفات اخرى خاصه بالعمارة
           </div>
           <ul className="divide-y divide-slate-100">
             {searchLoading && isSearchMode && (

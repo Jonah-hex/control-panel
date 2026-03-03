@@ -338,7 +338,7 @@ export default function UnitHandoverPage() {
               <span className="text-slate-400">|</span>
               <div className="flex items-center gap-2">
                 <Home className="w-5 h-5 text-slate-500" />
-                <span className="font-semibold text-slate-800">الوحدة {unit.unit_number} — الطابق {unit.floor}</span>
+                <span className="font-semibold text-slate-800">الوحدة {unit.unit_number} — الدور {unit.floor}</span>
               </div>
               {unit.area > 0 && (
                 <>

@@ -175,7 +175,7 @@ export default function ActivitiesPage() {
           buildingId: b.id,
           buildingName: b.name || '—',
           daysLeft,
-          endDate: endDate.toLocaleDateString('ar-SA')
+          endDate: endDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
         })
       }
     })
@@ -329,7 +329,7 @@ export default function ActivitiesPage() {
     if (minutes < 60) return `منذ ${minutes} دقيقة`
     if (hours < 24) return `منذ ${hours} ساعة`
     if (days === 1) return 'أمس'
-    return d.toLocaleDateString('ar-SA')
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
   const getActivityIcon = (type: string) => {

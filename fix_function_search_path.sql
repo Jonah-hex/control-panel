@@ -20,7 +20,9 @@ BEGIN
         'update_dashboard_employees_updated_at',
         'update_updated_at_column',
         'check_building_subscription_limit',
-        'handle_new_user'
+        'handle_new_user',
+        'set_investors_updated_at',
+        'building_docs_can_access'
       )
   LOOP
     EXECUTE format('ALTER FUNCTION %I.%I(%s) SET search_path = public', r.schema_name, r.func_name, r.args);

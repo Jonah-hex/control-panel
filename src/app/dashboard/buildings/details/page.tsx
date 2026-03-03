@@ -1372,7 +1372,7 @@ function DetailsContent() {
                           {isEditingGuardCard ? (
                             <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-amber-500 rounded-none" type="number" value={guardEdit.guard_salary_amount ?? ''} onChange={e => setGuardEdit({ ...guardEdit, guard_salary_amount: e.target.value })} />
                           ) : (
-                            <p className="text-gray-800 font-medium">{building.guard_salary_amount != null ? Number(building.guard_salary_amount).toLocaleString('ar-SA') : '—'}</p>
+                            <p className="text-gray-800 font-medium">{building.guard_salary_amount != null ? Number(building.guard_salary_amount).toLocaleString('en') : '—'}</p>
                           )}
                         </div>
                       )}

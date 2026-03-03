@@ -235,7 +235,27 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
-    if (effectiveOwnerId) fetchBuildings()
+    if (effectiveOwnerId) {
+      fetchBuildings()
+      const fetchUpcomingAppointments = async () => {
+        try {
+          const { data } = await supabase
+            .from('dashboard_appointments')
+            .select('id, title, scheduled_at, type, buildings ( name )')
+            .eq('owner_id', effectiveOwnerId)
+            .eq('status', 'scheduled')
+            .gte('scheduled_at', new Date().toISOString())
+            .order('scheduled_at', { ascending: true })
+            .limit(5)
+          setUpcomingAppointments((data as Array<{ id: string; title: string; scheduled_at: string; type: string; buildings?: { name: string } | null }>) || [])
+        } catch {
+          setUpcomingAppointments([])
+        }
+      }
+      fetchUpcomingAppointments()
+    } else {
+      setUpcomingAppointments([])
+    }
   }, [effectiveOwnerId])
 
   // مراقبة التحديثات الفورية للوحدات
@@ -434,7 +454,7 @@ export default function DashboardPage() {
     if (minutes < 60) return `منذ ${minutes} دقيقة`
     if (hours < 24) return `منذ ${hours} ساعة`
     if (days === 1) return 'أمس'
-    return d.toLocaleDateString('ar-SA')
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
   // حساب الإحصائيات من جدول الوحدات
@@ -1253,7 +1273,7 @@ export default function DashboardPage() {
               <div className="hidden md:block px-4 py-2 bg-white/70 border border-white/80 rounded-2xl shadow-sm">
                 <div className="text-xs text-gray-500">{greeting}</div>
                 <div className="text-sm font-medium text-gray-700">
-                  {currentTime.toLocaleDateString('ar-SA', { 
+                  {currentTime.toLocaleDateString('en-GB', { 
                     weekday: 'short', 
                     year: 'numeric', 
                     month: 'short', 
@@ -1688,7 +1708,8 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* التقويم والمواعيد */}
+            {/* التقويم والمواعيد — بيانات حقيقية من dashboard_appointments */}
+            {can('marketing_view') && (
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-shadow duration-300">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -1697,64 +1718,67 @@ export default function DashboardPage() {
                   </div>
                   المواعيد القادمة
                 </h2>
+                <Link
+                  href="/dashboard/tasks"
+                  className="text-xs font-medium text-amber-600 hover:text-amber-700"
+                >
+                  المهام والملاحظات
+                </Link>
               </div>
 
               <div className="space-y-3">
-                <div className="group relative flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-200 hover:border-blue-300 transition-all cursor-pointer hover:shadow-md">
-                  <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl flex items-center justify-center text-white font-black shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all">
-                    <div className="text-center">
-                      <div className="text-xl">١٥</div>
-                      <div className="text-xs opacity-80">ديسمبر</div>
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-bold text-gray-800 text-sm mb-1 group-hover:text-blue-600 transition-colors">معاينة عمارة النخيل</h4>
-                    <p className="text-xs text-gray-500 flex items-center gap-1.5">
-                      <Clock className="w-3 h-3" />
-                      ٣:٠٠ مساءً
-                    </p>
-                  </div>
-                  <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
-                </div>
-
-                <div className="group flex items-center gap-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border border-purple-200 hover:border-purple-300 transition-all cursor-pointer hover:shadow-md">
-                  <div className="w-14 h-14 bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl flex items-center justify-center text-white font-black shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all">
-                    <div className="text-center">
-                      <div className="text-xl">١٦</div>
-                      <div className="text-xs opacity-80">ديسمبر</div>
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-bold text-gray-800 text-sm mb-1 group-hover:text-purple-600 transition-colors">اجتماع الملاك</h4>
-                    <p className="text-xs text-gray-500 flex items-center gap-1.5">
-                      <Clock className="w-3 h-3" />
-                      ١٠:٠٠ صباحاً
-                    </p>
-                  </div>
-                </div>
-
-                <div className="group flex items-center gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-200 hover:border-green-300 transition-all cursor-pointer hover:shadow-md">
-                  <div className="w-14 h-14 bg-gradient-to-br from-green-600 to-emerald-600 rounded-2xl flex items-center justify-center text-white font-black shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all">
-                    <div className="text-center">
-                      <div className="text-xl">١٨</div>
-                      <div className="text-xs opacity-80">ديسمبر</div>
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-bold text-gray-800 text-sm mb-1 group-hover:text-green-600 transition-colors">صيانة دورية</h4>
-                    <p className="text-xs text-gray-500 flex items-center gap-1.5">
-                      <Clock className="w-3 h-3" />
-                      ٩:٠٠ صباحاً
-                    </p>
-                  </div>
-                </div>
+                {upcomingAppointments.length === 0 ? (
+                  <p className="text-sm text-gray-500 py-4 text-center">لا توجد مواعيد قادمة. أضف موعداً أو عيّن مهمة لموظف لجدولتها.</p>
+                ) : (
+                  upcomingAppointments.map((a, i) => {
+                    const d = new Date(a.scheduled_at)
+                    const day = d.getDate()
+                    const month = d.toLocaleDateString('en-GB', { month: 'short' })
+                    const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                    const cardStyles = [
+                      { card: 'bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-200 hover:border-blue-300', icon: 'bg-gradient-to-br from-blue-600 to-cyan-600' },
+                      { card: 'bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 hover:border-purple-300', icon: 'bg-gradient-to-br from-purple-600 to-pink-600' },
+                      { card: 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 hover:border-green-300', icon: 'bg-gradient-to-br from-green-600 to-emerald-600' },
+                      { card: 'bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 hover:border-amber-300', icon: 'bg-gradient-to-br from-amber-600 to-orange-600' },
+                      { card: 'bg-gradient-to-r from-slate-50 to-gray-50 border-2 border-slate-200 hover:border-slate-300', icon: 'bg-gradient-to-br from-slate-600 to-gray-600' },
+                    ]
+                    const s = cardStyles[i % cardStyles.length]
+                    return (
+                      <Link
+                        key={a.id}
+                        href="/dashboard/appointments"
+                        className={`group relative flex items-center gap-4 p-4 rounded-2xl transition-all cursor-pointer hover:shadow-md ${s.card}`}
+                      >
+                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white font-black shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all ${s.icon}`}>
+                          <div className="text-center">
+                            <div className="text-xl">{day}</div>
+                            <div className="text-xs opacity-80">{month}</div>
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-gray-800 text-sm mb-1 group-hover:text-blue-600 transition-colors truncate">{a.title}</h4>
+                          <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                            <Clock className="w-3 h-3 shrink-0" />
+                            {time}
+                            {a.buildings?.name && <span className="truncate"> · {a.buildings.name}</span>}
+                          </p>
+                        </div>
+                        <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse shrink-0" />
+                      </Link>
+                    )
+                  })
+                )}
               </div>
 
-              <button className="w-full mt-5 py-3.5 border-2 border-dashed border-gray-300 rounded-2xl text-sm font-semibold text-gray-500 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 group">
+              <Link
+                href="/dashboard/appointments"
+                className="w-full mt-5 py-3.5 border-2 border-dashed border-gray-300 rounded-2xl text-sm font-semibold text-gray-500 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 group"
+              >
                 <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
                 إضافة موعد جديد
-              </button>
+              </Link>
             </div>
+            )}
 
             {/* بطاقة الأداء */}
             <div className="bg-gradient-to-br from-green-600 to-emerald-600 rounded-2xl shadow-lg p-6 text-white">

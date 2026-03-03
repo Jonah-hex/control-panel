@@ -1391,6 +1391,7 @@ export default function InvestorsPage() {
           </div>
         </div>
       )}
+      </div>
     </main>
   );
 }
