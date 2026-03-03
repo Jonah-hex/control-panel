@@ -33,6 +33,7 @@ import {
   LayoutDashboard
 } from 'lucide-react'
 import { RiyalIcon } from '@/components/icons/RiyalIcon'
+import { UnitStatusBadge } from '@/components/UnitStatusBadge'
 
 interface Building {
   id: string
@@ -304,12 +305,6 @@ function UnitsFilterContent() {
     URL.revokeObjectURL(url)
   }
 
-  const statusBadge = (status: Unit['status']) => {
-    if (status === 'available') return 'bg-purple-100 text-purple-700'
-    if (status === 'reserved') return 'bg-amber-100 text-amber-700'
-    return 'bg-rose-100 text-rose-700'
-  }
-
   const statusLabel = (status: Unit['status']) => {
     if (status === 'available') return 'متاحة'
     if (status === 'reserved') return 'محجوزة'
@@ -547,9 +542,7 @@ function UnitsFilterContent() {
                         {unit.price ? `${unit.price.toLocaleString('ar-SA')} ر.س` : '-'}
                       </td>
                       <td className="px-4 py-4 text-center">
-                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${statusBadge(unit.status)}`}>
-                          {statusLabel(unit.status)}
-                        </span>
+                        <UnitStatusBadge status={unit.status} />
                       </td>
                       {can('units_edit') && (
                       <td className="px-4 py-4 text-center align-middle flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
@@ -726,9 +719,7 @@ function UnitsFilterContent() {
                 <div className="flex items-center gap-2">
                   <BadgeCheck className="w-4 h-4 text-emerald-500/70" />
                   <span className="text-xs font-semibold text-gray-500">حالة الوحدة</span>
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${statusBadge(selectedUnit.status)}`}>
-                    {statusLabel(selectedUnit.status)}
-                  </span>
+                  <UnitStatusBadge status={selectedUnit.status} />
                 </div>
                 {selectedUnit.description && (
                   <div className="space-y-1">

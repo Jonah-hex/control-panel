@@ -59,6 +59,8 @@ export interface UnitReservation {
   building_id: string;
   deposit_amount: number | null;
   receipt_number: string | null;
+  /** تاريخ إصدار سند العربون (يظهر في معاينة السند تحت رقم السند) */
+  receipt_date?: string | null;
   customer_name: string;
   customer_phone: string;
   marketer_name?: string | null;
@@ -110,7 +112,7 @@ export default function TransferOwnershipForm({
     const supabase = createClient();
     const { data } = await supabase
       .from("reservations")
-      .select("id, unit_id, building_id, deposit_amount, receipt_number, customer_name, customer_phone, marketer_name, marketer_phone, customer_iban_or_account, customer_bank_name, status")
+      .select("id, unit_id, building_id, deposit_amount, receipt_number, receipt_date, customer_name, customer_phone, marketer_name, marketer_phone, customer_iban_or_account, customer_bank_name, status")
       .eq("unit_id", unit.id)
       .in("status", ["active", "pending", "confirmed", "reserved"])
       .gt("deposit_amount", 0)
@@ -860,6 +862,7 @@ export default function TransferOwnershipForm({
             <table className="w-full text-sm border-collapse">
               <tbody className="[&>tr]:border-b [&>tr]:border-slate-100">
                 <tr><td className="py-2 text-slate-500 w-32">رقم السند</td><td className="py-2 font-mono font-semibold">{formatReceiptNumberDisplay(reservation.receipt_number)}</td></tr>
+                <tr><td className="py-2 text-slate-500 w-32">تاريخ السند</td><td className="py-2">{reservation.receipt_date ? new Date(reservation.receipt_date + 'T12:00:00').toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}</td></tr>
                 <tr><td className="py-2 text-slate-500">الوحدة</td><td className="py-2">وحدة {unit.unit_number} — الطابق {unit.floor}</td></tr>
                 <tr><td className="py-2 text-slate-500">العمارة</td><td className="py-2">{buildingName}</td></tr>
                 <tr><td className="py-2 text-slate-500">العميل</td><td className="py-2">{reservation.customer_name} — <span className="dir-ltr">{reservation.customer_phone}</span></td></tr>

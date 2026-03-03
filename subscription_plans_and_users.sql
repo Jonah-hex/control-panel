@@ -104,6 +104,11 @@ DECLARE
   plan_max_buildings INT;
   current_count INT;
 BEGIN
+  -- استثناء: حساب مطور النظام — لا تخضع لقوانين الاشتراك
+  IF EXISTS (SELECT 1 FROM auth.users WHERE id = NEW.owner_id AND email = 'albeladi220@gmail.com') THEN
+    RETURN NEW;
+  END IF;
+
   SELECT sp.max_buildings INTO plan_max_buildings
   FROM user_subscriptions us
   JOIN subscription_plans sp ON sp.id = us.plan_id

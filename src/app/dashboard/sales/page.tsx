@@ -21,6 +21,7 @@ import {
   ClipboardCheck,
 } from "lucide-react";
 import { RiyalIcon } from "@/components/icons/RiyalIcon";
+import { UnitStatusBadge } from "@/components/UnitStatusBadge";
 
 type SaleRow = {
   id: string;
@@ -801,10 +802,7 @@ export default function SalesPage() {
                           <td className="p-3 font-medium text-slate-800">{u.unit_number}</td>
                           <td className="p-3 text-slate-600">{u.floor}</td>
                           <td className="p-3">
-                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border shadow-sm ${u.status === "reserved" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-emerald-50 text-emerald-700 border-emerald-200"}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${u.status === "reserved" ? "bg-amber-500" : "bg-emerald-500"}`} aria-hidden />
-                              {u.status === "reserved" ? "محجوزة" : "متاحة"}
-                            </span>
+                            <UnitStatusBadge status={u.status as "available" | "reserved" | "sold"} />
                           </td>
                           <td className="p-3">
                             <button

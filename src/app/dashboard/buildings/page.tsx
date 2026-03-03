@@ -334,16 +334,19 @@ export default function BuildingsPage() {
                           {b.total_units}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="flex flex-wrap items-center justify-center gap-1.5">
-                          <span className="px-2 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-700">
-                            متاحة: {unitStatsByBuilding[b.id]?.available || 0}
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80 shadow-sm">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            متاحة <span className="font-bold text-emerald-700">{unitStatsByBuilding[b.id]?.available ?? 0}</span>
                           </span>
-                          <span className="px-2 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700">
-                            محجوزة: {unitStatsByBuilding[b.id]?.reserved || 0}
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200/80 shadow-sm">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                            محجوزة <span className="font-bold text-amber-700">{unitStatsByBuilding[b.id]?.reserved ?? 0}</span>
                           </span>
-                          <span className="px-2 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700">
-                            مباعة: {unitStatsByBuilding[b.id]?.sold || 0}
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200/80 shadow-sm">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                            مباعة <span className="font-bold text-slate-600">{unitStatsByBuilding[b.id]?.sold ?? 0}</span>
                           </span>
                         </div>
                       </td>

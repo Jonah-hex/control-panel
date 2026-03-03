@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { FileText, Building2, Pencil, X, FileUp, ExternalLink, User, Eye } from "lucide-react";
+import { UnitStatusBadge } from "./UnitStatusBadge";
 
 interface Unit {
   id: string;
@@ -361,19 +362,7 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
                   <td className="p-3 text-slate-600 align-middle">{unit.floor}</td>
                   <td className="p-3 text-slate-600 align-middle">{unit.owner_name || building?.owner_name || "-"}</td>
                   <td className="p-3 align-middle">
-                    <span
-                      className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-medium ${
-                        unit.status === "available"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : unit.status === "reserved"
-                          ? "bg-amber-100 text-amber-700"
-                          : unit.status === "sold"
-                          ? "bg-red-100 text-red-700"
-                          : "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {statusLabel(unit.status)}
-                    </span>
+                    <UnitStatusBadge status={unit.status as 'available' | 'reserved' | 'sold'} />
                   </td>
                   <td className="p-3 pr-4 pl-2 text-slate-600 font-mono align-middle break-all min-w-0">{unit.deed_number || "-"}</td>
                   <td className="p-3 align-middle">

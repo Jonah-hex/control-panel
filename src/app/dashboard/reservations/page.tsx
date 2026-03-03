@@ -58,6 +58,8 @@ interface Reservation {
   marketer_name: string | null;
   marketer_phone: string | null;
   receipt_number: string | null;
+  /** تاريخ إصدار سند العربون */
+  receipt_date: string | null;
   cancellation_reason: string | null;
   cancelled_at: string | null;
   completed_at: string | null;
@@ -285,7 +287,7 @@ export default function ReservationsPage() {
     }
     const baseCols = `id, customer_name, customer_email, customer_phone, reservation_date, expiry_date, status, notes,
          deposit_amount, deposit_paid, deposit_paid_date, created_at, updated_at, unit_id, building_id,
-         marketer_id, marketer_name, marketer_phone, receipt_number, cancellation_reason, cancelled_at, completed_at, sale_id,
+         marketer_id, marketer_name, marketer_phone, receipt_number, receipt_date, cancellation_reason, cancelled_at, completed_at, sale_id,
          customer_iban_or_account, customer_bank_name, deposit_settlement_type, deposit_refunded, deposit_refunded_at, deposit_refund_method`;
     const { data: dataWithRels, error: errRels } = await supabase
       .from("reservations")
@@ -361,7 +363,7 @@ export default function ReservationsPage() {
       const client = createClient();
       const { data } = await client
         .from("reservations")
-        .select("id, customer_name, customer_email, customer_phone, reservation_date, expiry_date, status, notes, deposit_amount, deposit_paid, deposit_paid_date, unit_id, building_id, marketer_id, marketer_name, marketer_phone, receipt_number, cancellation_reason, cancelled_at, completed_at, sale_id, customer_iban_or_account, customer_bank_name, deposit_refunded, deposit_refunded_at, deposit_refund_method")
+        .select("id, customer_name, customer_email, customer_phone, reservation_date, expiry_date, status, notes, deposit_amount, deposit_paid, deposit_paid_date, unit_id, building_id, marketer_id, marketer_name, marketer_phone, receipt_number, receipt_date, cancellation_reason, cancelled_at, completed_at, sale_id, customer_iban_or_account, customer_bank_name, deposit_refunded, deposit_refunded_at, deposit_refund_method")
         .eq("id", previewReceiptId)
         .single();
       if (data) {
@@ -549,6 +551,7 @@ export default function ReservationsPage() {
         expiry_date: expiryDate.toISOString(),
         status: "active",
         receipt_number: receiptNumber,
+        receipt_date: new Date().toISOString().slice(0, 10),
         customer_iban_or_account: createForm.deposit_receipt_method === "transfer" ? (createForm.customer_iban_or_account?.trim() || null) : null,
         customer_bank_name: createForm.deposit_receipt_method === "transfer" ? (createForm.customer_bank_name?.trim() || null) : null,
         notes: createForm.notes?.trim() || null,
@@ -1453,6 +1456,7 @@ export default function ReservationsPage() {
             <table className="w-full text-sm border-collapse relative print:text-xs">
               <tbody className="[&>tr]:border-b [&>tr]:border-slate-100 print:[&>tr>td]:py-1">
                 <tr><td className="py-2 text-slate-500 w-32">رقم السند</td><td className="py-2 font-mono font-semibold">{formatReceiptNumberDisplay(receiptPreview.receipt_number)}</td></tr>
+                <tr><td className="py-2 text-slate-500 w-32">تاريخ السند</td><td className="py-2">{receiptPreview.receipt_date ? formatDateEn(receiptPreview.receipt_date) : "—"}</td></tr>
                 <tr><td className="py-2 text-slate-500">الوحدة</td><td className="py-2">{(getUnit(receiptPreview)?.unit_number ?? "—")} — الطابق {getUnit(receiptPreview)?.floor ?? "—"}</td></tr>
                 <tr><td className="py-2 text-slate-500">العمارة</td><td className="py-2">{getBuilding(receiptPreview)?.name ?? "—"}</td></tr>
                 <tr><td className="py-2 text-slate-500">العميل</td><td className="py-2">{receiptPreview.customer_name} — {receiptPreview.customer_phone}</td></tr>

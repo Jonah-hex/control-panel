@@ -9,6 +9,7 @@ import { showToast } from '../details/toast'
 import { phoneDigitsOnly, isValidPhone10Digits } from '@/lib/validation-utils'
 import { useDashboardAuth } from '@/hooks/useDashboardAuth'
 import { useSubscription } from '@/hooks/useSubscription'
+import { UnitStatusBadge } from '@/components/UnitStatusBadge'
 import { 
   ArrowLeft, 
   Save,
@@ -256,10 +257,12 @@ export default function NewBuildingPage() {
       const newFloors = [...prevFloors];
       // إضافة أدوار جديدة إذا زاد العدد
       while (newFloors.length < formData.totalFloors) {
+        const floorIndex = newFloors.length
+        const startUnitNumber = floorIndex * formData.unitsPerFloor + 1
         newFloors.push({
           number: newFloors.length + 1,
           units: Array(formData.unitsPerFloor).fill(null).map((_, idx) => ({
-            unitNumber: `${idx + 1}`,
+            unitNumber: `${startUnitNumber + idx}`,
             floor: newFloors.length + 1,
             type: 'apartment',
             facing: 'front',
@@ -287,10 +290,10 @@ export default function NewBuildingPage() {
       for (let i = 0; i < newFloors.length; i++) {
         const units = newFloors[i].units;
         if (units.length < formData.unitsPerFloor) {
-          // أضف وحدات جديدة
+          // أضف وحدات جديدة (تسلسل الأرقام يتبع الدور والوحدة)
           for (let j = units.length; j < formData.unitsPerFloor; j++) {
             units.push({
-              unitNumber: `${j + 1}`,
+              unitNumber: `${i * formData.unitsPerFloor + j + 1}`,
               floor: i + 1,
               type: 'apartment',
               facing: 'front',
@@ -708,8 +711,10 @@ export default function NewBuildingPage() {
       }
     })
 
+    // ترتيب الأدوار حسب رقم الدور لضمان تسلسل صحيح (1، 2، 3، ...)
+    const sortedFloors = [...updatedFloors].sort((a, b) => a.number - b.number)
     let sequentialNumber = 1
-    updatedFloors = updatedFloors.map((floor) => ({
+    updatedFloors = sortedFloors.map((floor) => ({
       ...floor,
       units: floor.units.map((unit) => ({
         ...unit,
@@ -749,10 +754,11 @@ export default function NewBuildingPage() {
   // ==========================================
   
   const ensureSequentialNumbering = () => {
-    // التحقق والإصلاح التلقائي: ضمان أرقام متسلسلة صحيحة قبل الحفظ
-    // Verify and auto-fix: Ensure correct sequential numbering before saving
+    // التحقق والإصلاح التلقائي: ضمان أرقام متسلسلة صحيحة قبل الحفظ (حسب ترتيب الأدوار 1، 2، 3، ...)
+    // Verify and auto-fix: Ensure correct sequential numbering before saving (by floor order)
     let sequentialNumber = 1
-    const correctedFloors = floors.map(floor => ({
+    const sortedFloors = [...floors].sort((a, b) => a.number - b.number)
+    const correctedFloors = sortedFloors.map(floor => ({
       ...floor,
       units: floor.units.map(unit => ({
         ...unit,
@@ -762,6 +768,13 @@ export default function NewBuildingPage() {
     
     return correctedFloors
   }
+
+  // عند الدخول لخطوة الوحدات السكنية: تصحيح تسلسل أرقام الوحدات وعرض الأدوار بالترتيب
+  useEffect(() => {
+    if (currentStep === 3 && floors.length > 0) {
+      setFloors(ensureSequentialNumbering())
+    }
+  }, [currentStep])
 
   const confirmSaveBuilding = async () => {
     setShowConfirmModal(false)
@@ -1175,43 +1188,47 @@ export default function NewBuildingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50" dir="rtl">
-      {/* الشريط العلوي - تصميم محسّن */}
-      <div className="bg-white/90 shadow-lg border-b-2 border-indigo-100 sticky top-0 z-20 backdrop-blur-xl">
+      {/* هيدر: الحاوية الداخلية فقط (بدون خلفية الهيدر الخارجية) */}
+      <header className="sticky top-0 z-20 pt-4 pb-2 md:pt-5 md:pb-3">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center justify-between py-4 gap-4">
-            {/* اللوقو والنصوص — يمين */}
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-500/30 animate-pulse">
-                <Building2 className="w-7 h-7" />
+          <div className="flex flex-col gap-3 rounded-2xl border border-white/80 bg-white/70 px-3 sm:px-4 lg:px-5 py-3 md:flex-row md:items-center md:justify-between md:min-h-[72px] shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
+            {/* القسم الأيمن: العنوان والأيقونة */}
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <div className="w-11 h-11 flex-shrink-0 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 ring-1 ring-white/70">
+                <Building2 className="w-5 h-5 text-white" />
               </div>
-              <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-bold text-gray-800 leading-tight">
                   إضافة عمارة جديدة
                 </h1>
-                <p className="text-xs text-gray-500 flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3 text-indigo-400 animate-pulse" />
+                <p className="text-xs text-gray-500/90 flex items-center gap-1.5 mt-0.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
                   أدخل جميع تفاصيل العمارة والوحدات السكنية بطريقة سهلة وسريعة
                 </p>
               </div>
             </div>
 
-            {/* الأزرار — يسار: لوحة التحكم ثم قائمة العماير */}
-            <div className="flex items-center gap-3">
-              <Link href="/dashboard" className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200" title="رجوع إلى لوحة التحكم">
+            {/* القسم الأيسر: أزرار التنقل */}
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 flex-wrap">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/80 bg-white/70 text-gray-700 font-medium text-sm shadow-sm hover:bg-white hover:border-slate-200/80 hover:shadow-[0_2px_8px_rgba(15,23,42,0.06)] transition-all duration-200"
+                title="رجوع إلى لوحة التحكم"
+              >
                 <LayoutDashboard className="w-4 h-4" />
                 لوحة التحكم
               </Link>
               <Link
                 href="/dashboard/buildings"
-                className="inline-flex items-center gap-2.5 px-4 py-2.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-xl transform transition-all duration-300 hover:-translate-y-0.5 hover:scale-105"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold text-sm shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
               >
-                <Building2 className="w-5 h-5 text-white" />
-                <span className="text-sm font-bold">قائمة العماير</span>
+                <Building2 className="w-4 h-4" />
+                قائمة العماير
               </Link>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Steps Indicator - تصميم عصري */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-[34px]">
@@ -1853,7 +1870,7 @@ export default function NewBuildingPage() {
                   </div>
                 </div>
 
-                {floors.map((floor) => (
+                {[...floors].sort((a, b) => a.number - b.number).map((floor) => (
                   <div key={floor.number} className="border-2 border-emerald-200/30 rounded-3xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-500 backdrop-blur-sm">
                     {/* رأس الدور - النقر في أي مكان يفتح/يطوي */}
                     <div
@@ -1956,13 +1973,7 @@ export default function NewBuildingPage() {
                                     <span className="text-xs bg-blue-100/70 backdrop-blur-sm text-blue-700 px-2 py-1 rounded-full font-medium">
                                       {unit.type === 'apartment' ? 'شقة' : unit.type === 'studio' ? 'ملحق' : unit.type === 'duplex' ? 'دوبلكس' : 'بنتهاوس'}
                                     </span>
-                                    <span className={`text-xs px-2 py-1 rounded-full font-medium backdrop-blur-sm ${
-                                      unit.status === 'available' ? 'bg-green-100/70 text-green-700' :
-                                      unit.status === 'reserved' ? 'bg-yellow-100/70 text-yellow-700' :
-                                      'bg-red-100/70 text-red-700'
-                                    }`}>
-                                      {unit.status === 'available' ? 'متاح' : unit.status === 'reserved' ? 'محجوز' : 'مباع'}
-                                    </span>
+                                    <UnitStatusBadge status={unit.status} short />
                                   </div>
                                 </div>
                               </div>
