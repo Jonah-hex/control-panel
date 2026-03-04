@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Users, LayoutDashboard, Home, TrendingUp } from "lucide-react";
+import { Users, LayoutDashboard, Home, TrendingUp, BarChart3 } from "lucide-react";
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
 
 /** لوجو إدارة الملاك والمستثمرين — نفس أسلوب بطاقة لوحة التحكم */
@@ -80,7 +80,7 @@ export default function OwnersInvestorsPage() {
           <span className="h-px flex-1 max-w-[4rem] bg-gradient-to-r from-cyan-300 to-transparent rounded-full" />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
           {/* بطاقة الملاك — ملاك الوحدات المباعة (تظهر لمن لديه صلاحية الملاك) */}
           {canAccessOwners && (
             <Link
@@ -118,6 +118,27 @@ export default function OwnersInvestorsPage() {
                 </h3>
                 <p className="text-xs text-gray-500 group-hover:text-white/90 transition-colors duration-300">
                   إدارة المستثمرين — عرض ومتابعة بيانات المستثمرين واستثماراتهم
+                </p>
+              </div>
+            </Link>
+          )}
+
+          {/* لوحة تحليلات الاستثمار */}
+          {canAccessInvestors && (
+            <Link
+              href="/dashboard/owners-investors/analytics"
+              className={`${cardBase} p-6 hover:shadow-xl hover:-translate-y-1 cursor-pointer`}
+            >
+              <div className={cardOverlay} />
+              <div className="relative z-10 text-center">
+                <div className={`${iconBox} group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
+                  <BarChart3 className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="font-bold text-gray-800 group-hover:text-white transition-colors duration-300 text-sm mb-1">
+                  تحليلات الاستثمار
+                </h3>
+                <p className="text-xs text-gray-500 group-hover:text-white/90 transition-colors duration-300">
+                  ملخصات الأرباح والخسائر ومدة الاستثمار — شارتات وفلاتر وبحث
                 </p>
               </div>
             </Link>

@@ -304,8 +304,11 @@ export default function TransferOwnershipForm({
       const depositWhenIncluded = reservation != null && depositIncluded === true && reservation.deposit_amount != null ? Number(reservation.deposit_amount) : 0;
       const totalPaid = (cashNum ?? 0) + (transferNum ?? 0) + (checkNum ?? 0) + depositWhenIncluded;
       const unitPrice = unit.price != null && Number(unit.price) > 0 ? Number(unit.price) : null;
-      const salePrice = unitPrice ?? totalPaid;
       const remainingPayment = unitPrice != null && totalPaid < unitPrice ? unitPrice - totalPaid : null;
+      // سعر البيع المسجّل = المبلغ الإجمالي الفعلي (دفعة كاملة = المدفوع، جزئي = سعر الوحدة أو المدفوع + المتبقي)
+      const salePrice = remainingPayment != null && remainingPayment > 0
+        ? (unitPrice ?? totalPaid + remainingPayment)
+        : totalPaid;
       const isPartial = remainingPayment != null && remainingPayment > 0;
       const paymentMethodStorage = form.payment_methods.join(",");
 

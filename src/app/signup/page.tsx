@@ -5,12 +5,13 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, Building2, ArrowRight, Chrome } from 'lucide-react'
-import { validatePasswordStrength, validateEmail } from '@/lib/validation-utils'
+import { Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, Building2, ArrowRight, Chrome, Phone } from 'lucide-react'
+import { validatePasswordStrength, validateEmail, phoneDigitsOnly, isValidPhone10Digits } from '@/lib/validation-utils'
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -59,6 +60,14 @@ export default function SignupPage() {
       return
     }
 
+    // التحقق من الجوال إن وُجد (اختياري — 10 أرقام)
+    const phoneTrimmed = phone.trim().replace(/\s/g, '')
+    if (phoneTrimmed && !isValidPhone10Digits(phoneTrimmed)) {
+      setError('رقم الجوال يجب أن يكون 10 أرقام صحيحة')
+      setLoading(false)
+      return
+    }
+
     // التحقق من كلمة المرور
     const pwValidation = validatePasswordStrength(password)
     if (!pwValidation.isValid) {
@@ -88,6 +97,7 @@ export default function SignupPage() {
         options: {
           data: {
             full_name: fullName,
+            phone: phoneTrimmed ? phoneDigitsOnly(phoneTrimmed) : null,
             created_at: new Date().toISOString(),
           },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
@@ -104,6 +114,7 @@ export default function SignupPage() {
         setPassword('')
         setConfirmPassword('')
         setFullName('')
+        setPhone('')
       }, 1500)
       
     } catch (error: any) {
@@ -232,6 +243,26 @@ export default function SignupPage() {
                   className="w-full pr-10 pl-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition duration-300"
                   dir="ltr"
                   required
+                />
+              </div>
+            </div>
+
+            {/* Phone Input (optional) */}
+            <div className="relative group">
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                رقم الجوال <span className="text-slate-500 font-normal">(اختياري)</span>
+              </label>
+              <div className="relative">
+                <Phone className="absolute right-3 top-3.5 w-5 h-5 text-slate-500 group-focus-within:text-blue-400 transition" />
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  value={phone}
+                  onChange={(e) => setPhone(phoneDigitsOnly(e.target.value))}
+                  placeholder="05xxxxxxxx"
+                  className="w-full pr-10 pl-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition duration-300"
+                  dir="ltr"
+                  maxLength={10}
                 />
               </div>
             </div>

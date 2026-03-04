@@ -468,10 +468,10 @@ export default function MarketingReportsPage() {
         };
       });
     const topMarketersBySales = marketers
-      .map((m) => ({ ...m, ...byMarketer[m.id], completed: byMarketer[m.id]?.completed ?? 0, commission: byMarketer[m.id]?.commission ?? 0 }))
+      .map((m) => ({ ...m, ...byMarketer[m.id], completed: byMarketer[m.id]?.completed ?? 0, commission: byMarketer[m.id]?.commission ?? 0, reservations: byMarketer[m.id]?.reservations ?? 0 }))
       .filter((m) => m.completed > 0)
       .sort((a, b) => b.completed - a.completed || (b.commission ?? 0) - (a.commission ?? 0))
-      .slice(0, 10);
+      .slice(0, 4);
     return {
       totalReservations: filteredReservations.length,
       active,
@@ -1350,26 +1350,35 @@ export default function MarketingReportsPage() {
                 {stats.topMarketersBySales.length === 0 ? (
                   <div className="px-5 py-8 text-center text-slate-500 text-sm">لا يوجد مسوقون لديهم مبيعات في الفترة</div>
                 ) : (
-                  <div className="divide-y divide-slate-100">
-                    {stats.topMarketersBySales.map((m, i) => {
-                      const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
-                      return (
-                        <div key={m.id} className={`flex items-center justify-between gap-3 px-5 py-3 ${i < 3 ? "bg-amber-50/30" : "hover:bg-slate-50/50"} transition`}>
-                          <div className="flex items-center gap-3">
-                            {medal ? (
-                              <span className="text-lg shrink-0 w-7 text-center">{medal}</span>
-                            ) : (
-                              <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 text-xs font-bold flex items-center justify-center shrink-0">{i + 1}</span>
-                            )}
-                            <span className="font-medium text-slate-800">{m.name}</span>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <span className="text-xs text-slate-500">{formatNum(m.completed)} صفقة</span>
-                            <span className="dir-ltr text-sm font-bold text-amber-700 min-w-[80px] text-left">{formatNum(m.commission ?? 0)} {RIYAL}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[400px]">
+                      <thead>
+                        <tr className="text-right text-xs font-semibold text-slate-500 border-b border-slate-100">
+                          <th className="py-2.5 px-3">المسوق</th>
+                          <th className="py-2.5 px-3">عدد الحجوزات</th>
+                          <th className="py-2.5 px-3">مبيعات مكتملة</th>
+                          <th className="py-2.5 px-3">العمولة</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {stats.topMarketersBySales.map((m, i) => {
+                          const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
+                          return (
+                            <tr key={m.id} className={`${i < 3 ? "bg-amber-50/30" : ""} hover:bg-slate-50/50 transition`}>
+                              <td className="py-3 px-3">
+                                <span className="inline-flex items-center gap-2">
+                                  {medal ? <span className="text-base">{medal}</span> : <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-500 text-xs font-bold flex items-center justify-center">{i + 1}</span>}
+                                  <span className="font-medium text-slate-800">{m.name}</span>
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-slate-600 dir-ltr">{formatNum(m.reservations ?? 0)}</td>
+                              <td className="py-3 px-3 text-slate-600 dir-ltr">{formatNum(m.completed)}</td>
+                              <td className="py-3 px-3 dir-ltr text-sm font-bold text-amber-700">{formatNum(m.commission ?? 0)} {RIYAL}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
                 <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/50 print:hidden">

@@ -1,35 +1,28 @@
 'use client'
 
+import { StatusBadge, type StatusVariant } from './StatusBadge'
+
 /**
- * بادج موحّد لحالة الوحدة (متاحة / محجوزة / مباعة) — هوية المنصة
+ * بادج موحّد لحالة الوحدة (متاحة / محجوزة / مباعة) — يعتمد تصميم StatusBadge المشترك
  */
 export type UnitStatus = 'available' | 'reserved' | 'sold'
 
-const STATUS_CONFIG: Record<
-  UnitStatus,
-  { label: string; dot: string; bg: string; text: string; border: string }
-> = {
-  available: {
-    label: 'متاحة',
-    dot: 'bg-emerald-500',
-    bg: 'bg-emerald-50',
-    text: 'text-emerald-800',
-    border: 'border-emerald-200/80',
-  },
-  reserved: {
-    label: 'محجوزة',
-    dot: 'bg-amber-500',
-    bg: 'bg-amber-50',
-    text: 'text-amber-800',
-    border: 'border-amber-200/80',
-  },
-  sold: {
-    label: 'مباعة',
-    dot: 'bg-slate-500',
-    bg: 'bg-slate-100',
-    text: 'text-slate-700',
-    border: 'border-slate-200/80',
-  },
+const UNIT_VARIANT: Record<UnitStatus, StatusVariant> = {
+  available: 'emerald',
+  reserved: 'amber',
+  sold: 'slate',
+}
+
+const UNIT_LABEL: Record<UnitStatus, string> = {
+  available: 'متاحة',
+  reserved: 'محجوزة',
+  sold: 'مباعة',
+}
+
+const UNIT_LABEL_SHORT: Record<UnitStatus, string> = {
+  available: 'متاح',
+  reserved: 'محجوز',
+  sold: 'مباع',
 }
 
 interface UnitStatusBadgeProps {
@@ -41,37 +34,21 @@ interface UnitStatusBadgeProps {
 
 export function UnitStatusBadge({ status, short = false, className = '' }: UnitStatusBadgeProps) {
   const key = (status === 'available' || status === 'reserved' || status === 'sold' ? status : 'available') as UnitStatus
-  const config = STATUS_CONFIG[key]
-  const label = short
-    ? key === 'available'
-      ? 'متاح'
-      : key === 'reserved'
-        ? 'محجوز'
-        : 'مباع'
-    : config.label
-
-  return (
-    <span
-      className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border shadow-sm ${config.bg} ${config.text} ${config.border} ${className}`}
-    >
-      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dot}`} aria-hidden />
-      {label}
-    </span>
-  )
+  const label = short ? UNIT_LABEL_SHORT[key] : UNIT_LABEL[key]
+  return <StatusBadge label={label} variant={UNIT_VARIANT[key]} className={className} />
 }
 
-/** ألوان البادج فقط (للدمج مع نصوص مخصصة) */
+/** ألوان البادج فقط (للدمج مع نصوص مخصصة) — نفس تصميم StatusBadge */
 export function getUnitStatusStyles(status: UnitStatus | string | null | undefined) {
   const key = (status === 'available' || status === 'reserved' || status === 'sold' ? status : 'available') as UnitStatus
-  const c = STATUS_CONFIG[key]
-  return `inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border shadow-sm ${c.bg} ${c.text} ${c.border}`
+  const v = UNIT_VARIANT[key]
+  const classes = v === 'emerald' ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80' : v === 'amber' ? 'bg-amber-50 text-amber-800 border-amber-200/80' : 'bg-slate-50 text-slate-700 border-slate-200/80'
+  return `inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border shadow-sm ${classes}`
 }
 
 /** نص الحالة فقط */
 export function getUnitStatusLabel(status: UnitStatus | string | null | undefined, short = false): string {
   if (!status) return '—'
   const key = (status === 'available' || status === 'reserved' || status === 'sold' ? status : 'available') as UnitStatus
-  if (short)
-    return key === 'available' ? 'متاح' : key === 'reserved' ? 'محجوز' : 'مباع'
-  return STATUS_CONFIG[key].label
+  return short ? UNIT_LABEL_SHORT[key] : UNIT_LABEL[key]
 }

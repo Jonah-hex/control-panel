@@ -1131,19 +1131,6 @@ function DetailsContent() {
               </div>
               {(building.insurance_available || facilitiesEdit.insurance_available === 'true') && (
                 <div className="md:col-span-2 flex flex-wrap items-center gap-2">
-                  {building.insurance_policy_path && (
-                    <button
-                      type="button"
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-semibold text-sm shadow-md hover:from-green-600 hover:to-green-700 transition"
-                      onClick={async () => {
-                        const { data } = await supabase.storage.from('building-documents').createSignedUrl(building.insurance_policy_path!, 3600);
-                        if (data?.signedUrl) window.open(data.signedUrl, '_blank');
-                        else showToast('تعذر فتح ملف البوليصة.', 'error');
-                      }}
-                    >
-                      معاينة البوليصة
-                    </button>
-                  )}
                   {isEditingFacilitiesCard && (
                     <>
                       <input
@@ -1185,6 +1172,22 @@ function DetailsContent() {
                       </button>
                     </>
                   )}
+                </div>
+              )}
+              {/* عند وجود بوليصة مرفوعة: زر المعاينة يظهر دائماً في الأسفل */}
+              {building.insurance_policy_path && (
+                <div className="md:col-span-2 pt-3 mt-2 border-t border-green-100 flex justify-start">
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-semibold text-sm shadow-md hover:from-green-600 hover:to-green-700 transition"
+                    onClick={async () => {
+                      const { data } = await supabase.storage.from('building-documents').createSignedUrl(building.insurance_policy_path!, 3600);
+                      if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+                      else showToast('تعذر فتح ملف البوليصة.', 'error');
+                    }}
+                  >
+                    معاينة بوليصة التأمين
+                  </button>
                 </div>
               )}
               {isEditingFacilitiesCard && (

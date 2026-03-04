@@ -27,6 +27,7 @@ import {
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
 import { showToast } from "@/app/dashboard/buildings/details/toast";
 
+/** عرض سعر البيع للمالك النهائي من sales عند التوفر (سياسة المسارين: docs/sales-and-investment-policy.md) */
 /** بيانات اتحاد الملاك في العمارة (مطابق لكارد تفاصيل العمارة) */
 interface OwnerAssociationData {
   hasAssociation?: boolean;
@@ -619,8 +620,8 @@ export default function OwnersPage() {
               {viewOwnerUnit.transfer_check_image_url && (
                 <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
                   <span className="text-slate-600 shrink-0">
-                    {viewOwnerUnit.transfer_check_amount != null
-                      ? `صورة الشيك (${Number(viewOwnerUnit.transfer_check_amount).toLocaleString("en")} ر.س)`
+                    {(viewOwnerUnit.sale?.sale_price != null || viewOwnerUnit.transfer_check_amount != null)
+                      ? `صورة الشيك (${Number(viewOwnerUnit.sale?.sale_price ?? viewOwnerUnit.transfer_check_amount).toLocaleString("en")} ر.س)`
                       : "صورة الشيك"}
                   </span>
                   <a

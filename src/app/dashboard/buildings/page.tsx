@@ -14,7 +14,7 @@ interface Building {
   neighborhood?: string
   address?: string | null
   phone?: string | null
-  build_status?: 'ready' | 'under_construction' | 'old' | null
+  build_status?: 'ready' | 'under_construction' | 'finishing' | 'new_project' | 'old' | null
   year_built?: number | null
   total_units: number
   total_floors: number
@@ -126,6 +126,8 @@ export default function BuildingsPage() {
 
   const getBuildStatusLabel = (status?: Building['build_status']) => {
     if (status === 'under_construction') return { label: 'تحت الإنشاء', className: 'bg-amber-100 text-amber-700' }
+    if (status === 'finishing') return { label: 'تشطيب', className: 'bg-blue-100 text-blue-700' }
+    if (status === 'new_project') return { label: 'أرض مشروع جديد', className: 'bg-amber-100 text-amber-700' }
     if (status === 'old') return { label: 'قديم', className: 'bg-slate-200 text-slate-700' }
     return { label: 'جاهز', className: 'bg-emerald-100 text-emerald-700' }
   }

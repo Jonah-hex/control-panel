@@ -219,7 +219,7 @@ export default function NewBuildingPage() {
     yearBuilt: new Date().getFullYear(),
     
     // حقول جديدة - حالة البناء ومعلومات البناء
-    buildStatus: 'ready' as 'ready' | 'under_construction' | 'finishing' | 'new_project',
+    buildStatus: 'ready' as 'ready' | 'under_construction' | 'finishing' | 'new_project' | 'old',
     deedNumber: '',
     landArea: 0,
     buildingLicenseNumber: '',
@@ -1218,19 +1218,19 @@ export default function NewBuildingPage() {
             {/* القسم الأيسر: أزرار التنقل */}
             <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 flex-wrap">
               <Link
+                href="/dashboard/buildings"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold text-sm shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Building2 className="w-4 h-4" />
+                قائمة العماير
+              </Link>
+              <Link
                 href="/dashboard"
                 className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/80 bg-white/70 text-gray-700 font-medium text-sm shadow-sm hover:bg-white hover:border-slate-200/80 hover:shadow-[0_2px_8px_rgba(15,23,42,0.06)] transition-all duration-200"
                 title="رجوع إلى لوحة التحكم"
               >
                 <LayoutDashboard className="w-4 h-4" />
                 لوحة التحكم
-              </Link>
-              <Link
-                href="/dashboard/buildings"
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold text-sm shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <Building2 className="w-4 h-4" />
-                قائمة العماير
               </Link>
             </div>
           </div>
@@ -1465,6 +1465,7 @@ export default function NewBuildingPage() {
                         <option value="under_construction">تحت الإنشاء</option>
                         <option value="finishing">تشطيب</option>
                         <option value="new_project">أرض مشروع جديد</option>
+                        <option value="old">قديم</option>
                       </select>
                     </div>
                   </div>

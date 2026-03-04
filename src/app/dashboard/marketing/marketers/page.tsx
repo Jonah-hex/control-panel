@@ -9,7 +9,6 @@ import { showToast } from "@/app/dashboard/buildings/details/toast";
 import {
   UserPlus,
   LayoutDashboard,
-  ArrowRight,
   Pencil,
   Trash2,
   Phone,
@@ -22,6 +21,7 @@ import {
   Search,
 } from "lucide-react";
 import { phoneDigitsOnly, isValidPhone10Digits } from "@/lib/validation-utils";
+import { RiyalIcon } from "@/components/icons/RiyalIcon";
 
 interface Marketer {
   id: string;
@@ -334,7 +334,7 @@ export default function MarketersPage() {
                     <th className="text-right py-2.5 px-3 font-semibold text-slate-600">بيانات المسوق</th>
                     <th className="text-center py-2.5 px-2 font-semibold text-slate-600 w-16">حجز</th>
                     <th className="text-center py-2.5 px-2 font-semibold text-slate-600 w-16">بيع</th>
-                    <th className="text-center py-2.5 px-2 font-semibold text-slate-600 w-28">إجراءات</th>
+                    <th className="text-center py-2.5 px-2 font-semibold text-slate-600 min-w-[8.5rem]">إجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -366,14 +366,14 @@ export default function MarketersPage() {
                           <span className="text-slate-400 text-xs">—</span>
                         )}
                       </td>
-                      <td className="py-2 px-2 align-top">
-                        <div className="flex items-center justify-center gap-1">
+                      <td className="py-2 px-2 align-middle whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-1 flex-nowrap">
                           <Link
-                            href={`/dashboard/reservations?marketerId=${m.id}`}
-                            className="p-1.5 rounded-md border border-amber-200 text-amber-600 hover:bg-amber-50 transition"
-                            title="الحجوزات"
+                            href={`/dashboard/marketing/marketers/${m.id}/commissions`}
+                            className="p-1.5 rounded-md border border-amber-200 text-amber-600 hover:bg-amber-50 transition flex items-center justify-center"
+                            title="سجل العمولات"
                           >
-                            <ArrowRight className="w-4 h-4" />
+                            <RiyalIcon className="w-4 h-4" />
                           </Link>
                           <button
                             type="button"

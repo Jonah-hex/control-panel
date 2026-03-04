@@ -71,6 +71,7 @@ interface Unit {
   floor: number
   status: 'available' | 'reserved' | 'sold'
   electricity_meter_number?: string | null
+  electricity_meter_transferred_with_sale?: boolean | null
   owner_name?: string | null
   created_at: string
   updated_at?: string
@@ -165,6 +166,7 @@ export default function DashboardPage() {
   const [salesWithRemaining, setSalesWithRemaining] = useState<Array<{ id: string; building_id: string; remaining_payment: number; remaining_payment_due_date?: string | null; buyer_name?: string | null }>>([])
   const [buildingInvestorsWithDueDate, setBuildingInvestorsWithDueDate] = useState<Array<{ id: string; building_id: string; investor_name: string; investment_due_date: string }>>([])
   const [upcomingAppointments, setUpcomingAppointments] = useState<Array<{ id: string; title: string; scheduled_at: string; type: string; buildings?: { name: string } | null }>>([])
+  const [tasksCount, setTasksCount] = useState(0)
 
   const router = useRouter()
   const supabase = createClient()
@@ -254,8 +256,23 @@ export default function DashboardPage() {
         }
       }
       fetchUpcomingAppointments()
+      const fetchTasksCount = async () => {
+        try {
+          const { count, error } = await supabase
+            .from('dashboard_tasks')
+            .select('id', { count: 'exact', head: true })
+            .eq('owner_id', effectiveOwnerId)
+            .in('status', ['pending', 'accepted', 'scheduled'])
+          if (!error && count != null) setTasksCount(count)
+          else setTasksCount(0)
+        } catch {
+          setTasksCount(0)
+        }
+      }
+      fetchTasksCount()
     } else {
       setUpcomingAppointments([])
+      setTasksCount(0)
     }
   }, [effectiveOwnerId])
 
@@ -467,20 +484,29 @@ export default function DashboardPage() {
   const reservedUnits = units.filter(u => u.status === 'reserved').length
   const soldUnits = units.filter(u => u.status === 'sold').length
 
-  // تنبيهات فواتير الكهرباء — فقط خلال فترة صدور الفاتورة من الشركة السعودية للكهرباء (تصدر 26 من كل شهر، وتُعرض التنبيهات من 26 حتى 10 من الشهر التالي)
+  // تنبيهات فواتير الكهرباء — فقط خلال فترة الفاتورة (26 حتى 10). فقط عدادات الوحدات المتاحة (المملوكة للمنشأة): المستبعدة الوحدات المُباعة التي نُقل عدادها مع البيع. تنبيه واحد لكل عمارة (اسم العمارة فقط).
   const isElectricityBillPeriod = (() => {
     const today = new Date()
     const day = today.getDate()
     return day >= 26 || day <= 10
   })()
-  const electricityReminders = isElectricityBillPeriod
-    ? units
-        .filter(u => u.electricity_meter_number && String(u.electricity_meter_number).trim())
-        .map(u => ({
-          unit: u,
-          buildingName: buildings.find(b => b.id === u.building_id)?.name || '—'
-        }))
-    : []
+  const electricityReminders = useMemo(() => {
+    if (!isElectricityBillPeriod) return []
+    const seen = new Set<string>()
+    const out: { buildingId: string; buildingName: string }[] = []
+    for (const u of units) {
+      if (!u.electricity_meter_number || !String(u.electricity_meter_number).trim()) continue
+      if (u.status === 'sold' && u.electricity_meter_transferred_with_sale === true) continue
+      const bid = u.building_id
+      if (!bid || seen.has(bid)) continue
+      seen.add(bid)
+      out.push({
+        buildingId: bid,
+        buildingName: buildings.find(b => b.id === bid)?.name || '—'
+      })
+    }
+    return out
+  }, [isElectricityBillPeriod, units, buildings])
 
   // تنبيهات عمارة بدون عدادات كاملة — تنبيه واحد لكل عمارة (بالاسم فقط)
   const buildingsMissingMeters = useMemo(() => {
@@ -613,7 +639,7 @@ export default function DashboardPage() {
     filteredAssociationEndReminders.forEach(({ buildingId, daysLeft }) => ids.push(`assoc-${buildingId}-${daysLeft}`))
     filteredInvestmentEndReminders.forEach(({ investorId, daysLeft }) => ids.push(`inv-due-${investorId}-${daysLeft}`))
     filteredReservationReminders.forEach(({ reservation }) => ids.push(`res-expired-${reservation.id}`))
-    filteredElectricityReminders.forEach(({ unit }) => ids.push(`elec-${unit.id}`))
+    filteredElectricityReminders.forEach(({ buildingId }) => ids.push(`elec-building-${buildingId}`))
     filteredMissingMeterReminders.forEach(({ buildingId }) => ids.push(`meter-missing-${buildingId}`))
     reservationActivityForBell.cancelled.forEach((log: { id: string }) => ids.push(`activity-cancelled-${log.id}`))
     reservationActivityForBell.refunded.forEach((log: { id: string }) => ids.push(`activity-refund-${log.id}`))
@@ -652,7 +678,7 @@ export default function DashboardPage() {
     | { type: 'assoc'; sortTime: string; key: string; buildingId: string; buildingName: string; endDate: string; daysLeft: number }
     | { type: 'inv-due'; sortTime: string; key: string; investorId: string; buildingId: string; buildingName: string; investorName: string; dueDate: string; daysLeft: number }
     | { type: 'res-expired'; sortTime: string; key: string; reservation: (typeof reservations)[0]; unit: Unit | undefined; buildingName: string }
-    | { type: 'elec'; sortTime: string; key: string; unit: Unit; buildingName: string }
+    | { type: 'elec'; sortTime: string; key: string; buildingId: string; buildingName: string }
     | { type: 'meter-missing'; sortTime: string; key: string; buildingId: string; buildingName: string; needsComplete: boolean }
     | { type: 'cancelled'; sortTime: string; key: string; log: (typeof reservationCancelledLogs)[0] }
     | { type: 'refunded'; sortTime: string; key: string; log: (typeof depositRefundedLogs)[0] }
@@ -672,8 +698,8 @@ export default function DashboardPage() {
       const sortTime = reservation.expiry_date || reservation.created_at
       items.push({ type: 'res-expired', sortTime, key: `res-expired-${reservation.id}`, reservation, unit, buildingName })
     })
-    filteredElectricityReminders.forEach(({ unit, buildingName }) => {
-      items.push({ type: 'elec', sortTime: unit.updated_at || unit.created_at || fallbackTime, key: `elec-${unit.id}`, unit, buildingName })
+    filteredElectricityReminders.forEach(({ buildingId, buildingName }) => {
+      items.push({ type: 'elec', sortTime: fallbackTime, key: `elec-building-${buildingId}`, buildingId, buildingName })
     })
     filteredMissingMeterReminders.forEach(({ buildingId, buildingName, needsComplete }) => {
       items.push({ type: 'meter-missing', sortTime: fallbackTime, key: `meter-missing-${buildingId}`, buildingId, buildingName, needsComplete })
@@ -1031,8 +1057,8 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100" dir="rtl">
-      {/* وحدة الهيدر + شريط التنقل (ديسكتوب) */}
-      <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-gradient-to-b from-white/95 to-white/85 backdrop-blur-xl shadow-[0_4px_20px_rgba(15,23,42,0.06)]">
+      {/* تصميم الهيدر المعتمد: شريط شفاف + حاوية بيضاوية بيضاء واحدة (بدون تحية/تاريخ في الهيدر) — لا يُغيّر */}
+      <header className="sticky top-0 z-20 border-b border-slate-200/50 bg-transparent">
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-2 md:pt-4 md:pb-3">
           <div className="flex flex-col gap-3 rounded-2xl border border-white/80 bg-white/70 px-3 sm:px-4 lg:px-5 py-3 md:flex-row md:items-center md:justify-between md:min-h-[80px] shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
             {/* القسم الأيمن */}
@@ -1152,8 +1178,8 @@ export default function DashboardPage() {
                         ) : (
                           <div className="divide-y divide-gray-100">
                             {sortedNotifications.map((item) => {
-                              const timeLabel = item.type === 'assoc' ? item.endDate : item.type === 'inv-due' ? item.dueDate : item.type === 'res-expired' ? (item.reservation.expiry_date || item.reservation.created_at) : item.type === 'elec' ? (item.unit.updated_at || item.unit.created_at) : item.type === 'meter-missing' ? null : item.type === 'sale-remaining' ? (item.sale as { created_at?: string }).created_at : (item as { log?: { created_at: string } }).log?.created_at
-                              const displayTime = timeLabel ? formatNotificationTime(timeLabel) : null
+                              const timeLabel = item.type === 'assoc' ? item.endDate : item.type === 'inv-due' ? item.dueDate : item.type === 'res-expired' ? (item.reservation.expiry_date || item.reservation.created_at) : item.type === 'elec' ? null : item.type === 'meter-missing' ? null : item.type === 'sale-remaining' ? (item.sale as { created_at?: string }).created_at : (item as { log?: { created_at: string } }).log?.created_at
+                              const displayTime = item.type === 'elec' ? 'خلال فترة الفاتورة (26 — 10)' : timeLabel ? formatNotificationTime(timeLabel) : null
                               return (
                                 <div key={item.key} className="flex items-start gap-3 px-4 py-3.5 hover:bg-gray-50/70 transition">
                                   {item.type === 'assoc' && (
@@ -1189,13 +1215,12 @@ export default function DashboardPage() {
                                     </Link>
                                   )}
                                   {item.type === 'elec' && (
-                                    <Link href={`/dashboard/buildings/details?buildingId=${item.unit.building_id}#card-electricity`} onClick={() => setNotificationsOpen(false)} className="flex items-start gap-3 flex-1 min-w-0">
+                                    <Link href={`/dashboard/buildings/details?buildingId=${item.buildingId}#card-electricity`} onClick={() => setNotificationsOpen(false)} className="flex items-start gap-3 flex-1 min-w-0">
                                       <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600"><Zap className="w-5 h-5" /></span>
                                       <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-semibold text-gray-800">فاتورة كهرباء</p>
-                                        <p className="text-xs text-gray-600 mt-0.5 font-mono text-amber-700">{item.unit.electricity_meter_number}</p>
-                                        <p className="text-xs text-gray-400 mt-0.5">{item.buildingName} — وحدة {item.unit.unit_number}</p>
-                                        {displayTime && <p className="text-[11px] text-gray-400 mt-1">{displayTime}</p>}
+                                        <p className="text-sm font-semibold text-gray-800">فاتورة كهرباء — عدادات العمارة</p>
+                                        <p className="text-xs text-gray-400 mt-0.5">{item.buildingName}</p>
+                                        {displayTime && <p className="text-[11px] text-slate-500 mt-1">{displayTime}</p>}
                                       </div>
                                     </Link>
                                   )}
@@ -1270,16 +1295,19 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              {/* الوقت والتاريخ */}
-              <div className="hidden md:block px-4 py-2 bg-white/70 border border-white/80 rounded-2xl shadow-sm">
-                <div className="text-xs text-gray-500">{greeting}</div>
-                <div className="text-sm font-medium text-gray-700">
-                  {currentTime.toLocaleDateString('en-GB', { 
-                    weekday: 'short', 
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric' 
+{/* الوقت والتاريخ */}
+              <div className="hidden md:block px-5 py-3 rounded-2xl border border-slate-200/60 bg-white/90 shadow-sm shadow-slate-200/30 min-w-[10rem] text-right">
+                <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5">{greeting}</div>
+                <div className="text-sm font-semibold text-slate-800 tabular-nums">
+                  {currentTime.toLocaleDateString('en-GB', {
+                    weekday: 'short',
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
                   })}
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5 font-medium" dir="rtl">
+                  {currentTime.toLocaleDateString('ar-SA', { calendar: 'islamic-umalqura', year: 'numeric', month: 'long', day: 'numeric' })}
                 </div>
               </div>
 
@@ -1719,12 +1747,22 @@ export default function DashboardPage() {
                   </div>
                   المواعيد القادمة
                 </h2>
+                <span className="relative inline-flex items-center">
                 <Link
                   href="/dashboard/tasks"
                   className="text-xs font-medium text-amber-600 hover:text-amber-700"
                 >
                   المهام والملاحظات
                 </Link>
+                {tasksCount > 0 && (
+                  <span
+                    className="absolute -top-2 -end-5 flex aspect-square min-w-4 min-h-4 items-center justify-center rounded-full bg-gradient-to-br from-amber-500 to-orange-600 px-1 text-[9px] font-bold text-white shadow-md shadow-amber-500/30 tabular-nums"
+                    aria-label={`${tasksCount} مهمة أو ملاحظة`}
+                  >
+                    {tasksCount > 99 ? '99+' : tasksCount}
+                  </span>
+                )}
+              </span>
               </div>
 
               <div className="space-y-3">
