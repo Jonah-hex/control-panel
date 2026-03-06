@@ -252,10 +252,12 @@ function UnitsFilterContent() {
     const facingMatches = facingFilter === 'all' || unit.facing === facingFilter
     const typeMatches = typeFilter === 'all' || unit.type === typeFilter
     const term = searchTerm.trim().toLowerCase()
+    const termDigits = searchTerm.trim().replace(/,/g, '')
     const searchMatches =
       term.length === 0 ||
       unit.unit_number?.toLowerCase().includes(term) ||
-      unit.building?.name?.toLowerCase().includes(term)
+      unit.building?.name?.toLowerCase().includes(term) ||
+      (unit.price != null && termDigits !== '' && String(unit.price).includes(termDigits))
     return statusMatches && facingMatches && typeMatches && searchMatches
   })
 
@@ -376,49 +378,49 @@ function UnitsFilterContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="bg-emerald-50 border-b border-emerald-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl shadow-lg">
-                <Home className="w-8 h-8 text-white" />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto">
+        {/* هيدر — نفس مقاس ونمط إدارة العماير */}
+        <header className="relative rounded-2xl overflow-hidden mb-8 shadow-lg border border-gray-200/90 bg-gradient-to-br from-white to-gray-50">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-teal-500 opacity-10" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_70%_0%,rgba(20,184,166,0.08),transparent)]" />
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-4 sm:px-5 sm:py-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex-shrink-0 w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/25 ring-1 ring-white/70">
+                <Home className="w-5 h-5 text-white" />
               </div>
-              <div>
-                <h1 className="text-3xl font-black text-emerald-700">
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-bold text-gray-800 tracking-tight leading-tight">
                   {buildingIdFromUrl
                     ? `وحدات عمارة: ${buildings.find(b => b.id === buildingIdFromUrl)?.name ?? '—'}`
                     : 'إدارة الوحدات'}
                 </h1>
-                <p className="text-gray-600 text-sm mt-1">
+                <p className="text-xs text-gray-500 mt-0.5">
                   {buildingIdFromUrl
                     ? 'عرض ومعاينة وتعديل وحدات هذه العمارة'
                     : 'عرض شامل للوحدات مع الفلترة'}
                 </p>
               </div>
             </div>
-            
-            <div className="flex items-center gap-3">
-                <Link
-                  href="/dashboard/buildings"
-                  className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-emerald-200/90 text-emerald-700 font-medium text-sm shadow-sm hover:bg-emerald-50/50 hover:border-emerald-300 transition-all duration-200"
-                >
-                  <Building2 className="w-4 h-4" />
-                  قائمة العماير
-                </Link>
+            <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
+              <Link
+                href="/dashboard/buildings"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
+              >
+                <Building2 className="w-4 h-4" />
+                قائمة العماير
+              </Link>
               <Link
                 href="/dashboard"
-                className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-emerald-200/90 text-emerald-700 font-medium text-sm shadow-sm hover:bg-emerald-50/50 hover:border-emerald-300 transition-all duration-200"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
               >
                 <LayoutDashboard className="w-4 h-4" />
                 لوحة التحكم
               </Link>
             </div>
           </div>
-        </div>
-      </div>
+        </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div className="bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl p-5 text-white shadow-lg">
             <div className="flex items-center justify-between mb-2">
@@ -460,9 +462,19 @@ function UnitsFilterContent() {
               <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="ابحث برقم الشقة"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="ابحث باسم العمارة أو السعر"
+                value={
+                  (() => {
+                    const digitsOnly = searchTerm.replace(/,/g, '')
+                    if (digitsOnly === '' || !/^\d+$/.test(digitsOnly)) return searchTerm
+                    return Number(digitsOnly).toLocaleString('en')
+                  })()
+                }
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/,/g, '')
+                  if (raw === '' || /^\d*$/.test(raw)) setSearchTerm(raw)
+                  else setSearchTerm(e.target.value)
+                }}
                 className="w-full pr-10 pl-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               />
             </div>
@@ -744,7 +756,7 @@ function UnitsFilterContent() {
           </div>
         </>
       )}
-    </div>
+  </div>
   )
 }
 

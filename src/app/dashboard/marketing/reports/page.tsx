@@ -660,19 +660,21 @@ export default function MarketingReportsPage() {
   return (
     <main className="reports-print min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-amber-50/40 p-4 sm:p-6 lg:p-8 print:bg-white print:p-0" dir="rtl">
       <div className="max-w-6xl mx-auto relative">
-        {/* Header */}
-        <header className="rounded-2xl overflow-hidden mb-6 shadow-lg border border-gray-200/90 bg-gradient-to-br from-white to-gray-50 print:shadow-none print:border">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 sm:p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/25 print:shadow-none">
-                <LineChart className="w-7 h-7 text-white" />
+        {/* هيدر موحد — نفس مقاس إدارة العماير */}
+        <header className="relative rounded-2xl overflow-hidden mb-8 shadow-lg border border-gray-200/90 bg-gradient-to-br from-white to-gray-50 print:shadow-none print:border print:mb-4">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-600 opacity-10 print:opacity-0" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_70%_0%,rgba(245,158,11,0.08),transparent)] print:opacity-0" />
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-4 sm:px-5 sm:py-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex-shrink-0 w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/25 ring-1 ring-white/70 print:shadow-none">
+                <LineChart className="w-5 h-5 text-white" />
               </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-800 tracking-tight">التقارير والتحليلات</h1>
-                <p className="text-xs sm:text-sm text-gray-500 mt-0.5">ملخص وتقارير تفصيلية للحجوزات والمبيعات والمسوقين — إدارة التسويق والمبيعات</p>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-bold text-gray-800 tracking-tight leading-tight">التقارير والتحليلات</h1>
+                <p className="text-xs text-gray-500 mt-0.5">ملخص وتقارير تفصيلية للحجوزات والمبيعات والمسوقين — إدارة التسويق والمبيعات</p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2 print:hidden">
+            <div className="flex flex-wrap items-center gap-2 flex-shrink-0 print:hidden">
               <Link
                 href="/dashboard/marketing"
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50"
@@ -797,37 +799,45 @@ export default function MarketingReportsPage() {
                 )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition">
-                  <div className="flex items-center justify-between mb-2">
-                    <Calendar className="w-8 h-8 text-amber-600" />
-                    <span className="text-xs font-medium text-slate-500">الحجوزات ({periodLabel[period]})</span>
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition min-w-0">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                      <Calendar className="w-5 h-5 text-amber-600" />
+                    </span>
+                    <span className="text-xs font-medium text-slate-500 truncate min-w-0">الحجوزات ({periodLabel[period]})</span>
                   </div>
                   <p className="text-2xl font-bold text-slate-800">{formatNum(stats.totalReservations)}</p>
                   <p className="text-xs text-slate-500 mt-1">
                     نشط: {formatNum(stats.active)} · مكتمل: {formatNum(stats.completed)} · ملغى: {formatNum(stats.cancelled)}
                   </p>
                 </div>
-                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition">
-                  <div className="flex items-center justify-between mb-2">
-                    <RiyalIcon className="w-8 h-8 text-emerald-600" />
-                    <span className="text-xs font-medium text-slate-500">إجمالي العرابين</span>
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition min-w-0">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                      <RiyalIcon className="w-5 h-5 text-emerald-600" />
+                    </span>
+                    <span className="text-xs font-medium text-slate-500 truncate min-w-0">إجمالي العرابين</span>
                   </div>
                   <p className="text-2xl font-bold text-slate-800">
                     {formatNum(stats.totalDeposits)} <span className="text-sm font-normal text-slate-500">{RIYAL}</span>
                   </p>
                 </div>
-                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition">
-                  <div className="flex items-center justify-between mb-2">
-                    <TrendingUp className="w-8 h-8 text-blue-600" />
-                    <span className="text-xs font-medium text-slate-500">المبيعات ({periodLabel[period]})</span>
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition min-w-0">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                      <TrendingUp className="w-5 h-5 text-blue-600" />
+                    </span>
+                    <span className="text-xs font-medium text-slate-500 truncate min-w-0">المبيعات ({periodLabel[period]})</span>
                   </div>
                   <p className="text-2xl font-bold text-slate-800">{formatNum(stats.totalSales)}</p>
                   <p className="text-xs text-slate-500 mt-1">صفقة</p>
                 </div>
-                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition">
-                  <div className="flex items-center justify-between mb-2">
-                    <RiyalIcon className="w-8 h-8 text-emerald-600" />
-                    <span className="text-xs font-medium text-slate-500">إجمالي الإيرادات</span>
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition min-w-0">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                      <RiyalIcon className="w-5 h-5 text-emerald-600" />
+                    </span>
+                    <span className="text-xs font-medium text-slate-500 truncate min-w-0">إجمالي الإيرادات</span>
                   </div>
                   <p className="text-2xl font-bold text-slate-800">
                     {formatNum(stats.totalRevenue)} <span className="text-sm font-normal text-slate-500">{RIYAL}</span>

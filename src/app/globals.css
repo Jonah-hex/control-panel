@@ -651,15 +651,15 @@ main > div {
 /* تحسين inputs والخانات */
 @layer components {
   .form-input {
-    @apply w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition duration-300 font-medium;
+    @apply w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl outline-none transition duration-300 font-medium focus:ring-0;
   }
 
   .form-select {
-    @apply w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition duration-300 font-medium appearance-none;
+    @apply w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl outline-none transition duration-300 font-medium appearance-none focus:ring-0;
   }
 
   .form-textarea {
-    @apply w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition duration-300 font-medium resize-none;
+    @apply w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl outline-none transition duration-300 font-medium resize-none focus:ring-0;
   }
 
   .btn-primary {
@@ -706,11 +706,20 @@ main > div {
   }
 }
 
-/* تأثيرات الـ focus */
+/* إزالة التوهج وحلقة التركيز من كل الحقول في المنصة */
 input:focus,
 select:focus,
-textarea:focus {
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+textarea:focus,
+button:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* Gradient text effects */
@@ -763,6 +772,38 @@ textarea:focus {
 * {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+/* شريط تمرير الشريط الجانبي — رفيع ومتناسق */
+.dashboard-sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+.dashboard-sidebar-nav::-webkit-scrollbar-button:vertical {
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+.dashboard-sidebar-nav::-webkit-scrollbar-button {
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
+}
+.dashboard-sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dashboard-sidebar-nav::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+}
+.dashboard-sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+.dashboard-sidebar-nav {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
 }
 
 /* Animation للـ gradient backgrounds */

@@ -190,6 +190,9 @@ export default function ReservationsPage() {
   const [marketerSearch, setMarketerSearch] = useState("");
   const [marketerDropdownOpen, setMarketerDropdownOpen] = useState(false);
   const marketerDropdownRef = useRef<HTMLDivElement>(null);
+  const [reservationsPage, setReservationsPage] = useState(1);
+  const [reservationsPageSize, setReservationsPageSize] = useState(10);
+  const RESERVATIONS_PAGE_SIZES = [10, 25, 50, 100] as const;
 
   const supabase = createClient();
   const router = useRouter();
@@ -455,6 +458,20 @@ export default function ReservationsPage() {
         return normalizedDatePool.includes(dateQuery);
       });
   }, [reservations, statusFilter, searchQuery, dateSearchQuery, buildingIdFromUrl]);
+
+  const reservationsTotalPages = Math.max(1, Math.ceil(filteredReservations.length / reservationsPageSize));
+  const reservationsPaginated = useMemo(
+    () =>
+      filteredReservations.slice(
+        (reservationsPage - 1) * reservationsPageSize,
+        reservationsPage * reservationsPageSize
+      ),
+    [filteredReservations, reservationsPage, reservationsPageSize]
+  );
+
+  useEffect(() => {
+    if (reservationsPage > reservationsTotalPages && reservationsTotalPages >= 1) setReservationsPage(1);
+  }, [reservationsPage, reservationsTotalPages]);
 
   const expiringSoon = useMemo(() => {
     const now = new Date();
@@ -737,33 +754,43 @@ export default function ReservationsPage() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 sm:p-6 lg:p-8" dir="rtl">
       <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">إدارة الحجوزات</h1>
-            <p className="text-sm text-gray-500 mt-1">سجل الحجوزات — إلغاء الحجز — استرداد العرابين — إتمام البيع من إدارة التسويق والمبيعات</p>
-          </div>
-          {can("reservations") && (
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={handleBack}
-                className="inline-flex items-center justify-center w-10 h-10 bg-white border border-amber-200 text-amber-700 rounded-xl hover:bg-amber-50 transition"
-                title="رجوع"
-                aria-label="رجوع للصفحة السابقة"
-              >
-                <ArrowRight className="w-5 h-5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setCreateOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-medium hover:from-amber-600 hover:to-orange-700 transition shadow-lg shadow-amber-500/25"
-              >
-                <Plus className="w-5 h-5" />
-                حجز وحدة جديدة
-              </button>
+        {/* هيدر موحد — نفس نمط إدارة العماير والوحدات */}
+        <header className="relative rounded-2xl overflow-hidden mb-8 shadow-lg border border-gray-200/90 bg-gradient-to-br from-white to-gray-50">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-600 opacity-10" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_70%_0%,rgba(245,158,11,0.08),transparent)]" />
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-4 sm:px-5 sm:py-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex-shrink-0 w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/25 ring-1 ring-white/70">
+                <Calendar className="w-5 h-5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-bold text-gray-800 tracking-tight leading-tight">إدارة الحجوزات</h1>
+                <p className="text-xs text-gray-500 mt-0.5">سجل الحجوزات — إلغاء الحجز — استرداد العرابين — إتمام البيع من إدارة التسويق والمبيعات</p>
+              </div>
             </div>
-          )}
-        </div>
+            {can("reservations") && (
+              <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="inline-flex items-center justify-center w-10 h-10 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 shadow-sm"
+                  title="رجوع"
+                  aria-label="رجوع للصفحة السابقة"
+                >
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCreateOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-medium text-sm shadow-lg shadow-amber-500/25 hover:from-amber-600 hover:to-orange-700 transition-all duration-200"
+                >
+                  <Plus className="w-4 h-4" />
+                  حجز وحدة جديدة
+                </button>
+              </div>
+            )}
+          </div>
+        </header>
 
         {/* سياسات الحجز */}
         <div className="mb-6 rounded-2xl border border-amber-200/80 bg-amber-50/50 p-4">
@@ -888,8 +915,9 @@ export default function ReservationsPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
+            <>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="text-right p-3 font-semibold text-gray-700">الوحدة / العمارة</th>
@@ -906,7 +934,7 @@ export default function ReservationsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredReservations.map((r) => (
+                  {reservationsPaginated.map((r) => (
                     <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50/80">
                       <td className="p-3">
                         <span className="font-medium text-gray-800">
@@ -1011,8 +1039,56 @@ export default function ReservationsPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+                </table>
+              </div>
+              {filteredReservations.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                  <span>عرض</span>
+                  <select
+                    value={reservationsPageSize}
+                    onChange={(e) => {
+                      setReservationsPageSize(Number(e.target.value));
+                      setReservationsPage(1);
+                    }}
+                    className="rounded-2xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-0 transition-all duration-200"
+                  >
+                    {RESERVATIONS_PAGE_SIZES.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="font-mono">
+                    {((reservationsPage - 1) * reservationsPageSize + 1).toLocaleString("en")}–
+                    {Math.min(reservationsPage * reservationsPageSize, filteredReservations.length).toLocaleString("en")} من{" "}
+                    {filteredReservations.length.toLocaleString("en")}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setReservationsPage((p) => Math.max(1, p - 1))}
+                    disabled={reservationsPage <= 1}
+                    className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm focus:outline-none focus:ring-0"
+                  >
+                    السابق
+                  </button>
+                  <span className="px-2 py-1.5 text-sm text-slate-600 font-mono">
+                    ص {reservationsPage.toLocaleString("en")} / {reservationsTotalPages.toLocaleString("en")}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setReservationsPage((p) => Math.min(reservationsTotalPages, p + 1))}
+                    disabled={reservationsPage >= reservationsTotalPages}
+                    className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm focus:outline-none focus:ring-0"
+                  >
+                    التالي
+                  </button>
+                </div>
+              </div>
+              )}
+            </>
           )}
         </div>
       </div>

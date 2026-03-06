@@ -29,8 +29,6 @@ import {
   AlertCircle,
   CheckCircle,
   XCircle,
-  Download,
-  Upload,
   Search,
   ShoppingCart,
   CheckSquare,
@@ -830,44 +828,67 @@ export default function DashboardPage() {
         endDate: r.endDate
       }
     })
-    const fromMeterAdded: Activity[] = meterAddedLogs.map(log => ({
-      id: `meter-${log.id}`,
-      type: 'meter_added' as const,
-      building_name: (log.metadata?.building_name as string) || '—',
-      building_id: (log.metadata?.building_id as string) || undefined,
-      user_name: (log.metadata?.created_by_name as string)?.trim() || 'صاحب الحساب',
-      user_role_label: (log.metadata?.created_by_name as string)?.trim() ? 'موظف' : 'صاحب الحساب',
-      timestamp: log.created_at,
-      details: log.action_description || 'تم إضافة عداد'
-    }))
-    const fromOwnershipTransferred: Activity[] = ownershipTransferredLogs.map(log => ({
-      id: `transfer-${log.id}`,
-      type: 'ownership_transferred' as const,
-      building_name: (log.metadata?.building_name as string) || '—',
-      building_id: (log.metadata?.building_id as string) || undefined,
-      user_name: (log.metadata?.created_by_name as string)?.trim() || 'صاحب الحساب',
-      user_role_label: (log.metadata?.created_by_name as string)?.trim() ? 'موظف' : 'صاحب الحساب',
-      timestamp: log.created_at,
-      details: log.action_description || 'نقل ملكية'
-    }))
-    const fromRemainingPaymentCollected: Activity[] = remainingPaymentCollectedLogs.map(log => ({
-      id: `remaining-${log.id}`,
-      type: 'remaining_payment_collected' as const,
-      building_name: '—',
-      user_name: 'النظام',
-      user_role_label: 'النظام',
-      timestamp: log.created_at,
-      details: log.action_description || 'تم تأكيد تحصيل المبلغ المتبقي'
-    }))
-    const fromRemainingPaymentCollectedLate: Activity[] = remainingPaymentCollectedLateLogs.map(log => ({
-      id: `remaining-late-${log.id}`,
-      type: 'remaining_payment_collected_late' as const,
-      building_name: (log.metadata?.building_name as string) || '—',
-      user_name: 'النظام',
-      user_role_label: 'النظام',
-      timestamp: log.created_at,
-      details: log.action_description || 'تأخير في تحصيل المبلغ المتبقي — تم الدفع بعد تاريخ الاستحقاق'
-    }))
+    const buildingIds = buildings.map(b => b.id)
+    const fromMeterAdded: Activity[] = meterAddedLogs
+      .filter(log => {
+        const bid = log.metadata?.building_id as string | undefined
+        return Boolean(bid && buildingIds.includes(bid))
+      })
+      .map(log => ({
+        id: `meter-${log.id}`,
+        type: 'meter_added' as const,
+        building_name: (log.metadata?.building_name as string) || '—',
+        building_id: (log.metadata?.building_id as string) || undefined,
+        user_name: (log.metadata?.created_by_name as string)?.trim() || 'صاحب الحساب',
+        user_role_label: (log.metadata?.created_by_name as string)?.trim() ? 'موظف' : 'صاحب الحساب',
+        timestamp: log.created_at,
+        details: log.action_description || 'تم إضافة عداد'
+      }))
+    const fromOwnershipTransferred: Activity[] = ownershipTransferredLogs
+      .filter(log => {
+        const bid = log.metadata?.building_id as string | undefined
+        return Boolean(bid && buildingIds.includes(bid))
+      })
+      .map(log => ({
+        id: `transfer-${log.id}`,
+        type: 'ownership_transferred' as const,
+        building_name: (log.metadata?.building_name as string) || '—',
+        building_id: (log.metadata?.building_id as string) || undefined,
+        user_name: (log.metadata?.created_by_name as string)?.trim() || 'صاحب الحساب',
+        user_role_label: (log.metadata?.created_by_name as string)?.trim() ? 'موظف' : 'صاحب الحساب',
+        timestamp: log.created_at,
+        details: log.action_description || 'نقل ملكية'
+      }))
+    const fromRemainingPaymentCollected: Activity[] = remainingPaymentCollectedLogs
+      .filter(log => {
+        const bid = log.metadata?.building_id as string | undefined
+        return Boolean(bid && buildingIds.includes(bid))
+      })
+      .map(log => ({
+        id: `remaining-${log.id}`,
+        type: 'remaining_payment_collected' as const,
+        building_name: (log.metadata?.building_name as string) || '—',
+        building_id: (log.metadata?.building_id as string) || undefined,
+        user_name: 'النظام',
+        user_role_label: 'النظام',
+        timestamp: log.created_at,
+        details: log.action_description || 'تم تأكيد تحصيل المبلغ المتبقي'
+      }))
+    const fromRemainingPaymentCollectedLate: Activity[] = remainingPaymentCollectedLateLogs
+      .filter(log => {
+        const bid = log.metadata?.building_id as string | undefined
+        return Boolean(bid && buildingIds.includes(bid))
+      })
+      .map(log => ({
+        id: `remaining-late-${log.id}`,
+        type: 'remaining_payment_collected_late' as const,
+        building_name: (log.metadata?.building_name as string) || '—',
+        building_id: (log.metadata?.building_id as string) || undefined,
+        user_name: 'النظام',
+        user_role_label: 'النظام',
+        timestamp: log.created_at,
+        details: log.action_description || 'تأخير في تحصيل المبلغ المتبقي — تم الدفع بعد تاريخ الاستحقاق'
+      }))
     return [...fromUnits, ...fromReservations, ...fromExpiredReservations, ...fromBuildings, ...fromAssoc, ...fromMeterAdded, ...fromOwnershipTransferred, ...fromRemainingPaymentCollected, ...fromRemainingPaymentCollectedLate]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 7)
@@ -1015,6 +1036,30 @@ export default function DashboardPage() {
     }
   }
 
+  /** رابط تفاعلي لكل نشاط حسب النوع والصلاحيات — يوجّه للصفحة المناسبة */
+  const getActivityLink = (activity: Activity): string => {
+    const bid = activity.building_id
+    switch (activity.type) {
+      case 'sold':
+        return bid ? `/dashboard/sales?buildingId=${encodeURIComponent(bid)}` : '/dashboard/sales'
+      case 'reserved':
+        return bid ? `/dashboard/reservations?buildingId=${encodeURIComponent(bid)}` : '/dashboard/reservations'
+      case 'add':
+        return bid && can('building_details') ? `/dashboard/buildings/details?buildingId=${encodeURIComponent(bid)}` : '/dashboard/buildings'
+      case 'association_end':
+        return bid && can('details_association') ? `/dashboard/buildings/details?buildingId=${encodeURIComponent(bid)}` : '/dashboard/buildings'
+      case 'meter_added':
+        return bid && can('details_electricity') ? `/dashboard/buildings/details?buildingId=${encodeURIComponent(bid)}#card-electricity` : '/dashboard/buildings'
+      case 'ownership_transferred':
+        return bid && can('deeds') ? `/dashboard/buildings/details?buildingId=${encodeURIComponent(bid)}` : '/dashboard/buildings'
+      case 'remaining_payment_collected':
+      case 'remaining_payment_collected_late':
+        return '/dashboard/sales'
+      default:
+        return bid ? `/dashboard/buildings/details?buildingId=${encodeURIComponent(bid)}` : '/dashboard/buildings'
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
@@ -1059,7 +1104,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100" dir="rtl">
       {/* تصميم الهيدر المعتمد: شريط شفاف + حاوية بيضاوية بيضاء واحدة (بدون تحية/تاريخ في الهيدر) — لا يُغيّر */}
       <header className="sticky top-0 z-20 border-b border-slate-200/50 bg-transparent">
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-2 md:pt-4 md:pb-3">
+        <div className="relative w-full max-w-full px-4 sm:px-6 lg:px-8 pt-3 pb-2 md:pt-4 md:pb-3">
           <div className="flex flex-col gap-3 rounded-2xl border border-white/80 bg-white/70 px-3 sm:px-4 lg:px-5 py-3 md:flex-row md:items-center md:justify-between md:min-h-[80px] shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
             {/* القسم الأيمن */}
             <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0 md:flex-1">
@@ -1401,10 +1446,10 @@ export default function DashboardPage() {
       )}
 
       {/* المحتوى الرئيسي */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-8">
         
         {/* بطاقات الإحصائيات المحدثة */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8 -mt-[9px]">
           {stats.map((stat, index) => (
             <Link
               key={index}
@@ -1460,7 +1505,7 @@ export default function DashboardPage() {
         </div>
 
         {/* إجراءات سريعة */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8 -mt-[9px]">
           {quickActions.map((action, index) => {
             const allowed = can(action.permission) || ('permissionAlt' in action && action.permissionAlt && can(action.permissionAlt))
             const showWithoutPermission = action.permission === 'buildings_create' || action.permission === 'statistics'
@@ -1507,11 +1552,11 @@ export default function DashboardPage() {
           })}
         </div>
 
-        {/* صفين من المحتوى */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* صفين من المحتوى — محاذاة الأسفل بين العمودين */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
           
           {/* العمود الأيمن - آخر النشاطات */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 flex flex-col min-h-0">
             
             {/* بطاقة النشاطات الأخيرة */}
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-shadow duration-300">
@@ -1522,21 +1567,24 @@ export default function DashboardPage() {
                   </div>
                   آخر النشاطات
                 </h2>
-                <Link href="/dashboard/activities" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1 hover:gap-2 transition-all group cursor-pointer">
-                  <span>عرض الكل</span>
-                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Link>
+                {can('activities') && (
+                  <Link href="/dashboard/activities" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1 hover:gap-2 transition-all group cursor-pointer">
+                    <span>عرض الكل</span>
+                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                )}
               </div>
 
               <div className="space-y-3">
                 {filteredActivities.length === 0 ? (
                   <div className="text-center py-8 text-gray-500 text-sm">لا توجد نشاطات بعد — ستظهر هنا عند إضافة عمارة أو بيع/حجز وحدة</div>
                 ) : filteredActivities.map((activity) => (
-                  <div
+                  <Link
                     key={activity.id}
-                    className="relative flex items-start gap-4 p-4 rounded-xl border border-transparent"
+                    href={getActivityLink(activity)}
+                    className="relative flex items-start gap-4 p-4 rounded-xl border border-transparent hover:border-gray-200 hover:bg-gray-50/80 transition-colors duration-200 cursor-pointer block no-underline text-inherit"
                   >
-                    <div className={`w-12 h-12 bg-gradient-to-br ${
+                    <div className={`w-12 h-12 flex-shrink-0 bg-gradient-to-br ${
                       activity.type === 'add' ? 'from-green-100 to-emerald-200' :
                       activity.type === 'edit' ? 'from-blue-100 to-cyan-200' :
                       activity.type === 'delete' ? 'from-red-100 to-rose-200' :
@@ -1555,7 +1603,7 @@ export default function DashboardPage() {
                       <div className="flex items-center justify-between mb-1.5">
                         <h4 className="font-bold text-gray-800 truncate">{activity.building_name}</h4>
                         <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                          <Clock className="w-3.5 h-3.5" />
+                          <Clock className="w-3.5 h-3.5 flex-shrink-0" />
                           <span>
                             {activity.type === 'association_end' && activity.endDate
                               ? `تاريخ النهاية: ${activity.endDate}`
@@ -1565,7 +1613,7 @@ export default function DashboardPage() {
                       </div>
                       <p className="text-sm text-gray-600 mb-2 leading-relaxed">{activity.details}</p>
                       <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 bg-gradient-to-br from-blue-400 to-purple-400 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                        <div className="w-5 h-5 bg-gradient-to-br from-blue-400 to-purple-400 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                           {activity.user_name.charAt(0).toUpperCase()}
                         </div>
                         <p className="text-xs text-gray-500">
@@ -1587,69 +1635,15 @@ export default function DashboardPage() {
                         </p>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>
 
-            {/* بطاقة التحديثات والتحليلات */}
-            <div className="relative bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 rounded-2xl shadow-2xl p-6 text-white overflow-hidden">
-              {/* Animated Background Pattern */}
-              <div className="absolute inset-0 opacity-10">
-                <div className="absolute inset-0" style={{
-                  backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 80%, white 1px, transparent 1px)',
-                  backgroundSize: '50px 50px'
-                }}></div>
-              </div>
-              
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 animate-pulse" />
-                    تحليلات الأداء
-                  </h3>
-                  <div className="bg-white/20 backdrop-blur-sm p-2.5 rounded-xl hover:bg-white/30 transition-colors cursor-pointer">
-                    <BarChart3 className="w-5 h-5" />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl hover:bg-white/20 transition-all cursor-pointer group">
-                    <div className="flex items-center gap-2 text-blue-100 text-sm mb-2">
-                      <TrendingUp className="w-4 h-4" />
-                      <span>نمو هذا الشهر</span>
-                    </div>
-                    <p className="text-3xl font-black group-hover:scale-110 transition-transform">+24%</p>
-                  </div>
-                  <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl hover:bg-white/20 transition-all cursor-pointer group">
-                    <div className="flex items-center gap-2 text-purple-100 text-sm mb-2">
-                      <Zap className="w-4 h-4" />
-                      <span>الوحدات الجديدة</span>
-                    </div>
-                    <p className="text-3xl font-black group-hover:scale-110 transition-transform">18</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <button className="flex-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm py-3 px-4 rounded-xl text-sm font-semibold transition-all hover:scale-105 hover:shadow-lg flex items-center justify-center gap-2">
-                    <Download className="w-4 h-4" />
-                    تقرير شهري
-                  </button>
-                  <button className="flex-1 bg-white hover:bg-gray-100 text-blue-600 py-3 px-4 rounded-xl text-sm font-semibold transition-all hover:scale-105 hover:shadow-lg flex items-center justify-center gap-2">
-                    <Upload className="w-4 h-4" />
-                    تصدير بيانات
-                  </button>
-                </div>
-              </div>
-              
-              {/* Decorative Elements */}
-              <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-              <div className="absolute -top-6 -left-6 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
-            </div>
           </div>
 
-          {/* العمود الأيسر - آخر العماير والتقويم */}
-          <div className="space-y-6">
+          {/* العمود الأيسر - آخر العماير والتقويم — محاذاة من تحت */}
+          <div className="flex flex-col gap-6 lg:items-stretch">
             
             {/* آخر العماير المضافة */}
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
@@ -1819,8 +1813,8 @@ export default function DashboardPage() {
             </div>
             )}
 
-            {/* بطاقة الأداء */}
-            <div className="bg-gradient-to-br from-green-600 to-emerald-600 rounded-2xl shadow-lg p-6 text-white">
+            {/* بطاقة مؤشرات الأداء — تتمدد لملء العمود ومحاذاة الأسفل مع آخر النشاطات */}
+            <div className="bg-gradient-to-br from-green-600 to-emerald-600 rounded-2xl shadow-lg p-6 text-white flex-1 min-h-0 flex flex-col">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">مؤشرات الأداء</h3>
                 <div className="flex items-center gap-2">
@@ -1857,16 +1851,6 @@ export default function DashboardPage() {
                   </div>
                   <div className="h-2 bg-white/20 rounded-full overflow-hidden">
                     <div className="h-full bg-red-300 rounded-full transition-all duration-500" style={{ width: `${soldPercentage}%` }} />
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-white/20">
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span>إجمالي الوحدات</span>
-                    <span className="font-bold">{totalUnits}</span>
-                  </div>
-                  <div className="text-xs text-green-100 mt-2">
-                    ✓ {availablePercentage}% متاح | ⏳ {reservedPercentage}% محجوز | ✓ {soldPercentage}% مباع
                   </div>
                 </div>
               </div>

@@ -156,36 +156,36 @@ export default function BuildingsPage() {
   const totalSoldUnits = Object.values(unitStatsByBuilding).reduce((sum, s) => sum + s.sold, 0)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100" dir="rtl">
-      {/* Header */}
-      <div className="sticky top-0 z-20 border-b border-slate-200/70 bg-gradient-to-b from-white/95 to-white/85 backdrop-blur-xl shadow-[0_4px_20px_rgba(15,23,42,0.06)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-3">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-2xl border border-white/80 bg-white/70 px-3 sm:px-4 lg:px-5 py-3 shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-sky-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/30 ring-1 ring-white/70 text-white flex-shrink-0">
-                <Building2 className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-lg sm:text-xl font-bold text-slate-800 leading-tight">إدارة العماير</h1>
-                <p className="text-xs text-slate-500/90">قائمة العماير المسجلة في النظام</p>
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100 p-4 sm:p-6 lg:p-8" dir="rtl">
+      <div className="max-w-7xl mx-auto">
+        {/* Header — نفس نمط التقارير والمبيعات والتسويق */}
+        <header className="relative rounded-2xl overflow-hidden mb-8 shadow-lg border border-gray-200/90 bg-gradient-to-br from-white to-gray-50">
+        <div className="absolute inset-0 bg-gradient-to-br from-sky-500 to-indigo-600 opacity-10" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_70%_0%,rgba(14,165,233,0.08),transparent)]" />
+        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-4 sm:px-5 sm:py-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex-shrink-0 w-11 h-11 rounded-2xl bg-gradient-to-br from-sky-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/25 ring-1 ring-white/70">
+              <Building2 className="w-5 h-5 text-white" />
             </div>
-
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-              <Link
-                href="/dashboard"
-                className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                لوحة التحكم
-              </Link>
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-xl font-bold text-gray-800 tracking-tight leading-tight">إدارة العماير</h1>
+              <p className="text-xs text-gray-500 mt-0.5">قائمة العماير المسجلة في النظام</p>
             </div>
           </div>
+          <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              لوحة التحكم
+            </Link>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Main Content */}
+        <div className="py-8">
         {/* Search + stats */}
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white/80 backdrop-blur p-4 sm:p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
@@ -432,5 +432,6 @@ export default function BuildingsPage() {
         </div>
       )}
     </div>
+  </div>
   )
 }

@@ -6,16 +6,16 @@ import { useRouter } from "next/navigation";
 import { Users, LayoutDashboard, Home, TrendingUp, BarChart3 } from "lucide-react";
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
 
-/** لوجو إدارة الملاك والمستثمرين — نفس أسلوب بطاقة لوحة التحكم */
+/** لوجو إدارة الملاك والمستثمرين — نفس مقاس ونمط هيدر إدارة العماير */
 function OwnersInvestorsLogo() {
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-teal-500/25 ring-2 ring-white/80">
-        <Users className="w-7 h-7 text-white" />
+    <div className="flex items-center gap-3 min-w-0">
+      <div className="flex-shrink-0 w-11 h-11 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-teal-500/25 ring-1 ring-white/70">
+        <Users className="w-5 h-5 text-white" />
       </div>
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-800 tracking-tight">إدارة الملاك والمستثمرين</h1>
-        <p className="text-xs sm:text-sm text-gray-500 mt-0.5">ملاك الوحدات المباعة والمستثمرين — إدارة وعرض البيانات</p>
+      <div className="min-w-0">
+        <h1 className="text-lg sm:text-xl font-bold text-gray-800 tracking-tight leading-tight">إدارة الملاك والمستثمرين</h1>
+        <p className="text-xs text-gray-500 mt-0.5">ملاك الوحدات المباعة والمستثمرين — إدارة وعرض البيانات</p>
       </div>
     </div>
   );
@@ -61,15 +61,17 @@ export default function OwnersInvestorsPage() {
         <header className="relative rounded-2xl overflow-hidden mb-8 shadow-lg border border-gray-200/90 bg-gradient-to-br from-white to-gray-50">
           <div className="absolute inset-0 bg-gradient-to-br from-teal-500 to-cyan-600 opacity-10" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_70%_0%,rgba(20,184,166,0.08),transparent)]" />
-          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 sm:p-6">
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-4 sm:px-5 sm:py-4">
             <OwnersInvestorsLogo />
-            <Link
-              href="/dashboard"
-              className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              لوحة التحكم
-            </Link>
+            <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                لوحة التحكم
+              </Link>
+            </div>
           </div>
         </header>
 

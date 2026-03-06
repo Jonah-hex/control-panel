@@ -1,4 +1,6 @@
 // src/app/auth/reset-password/page.tsx
+// هذه الصفحة تُفتح فقط عبر الرابط المرسل إلى بريد المستخدم (Supabase يثبت الجلسة من الرابط).
+// updateUser({ password }) يعمل فقط بجلسة صالحة، فلا يمكن تعيين كلمة مرور بدون الرابط.
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -70,8 +72,8 @@ export default function ResetPasswordPage() {
         router.refresh()
       }, 2000)
       
-    } catch (error: any) {
-      setError(error.message || 'فشل تحديث كلمة المرور. يرجى المحاولة مجدداً')
+    } catch {
+      setError('فشل تحديث كلمة المرور. استخدم الرابط المرسل إلى بريدك أو اطلب رابطاً جديداً من صفحة المستخدم.')
     } finally {
       setLoading(false)
     }

@@ -12,23 +12,16 @@ import {
   LayoutDashboard,
   User as UserIcon,
   Shield,
-  Building2,
-  FileText,
-  Users,
-  TrendingUp,
-  Calendar,
-  ShoppingCart,
-  Settings,
-  ChevronRight,
   CheckCircle,
   Mail,
   Briefcase,
   Phone,
-  Lock,
   ShieldCheck,
   Send,
   BadgeCheck,
   Crown,
+  Smartphone,
+  Clock,
 } from 'lucide-react'
 
 /** صلاحيات موجزة: عنوان المجموعة + مفاتيحها (لعرض ملخص "كامل" أو "ن صلاحية") */
@@ -41,17 +34,6 @@ const PERMISSION_GROUPS: { title: string; keys: PermissionKey[] }[] = [
   { title: 'التقارير والإعدادات', keys: ['statistics', 'activities', 'reports', 'security', 'settings'] },
 ]
 
-/** روابط سريعة حسب الصلاحية */
-const QUICK_LINKS: { href: string; label: string; icon: React.ReactNode; permission?: PermissionKey }[] = [
-  { href: '/dashboard', label: 'لوحة التحكم', icon: <LayoutDashboard className="w-5 h-5" /> },
-  { href: '/dashboard/buildings', label: 'قائمة العماير', icon: <Building2 className="w-5 h-5" />, permission: 'buildings' },
-  { href: '/dashboard/reservations', label: 'سجل الحجوزات', icon: <Calendar className="w-5 h-5" />, permission: 'reservations' },
-  { href: '/dashboard/sales', label: 'سجل المبيعات', icon: <ShoppingCart className="w-5 h-5" />, permission: 'sales' },
-  { href: '/dashboard/owners-investors/owners', label: 'الملاك', icon: <Users className="w-5 h-5" />, permission: 'owners_view' },
-  { href: '/dashboard/owners-investors/investors', label: 'المستثمرون', icon: <TrendingUp className="w-5 h-5" />, permission: 'investors_view' },
-  { href: '/user/settings', label: 'الإعدادات المتقدمة', icon: <Settings className="w-5 h-5" />, permission: 'settings' },
-]
-
 export default function UserPage() {
   const router = useRouter()
   const { user, ready, can, currentUserDisplayName, isOwner } = useDashboardAuth()
@@ -62,7 +44,11 @@ export default function UserPage() {
   const [phoneEditing, setPhoneEditing] = useState(false)
   const [phoneEdit, setPhoneEdit] = useState('')
   const [phoneSaving, setPhoneSaving] = useState(false)
+  const [sessions, setSessions] = useState<Array<{ id: string; last_activity_at: string }>>([])
   const supabase = createClient()
+
+  const formatDate = (date: string) =>
+    new Date(date).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
   useEffect(() => {
     if (!ready || !user) return
@@ -98,6 +84,20 @@ export default function UserPage() {
     }
   }, [ready, user, router])
 
+  useEffect(() => {
+    if (!user) return
+    const load = async () => {
+      try {
+        const res = await fetch('/api/auth/sessions')
+        const data = await res.json()
+        if (data?.data) setSessions(data.data)
+      } catch {
+        // تجاهل فشل تحميل الجلسات في صفحة المستخدم
+      }
+    }
+    load()
+  }, [user])
+
   if (!ready || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 flex items-center justify-center" dir="rtl">
@@ -107,6 +107,15 @@ export default function UserPage() {
   }
 
   const email = (user as { email?: string }).email ?? ''
+
+  /** إخفاء جزء من البريد للعرض فقط (مثال: alb***@gmail.com) */
+  const maskEmail = (e: string) => {
+    if (!e || !e.includes('@')) return e
+    const [local, domain] = e.split('@')
+    if (local.length <= 2) return `${local}***@${domain}`
+    return `${local.slice(0, 3)}***@${domain}`
+  }
+  const emailDisplay = maskEmail(email)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100" dir="rtl">
@@ -155,10 +164,6 @@ export default function UserPage() {
                   {planName}
                 </span>
               )}
-            </div>
-            <div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
-              <Mail className="w-4 h-4 text-slate-400" />
-              <span className="text-slate-600 text-sm dir-ltr">{email}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
               <Phone className="w-4 h-4 text-slate-400 flex-shrink-0" />
@@ -229,8 +234,8 @@ export default function UserPage() {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
-              <span className="text-slate-500 text-xs">الدور</span>
-              <span className="font-medium text-slate-800">
+              <span className="text-slate-500 text-sm">الدور</span>
+              <span className="font-medium text-slate-800 text-sm">
                 {isOwner ? 'مدير النظام (مالك الحساب)' : 'موظف'}
               </span>
             </div>
@@ -251,14 +256,14 @@ export default function UserPage() {
               تأمين الحساب
             </h2>
           </div>
+          <p className="px-5 py-4 text-sm text-slate-600 leading-relaxed border-b border-slate-100">
+            لحماية حسابك، نرسل <strong>رابطاً آمناً</strong> إلى البريد الإلكتروني المسجّل في النظام. استخدم الرابط خلال المهلة المحددة (عادة ساعة) لتعيين كلمة مرور جديدة.
+          </p>
           <div className="p-5 space-y-4">
-            <p className="text-sm text-slate-600 leading-relaxed">
-              لحماية حسابك، نرسل <strong>رابطاً آمناً</strong> إلى البريد الإلكتروني المسجّل في النظام. استخدم الرابط خلال المهلة المحددة (عادة ساعة) لتعيين كلمة مرور جديدة من صفحة آمنة.
-            </p>
             <div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
               <Mail className="w-4 h-4 text-slate-400" />
               <span className="text-xs text-slate-500">سيُرسل الرابط إلى:</span>
-              <span className="text-sm font-medium text-slate-800 dir-ltr">{email || '—'}</span>
+              <span className="text-sm font-medium text-slate-800 dir-ltr">{emailDisplay || '—'}</span>
             </div>
             <button
               type="button"
@@ -281,6 +286,50 @@ export default function UserPage() {
               <Send className="w-4 h-4" />
               {resetLinkSending ? 'جاري الإرسال...' : 'إرسال رابط تغيير كلمة المرور إلى بريدي'}
             </button>
+          </div>
+        </section>
+
+        {/* ملخص الأمان — الجلسات وحالة الحساب */}
+        <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 bg-gradient-to-l from-emerald-50/80 to-white">
+            <h2 className="font-semibold text-slate-800 flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" />
+              ملخص الأمان
+            </h2>
+          </div>
+          <div className="p-5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+              <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Smartphone className="w-5 h-5 text-slate-500" />
+                  <span className="text-sm font-medium text-slate-600">الجلسات النشطة</span>
+                </div>
+                <p className="text-2xl font-bold text-slate-800">{sessions.length}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Clock className="w-5 h-5 text-slate-500" />
+                  <span className="text-sm font-medium text-slate-600">آخر نشاط</span>
+                </div>
+                <p className="text-sm text-slate-700">
+                  {sessions.length > 0 ? formatDate(sessions[0].last_activity_at) : 'لا توجد جلسات'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Shield className="w-5 h-5 text-slate-500" />
+                  <span className="text-sm font-medium text-slate-600">حالة الأمان</span>
+                </div>
+                <p className="text-sm font-medium text-emerald-600">✓ آمن</p>
+              </div>
+            </div>
+            <Link
+              href="/dashboard/security"
+              className="block rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-slate-100/50 p-4 transition text-slate-700 no-underline"
+            >
+              <h3 className="font-semibold text-slate-800 mb-1">المصادقة الثنائية</h3>
+              <p className="text-sm text-slate-500">قريباً: سيتم توفير إعدادات المصادقة الثنائية من صفحة الأمان</p>
+            </Link>
           </div>
         </section>
 
@@ -308,38 +357,6 @@ export default function UserPage() {
                       <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
                       {full ? 'كامل' : `${allowed.length} صلاحية`}
                     </span>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        </section>
-
-        {/* روابط سريعة */}
-        <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50">
-            <h2 className="font-semibold text-slate-800 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-slate-500" />
-              روابط سريعة للعمل
-            </h2>
-          </div>
-          <div className="p-5">
-            <ul className="space-y-1">
-              {QUICK_LINKS.map((link) => {
-                const show = !link.permission || can(link.permission)
-                if (!show) return null
-                return (
-                  <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      className="flex items-center justify-between gap-3 w-full px-4 py-3 rounded-xl text-slate-700 hover:bg-slate-50 border border-transparent hover:border-slate-200 transition"
-                    >
-                      <span className="flex items-center gap-3">
-                        <span className="text-slate-400">{link.icon}</span>
-                        <span className="font-medium text-sm">{link.label}</span>
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-slate-400" />
-                    </Link>
                   </li>
                 )
               })}

@@ -369,32 +369,35 @@ export default function ActivitiesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100" dir="rtl">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center justify-between py-5 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl">
-                <Activity className="w-6 h-6 text-white" />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 sm:p-6 lg:p-8" dir="rtl">
+      <div className="max-w-4xl mx-auto">
+        {/* هيدر موحد — نفس نمط إدارة العماير */}
+        <header className="relative rounded-2xl overflow-hidden mb-8 shadow-lg border border-gray-200/90 bg-gradient-to-br from-white to-gray-50">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 opacity-10" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_70%_0%,rgba(99,102,241,0.08),transparent)]" />
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-4 sm:px-5 sm:py-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex-shrink-0 w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 ring-1 ring-white/70">
+                <Activity className="w-5 h-5 text-white" />
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-800">سجل النشاطات</h1>
-                <p className="text-sm text-gray-500">{filteredActivities.length} نشاط</p>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-bold text-gray-800 tracking-tight leading-tight">سجل النشاطات</h1>
+                <p className="text-xs text-gray-500 mt-0.5">{filteredActivities.length} نشاط</p>
               </div>
             </div>
-            <Link
-              href="/dashboard"
-              className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              لوحة التحكم
-            </Link>
+            <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                لوحة التحكم
+              </Link>
+            </div>
           </div>
-        </div>
-      </div>
+        </header>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="pb-6">
         {/* فلتر حسب النوع */}
         <div className="flex flex-wrap gap-2 mb-6">
           <Filter className="w-4 h-4 text-gray-500 mt-1" />
@@ -474,6 +477,7 @@ export default function ActivitiesPage() {
               ))}
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>

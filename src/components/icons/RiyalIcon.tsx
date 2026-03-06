@@ -26,7 +26,7 @@ export function RiyalIcon({ className, ...props }: SVGProps<SVGSVGElement>) {
         x="12"
         y="17"
         textAnchor="middle"
-        fontSize="15"
+        fontSize="22"
         fontWeight="700"
         fill="currentColor"
         stroke="none"

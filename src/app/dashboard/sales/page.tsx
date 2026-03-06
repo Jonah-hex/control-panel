@@ -422,19 +422,19 @@ export default function SalesPage() {
       <div className="max-w-6xl mx-auto relative">
         {/* هيدر احترافي */}
         <header className="relative rounded-2xl overflow-hidden mb-8 shadow-lg border border-gray-200/90 bg-gradient-to-br from-white to-gray-50">
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-orange-600/10" />
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-600 opacity-10" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_70%_0%,rgba(245,158,11,0.08),transparent)]" />
-          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 sm:p-6">
-            <div className="flex items-center gap-3">
-              <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/25 ring-2 ring-white/80">
-                <RiyalIcon className="w-7 h-7 text-white" />
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-4 sm:px-5 sm:py-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex-shrink-0 w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/25 ring-1 ring-white/70">
+                <RiyalIcon className="w-5 h-5 text-white" />
               </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-800 tracking-tight">إدارة التسويق والمبيعات</h1>
-                <p className="text-xs sm:text-sm text-gray-500 mt-0.5">سجل المبيعات وإتمام نقل الملكية — تتبع عمليات البيع والمدفوعات</p>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-bold text-gray-800 tracking-tight leading-tight">إدارة التسويق والمبيعات</h1>
+                <p className="text-xs text-gray-500 mt-0.5">سجل المبيعات وإتمام نقل الملكية — تتبع عمليات البيع والمدفوعات</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
               <Link
                 href="/dashboard/marketing"
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition"
@@ -443,7 +443,7 @@ export default function SalesPage() {
               </Link>
               <Link
                 href="/dashboard"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
               >
                 <LayoutDashboard className="w-4 h-4" />
                 لوحة التحكم
@@ -565,7 +565,7 @@ export default function SalesPage() {
                         <select
                           value={reservationsPageSize}
                           onChange={(e) => { setReservationsPageSize(Number(e.target.value)); setReservationsPage(1); }}
-                          className="rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-0 transition-all duration-200"
                         >
                           {RESERVATIONS_PAGE_SIZES.map((n) => (
                             <option key={n} value={n}>{n}</option>
@@ -580,7 +580,7 @@ export default function SalesPage() {
                           type="button"
                           onClick={() => setReservationsPage((p) => Math.max(1, p - 1))}
                           disabled={reservationsPage <= 1}
-                          className="min-w-[2.5rem] py-1.5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm focus:outline-none focus:ring-0"
                         >
                           السابق
                         </button>
@@ -591,7 +591,7 @@ export default function SalesPage() {
                           type="button"
                           onClick={() => setReservationsPage((p) => Math.min(reservationsTotalPages, p + 1))}
                           disabled={reservationsPage >= reservationsTotalPages}
-                          className="min-w-[2.5rem] py-1.5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm focus:outline-none focus:ring-0"
                         >
                           التالي
                         </button>
@@ -698,7 +698,7 @@ export default function SalesPage() {
                         <select
                           value={salesPageSize}
                           onChange={(e) => { setSalesPageSize(Number(e.target.value)); setSalesPage(1); }}
-                          className="rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-0 transition-all duration-200"
                         >
                           {SALES_PAGE_SIZES.map((n) => (
                             <option key={n} value={n}>{n}</option>
@@ -713,7 +713,7 @@ export default function SalesPage() {
                           type="button"
                           onClick={() => setSalesPage((p) => Math.max(1, p - 1))}
                           disabled={salesPage <= 1}
-                          className="min-w-[2.5rem] py-1.5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm focus:outline-none focus:ring-0"
                         >
                           السابق
                         </button>
@@ -724,7 +724,7 @@ export default function SalesPage() {
                           type="button"
                           onClick={() => setSalesPage((p) => Math.min(salesTotalPages, p + 1))}
                           disabled={salesPage >= salesTotalPages}
-                          className="min-w-[2.5rem] py-1.5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm focus:outline-none focus:ring-0"
                         >
                           التالي
                         </button>
