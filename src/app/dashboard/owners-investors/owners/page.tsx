@@ -252,12 +252,13 @@ export default function OwnersPage() {
       const newCount = (assoc.registeredUnitsCount ?? 0) + 1;
       const updatedAssoc = { ...assoc, registeredUnitsCount: newCount };
 
-      const [unitErr, buildingErr] = await Promise.all([
+      const [unitRes, buildingRes] = await Promise.all([
         supabase.from("units").update({ owner_association_registered: true }).eq("id", unit.id),
         supabase.from("buildings").update({ owner_association: JSON.stringify(updatedAssoc) }).eq("id", unit.building_id),
       ]);
-      if (unitErr || buildingErr) {
-        showToast(unitErr?.message || buildingErr?.message || "حدث خطأ أثناء التسجيل.", "error");
+      const err = unitRes.error || buildingRes.error;
+      if (err) {
+        showToast(err.message || "حدث خطأ أثناء التسجيل.", "error");
         return;
       }
       setOwnerUnits((prev) =>

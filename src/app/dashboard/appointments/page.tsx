@@ -30,7 +30,7 @@ interface Appointment {
   notes: string | null;
   status: AppointmentStatus;
   created_at: string;
-  buildings?: { id: string; name: string } | null;
+  buildings?: { id: string; name: string }[] | null;
 }
 
 const TYPE_LABELS: Record<AppointmentType, string> = {
@@ -295,10 +295,10 @@ export default function AppointmentsPage() {
                         <span className="px-2 py-0.5 rounded-lg bg-blue-100 text-blue-800 text-xs font-medium">
                           {TYPE_LABELS[a.type]}
                         </span>
-                        {a.buildings?.name && (
+                        {a.buildings?.[0]?.name && (
                           <span className="flex items-center gap-1 text-xs text-gray-500">
                             <Building2 className="w-3 h-3" />
-                            {a.buildings.name}
+                            {a.buildings[0].name}
                           </span>
                         )}
                         <span className="px-2 py-0.5 rounded-lg bg-gray-100 text-gray-600 text-xs">

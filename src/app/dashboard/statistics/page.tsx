@@ -246,7 +246,6 @@ export default function StatisticsPage() {
         unitTypeStats,
         roomsDistribution,
         salesCount,
-        totalRevenueFromSales,
         conversionRate,
         portfolioValueAvailable,
         minUnitPrice,

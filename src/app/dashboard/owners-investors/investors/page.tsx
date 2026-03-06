@@ -306,7 +306,7 @@ export default function InvestorsPage() {
           const enriched = (uiData as UnitInvestmentRow[]).map((r) => {
             const b = buildingList.find((x) => x.id === r.building_id) ?? null;
             const u = unitsList.find((x) => x.id === r.unit_id) ?? null;
-            return { ...r, building: b, unit: u };
+            return { ...r, building: b, unit: u ? { unit_number: String(u.unit_number), floor: u.floor } : null };
           });
           setUnitInvestments(enriched);
         } else {
@@ -343,7 +343,7 @@ export default function InvestorsPage() {
           const u = units.find((x) => x.id === r.unit_id) ?? null;
           const resalePrice = r.resale_sale_id ? sales.find((s) => s.id === r.resale_sale_id)?.sale_price ?? null : null;
           const profit = resalePrice != null ? resalePrice - r.purchase_price : null;
-          return { ...r, building: b, unit: u, resalePrice, profit };
+          return { ...r, building: b, unit: u ? { unit_number: String(u.unit_number), floor: u.floor } : null, resalePrice, profit };
         });
         setUnitInvestments(enriched);
         const updated = enriched.find((x) => x.id === viewingUnitInvestment.id);
@@ -376,7 +376,7 @@ export default function InvestorsPage() {
           const u = units.find((x) => x.id === r.unit_id) ?? null;
           const resalePrice = r.resale_sale_id ? sales.find((s) => s.id === r.resale_sale_id)?.sale_price ?? null : null;
           const profit = resalePrice != null ? resalePrice - r.purchase_price : null;
-          return { ...r, building: b, unit: u, resalePrice, profit };
+          return { ...r, building: b, unit: u ? { unit_number: String(u.unit_number), floor: u.floor } : null, resalePrice, profit };
         });
         setUnitInvestments(enriched);
       }
@@ -707,7 +707,7 @@ export default function InvestorsPage() {
         const enriched = (data as UnitInvestmentRow[]).map((r) => {
           const b = buildings.find((x) => x.id === r.building_id) ?? null;
           const u = units.find((x) => x.id === r.unit_id) ?? null;
-          return { ...r, building: b, unit: u };
+          return { ...r, building: b, unit: u ? { unit_number: String(u.unit_number), floor: u.floor } : null };
         });
         setUnitInvestments(enriched);
       }

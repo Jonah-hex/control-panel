@@ -319,7 +319,7 @@ export default function SalesPage() {
       const { data: user } = await supabase.auth.getUser();
       const buildingName = (selectedSale as SaleRow & { buildings?: { name: string } | null }).buildings?.name ?? "—";
       await supabase.from("activity_logs").insert({
-        user_id: user?.data?.user?.id ?? null,
+        user_id: user?.user?.id ?? null,
         action_type: "remaining_payment_collected",
         action_description: `تأكيد تحصيل المتبقي — بيع ${selectedSale.id} — ${Number(selectedSale.remaining_payment).toLocaleString("en")} ر.س — تحوّل إلى دفع مكتمل`,
         metadata: {
@@ -334,7 +334,7 @@ export default function SalesPage() {
       });
       if (isLate && selectedSale.remaining_payment_due_date) {
         await supabase.from("activity_logs").insert({
-          user_id: user?.data?.user?.id ?? null,
+          user_id: user?.user?.id ?? null,
           action_type: "remaining_payment_collected_late",
           action_description: `تأخير في تحصيل المتبقي — كان الاستحقاق ${new Date(selectedSale.remaining_payment_due_date).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })} — تم الدفع في ${new Date(collectedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })} — ${buildingName} — ${Number(selectedSale.remaining_payment).toLocaleString("en")} ر.س`,
           metadata: {
@@ -905,8 +905,8 @@ export default function SalesPage() {
                         بيانات المسوق
                       </h2>
                       <div className="bg-slate-50 rounded-xl p-4 space-y-2">
-                        {(saleLinkedReservation?.marketer_name ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">اسم المسوق</span><span className="font-medium">{saleLinkedReservation.marketer_name}</span></p>}
-                        {(saleLinkedReservation?.marketer_phone ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">جوال المسوق</span><span className="font-medium dir-ltr">{saleLinkedReservation.marketer_phone}</span></p>}
+                        {(saleLinkedReservation?.marketer_name ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">اسم المسوق</span><span className="font-medium">{saleLinkedReservation?.marketer_name}</span></p>}
+                        {(saleLinkedReservation?.marketer_phone ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">جوال المسوق</span><span className="font-medium dir-ltr">{saleLinkedReservation?.marketer_phone}</span></p>}
                         <p className="flex justify-between text-sm"><span className="text-slate-500">عمولة البيع</span><span className="font-medium">{selectedSale.commission_amount != null ? `${Number(selectedSale.commission_amount).toLocaleString("en")} ر.س` : "لا يوجد عمولة بيع"}</span></p>
                       </div>
                     </section>
@@ -926,8 +926,8 @@ export default function SalesPage() {
                         </>
                       )}
                       {selectedSaleUnit?.transfer_amount != null && Number(selectedSaleUnit.transfer_amount) > 0 && <p className="flex justify-between text-sm"><span className="text-slate-500">مبلغ الحوالة</span><span className="font-medium dir-ltr">{Number(selectedSaleUnit.transfer_amount).toLocaleString("en")} ر.س</span></p>}
-                      {(selectedSaleUnit?.transfer_bank_name ?? "").toString().trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">اسم البنك (تحويل)</span><span className="font-medium">{String(selectedSaleUnit.transfer_bank_name)}</span></p>}
-                      {(selectedSaleUnit?.transfer_reference_number ?? "").toString().trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">رقم الحوالة</span><span className="font-medium dir-ltr">{String(selectedSaleUnit.transfer_reference_number)}</span></p>}
+                      {(selectedSaleUnit?.transfer_bank_name ?? "").toString().trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">اسم البنك (تحويل)</span><span className="font-medium">{String(selectedSaleUnit?.transfer_bank_name ?? "")}</span></p>}
+                      {(selectedSaleUnit?.transfer_reference_number ?? "").toString().trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">رقم الحوالة</span><span className="font-medium dir-ltr">{String(selectedSaleUnit?.transfer_reference_number ?? "")}</span></p>}
                       {((selectedSaleUnit?.transfer_bank_name ?? "").toString().trim() || (selectedSaleUnit?.transfer_amount != null && Number(selectedSaleUnit.transfer_amount) > 0) || (selectedSaleUnit?.transfer_reference_number ?? "").toString().trim()) && <div className="border-t border-slate-200/80 my-2" />}
                       {selectedSaleUnit?.transfer_check_amount != null && Number(selectedSaleUnit.transfer_check_amount) > 0 && (
                         <>
@@ -975,7 +975,7 @@ export default function SalesPage() {
                         تفاصيل نقل الملكية والوحدة
                       </h2>
                       <div className="bg-slate-50 rounded-xl p-4 space-y-2">
-                        {(selectedSaleUnit?.previous_owner_name ?? "").toString().trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">المالك السابق</span><span className="font-medium">{String(selectedSaleUnit.previous_owner_name)}</span></p>}
+                        {(selectedSaleUnit?.previous_owner_name ?? "").toString().trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">المالك السابق</span><span className="font-medium">{String(selectedSaleUnit?.previous_owner_name ?? "")}</span></p>}
                         {selectedSaleUnit && <p className="flex justify-between text-sm"><span className="text-slate-500">نقل عداد الكهرباء مع الوحدة</span><span className="font-medium">{selectedSaleUnit.electricity_meter_transferred_with_sale === true ? "نعم" : "لا"}</span></p>}
                         {selectedSaleUnit && <p className="flex justify-between text-sm"><span className="text-slate-500">حالة غرفة السائق</span><span className="font-medium">{selectedSaleUnit.driver_room_number != null && String(selectedSaleUnit.driver_room_number).trim() ? `رقم ${String(selectedSaleUnit.driver_room_number)} — ${selectedSaleUnit.driver_room_transferred_with_sale === true ? "تم النقل مع الوحدة" : "لم يُنقل مع الوحدة"}` : "غير مسجّلة"}</span></p>}
                         <p className="flex justify-between text-sm"><span className="text-slate-500">الاستلام</span><span className="font-medium dir-ltr">{selectedSaleHandover ? `تم — ${selectedSaleHandover.handover_date ? new Date(selectedSaleHandover.handover_date).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) : ""}` : "لم يُسجّل استلام بعد"}</span></p>

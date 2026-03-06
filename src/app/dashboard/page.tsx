@@ -248,7 +248,14 @@ export default function DashboardPage() {
             .gte('scheduled_at', new Date().toISOString())
             .order('scheduled_at', { ascending: true })
             .limit(5)
-          setUpcomingAppointments((data as Array<{ id: string; title: string; scheduled_at: string; type: string; buildings?: { name: string } | null }>) || [])
+          const normalized = (data || []).map((a: { id: string; title: string; scheduled_at: string; type: string; buildings?: { name: string } | { name: string }[] | null }) => ({
+            id: a.id,
+            title: a.title,
+            scheduled_at: a.scheduled_at,
+            type: a.type,
+            buildings: Array.isArray(a.buildings) ? (a.buildings[0] ?? null) : a.buildings ?? null
+          }))
+          setUpcomingAppointments(normalized)
         } catch {
           setUpcomingAppointments([])
         }
@@ -1279,7 +1286,7 @@ export default function DashboardPage() {
                                     </Link>
                                   )}
                                   {item.type === 'cancelled' && (
-                                    <Link href={`/dashboard/reservations${(item.log.metadata?.building_id as string) ? `?buildingId=${item.log.metadata.building_id}` : ''}`} onClick={() => setNotificationsOpen(false)} className="flex items-start gap-3 flex-1 min-w-0">
+                                    <Link href={`/dashboard/reservations${item.log.metadata?.building_id ? `?buildingId=${String(item.log.metadata.building_id)}` : ''}`} onClick={() => setNotificationsOpen(false)} className="flex items-start gap-3 flex-1 min-w-0">
                                       <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-red-600"><Trash2 className="w-5 h-5" /></span>
                                       <div className="flex-1 min-w-0">
                                         <p className="text-sm font-semibold text-gray-800">إلغاء حجز</p>
@@ -1289,7 +1296,7 @@ export default function DashboardPage() {
                                     </Link>
                                   )}
                                   {item.type === 'refunded' && (
-                                    <Link href={`/dashboard/reservations${(item.log.metadata?.building_id as string) ? `?buildingId=${item.log.metadata.building_id}` : ''}`} onClick={() => setNotificationsOpen(false)} className="flex items-start gap-3 flex-1 min-w-0">
+                                    <Link href={`/dashboard/reservations${item.log.metadata?.building_id ? `?buildingId=${String(item.log.metadata.building_id)}` : ''}`} onClick={() => setNotificationsOpen(false)} className="flex items-start gap-3 flex-1 min-w-0">
                                       <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600"><ArrowRightLeft className="w-5 h-5" /></span>
                                       <div className="flex-1 min-w-0">
                                         <p className="text-sm font-semibold text-gray-800">استرداد عربون</p>

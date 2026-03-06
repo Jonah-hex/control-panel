@@ -97,7 +97,11 @@ export default function TasksPage() {
       setLoading(false);
       return;
     }
-    setTasks((data as Task[]) || []);
+    const normalized = (data || []).map((t: Record<string, unknown>) => ({
+      ...t,
+      buildings: Array.isArray(t.buildings) ? (t.buildings[0] ?? null) : (t.buildings ?? null)
+    })) as Task[];
+    setTasks(normalized);
     setLoading(false);
   }, [effectiveOwnerId, supabase]);
 

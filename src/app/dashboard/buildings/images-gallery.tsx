@@ -18,6 +18,8 @@ interface GalleryProps {
   images: string[];
   onAdd: (files: FileList) => void | Promise<void>;
   onDelete: (idx: number) => void | Promise<void>;
+  onDownload?: (url: string) => void;
+  onShareCopy?: () => void;
   uploading?: boolean;
   emptyMessage?: string;
 }
@@ -27,6 +29,8 @@ export default function ImagesGallery({
   images,
   onAdd,
   onDelete,
+  onDownload: _onDownload,
+  onShareCopy: _onShareCopy,
   uploading = false,
   emptyMessage = "لا توجد صور بعد. اسحب الصور هنا أو انقر للرفع.",
 }: GalleryProps) {

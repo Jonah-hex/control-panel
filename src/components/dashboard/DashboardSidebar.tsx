@@ -28,7 +28,7 @@ import { createClient } from '@/lib/supabase/client'
 type NavItem = {
   href: string
   label: string
-  icon: React.ComponentType<{ size?: number; className?: string }>
+  icon: React.ComponentType<{ size?: number | string; className?: string }>
   permission?: string
 }
 const navConfig: NavItem[] = [
