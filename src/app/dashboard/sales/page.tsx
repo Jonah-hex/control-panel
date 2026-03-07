@@ -19,6 +19,7 @@ import {
   User,
   MapPin,
   ClipboardCheck,
+  CalendarClock,
 } from "lucide-react";
 import { RiyalIcon } from "@/components/icons/RiyalIcon";
 import { UnitStatusBadge } from "@/components/UnitStatusBadge";
@@ -139,6 +140,16 @@ export default function SalesPage() {
   const [selectedSaleUnit, setSelectedSaleUnit] = useState<Record<string, unknown> | null>(null);
   const [selectedSaleHandover, setSelectedSaleHandover] = useState<{ handover_date: string; status: string } | null>(null);
   const [confirmingRemaining, setConfirmingRemaining] = useState(false);
+  const [confirmRemainingCollectOpen, setConfirmRemainingCollectOpen] = useState(false);
+  const [postponeDueDateOpen, setPostponeDueDateOpen] = useState(false);
+  const [postponeNewDueDate, setPostponeNewDueDate] = useState("");
+  const [postponingRemaining, setPostponingRemaining] = useState(false);
+
+  useEffect(() => {
+    setPostponeDueDateOpen(false);
+    setPostponeNewDueDate("");
+    setConfirmRemainingCollectOpen(false);
+  }, [selectedSale?.id]);
 
   useEffect(() => {
     if (!selectedSale?.id) {
@@ -361,6 +372,47 @@ export default function SalesPage() {
       showToast("حدث خطأ أثناء التأكيد", "error");
     } finally {
       setConfirmingRemaining(false);
+    }
+  };
+
+  /** تأجيل استحقاق المبلغ المتبقي — تحديث تاريخ الاستحقاق فقط */
+  const handlePostponeRemainingDueDate = async () => {
+    if (!selectedSale?.id || selectedSale.payment_status !== "partial" || (selectedSale.remaining_payment ?? 0) <= 0) return;
+    const newDate = postponeNewDueDate.trim();
+    if (!newDate) {
+      showToast("اختر تاريخ استحقاق جديد", "error");
+      return;
+    }
+    const parsed = new Date(newDate + "T12:00:00");
+    if (Number.isNaN(parsed.getTime())) {
+      showToast("تاريخ غير صالح", "error");
+      return;
+    }
+    setPostponingRemaining(true);
+    try {
+      const dueDateIso = parsed.toISOString().slice(0, 10);
+      const { error } = await supabase
+        .from("sales")
+        .update({
+          remaining_payment_due_date: dueDateIso,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", selectedSale.id);
+      if (error) {
+        showToast(error.message || "تعذر تحديث تاريخ الاستحقاق", "error");
+        setPostponingRemaining(false);
+        return;
+      }
+      setSelectedSale({ ...selectedSale, remaining_payment_due_date: dueDateIso });
+      const { rows } = await fetchSalesWithRelations();
+      setSales(rows);
+      setPostponeDueDateOpen(false);
+      setPostponeNewDueDate("");
+      showToast("تم تأجيل استحقاق المبلغ المتبقي إلى " + new Date(dueDateIso).toLocaleDateString("ar-SA", { day: "numeric", month: "long", year: "numeric" }));
+    } catch {
+      showToast("حدث خطأ أثناء التأجيل", "error");
+    } finally {
+      setPostponingRemaining(false);
     }
   };
 
@@ -952,16 +1004,86 @@ export default function SalesPage() {
                           {selectedSale.payment_status === "completed" ? "مكتمل" : selectedSale.payment_status === "partial" ? "جزئي" : "قيد الانتظار"}
                         </span></p>
                       {selectedSale.payment_status === "partial" && (selectedSale.remaining_payment ?? 0) > 0 && (
-                        <div className="mt-3 pt-3 border-t border-slate-100">
+                        <div className="mt-3 pt-3 border-t border-slate-100 space-y-3">
                           <button
                             type="button"
-                            onClick={handleConfirmRemainingCollected}
+                            onClick={() => setConfirmRemainingCollectOpen(true)}
                             disabled={confirmingRemaining}
                             className="inline-flex items-center gap-2 w-full justify-center px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
                           >
                             <ClipboardCheck className="w-4 h-4" />
                             {confirmingRemaining ? "جاري التأكيد..." : "تأكيد تحصيل المتبقي"}
                           </button>
+                          {confirmRemainingCollectOpen && (
+                            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={() => setConfirmRemainingCollectOpen(false)}>
+                              <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+                                <p className="text-slate-800 font-medium text-center">
+                                  تأكيد استحقاق المبلغ: <span className="dir-ltr font-bold text-emerald-700">{Number(selectedSale.remaining_payment).toLocaleString("en")} ر.س</span>
+                                </p>
+                                <p className="text-sm text-slate-500 text-center">هل أنت متأكد من تأكيد تحصيل المبلغ المتبقي؟ سيتم تحديث حالة الدفع إلى مكتمل.</p>
+                                <div className="flex gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setConfirmRemainingCollectOpen(false);
+                                      handleConfirmRemainingCollected();
+                                    }}
+                                    disabled={confirmingRemaining}
+                                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                  >
+                                    {confirmingRemaining ? "جاري..." : "تأكيد"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmRemainingCollectOpen(false)}
+                                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50"
+                                  >
+                                    إلغاء
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          {!postponeDueDateOpen ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPostponeDueDateOpen(true);
+                                setPostponeNewDueDate(selectedSale.remaining_payment_due_date?.slice(0, 10) ?? "");
+                              }}
+                              className="inline-flex items-center gap-2 w-full justify-center px-4 py-2.5 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-sm font-medium hover:bg-amber-100 transition"
+                            >
+                              <CalendarClock className="w-4 h-4" />
+                              تأجيل الدفعة المتبقية
+                            </button>
+                          ) : (
+                            <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 space-y-2">
+                              <label className="block text-sm font-medium text-slate-700">تاريخ استحقاق جديد</label>
+                              <input
+                                type="date"
+                                value={postponeNewDueDate}
+                                onChange={(e) => setPostponeNewDueDate(e.target.value)}
+                                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={handlePostponeRemainingDueDate}
+                                  disabled={postponingRemaining || !postponeNewDueDate.trim()}
+                                  className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                >
+                                  {postponingRemaining ? "جاري الحفظ..." : "تأكيد التأجيل"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setPostponeDueDateOpen(false); setPostponeNewDueDate(""); }}
+                                  className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50"
+                                >
+                                  إلغاء
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                       {(selectedSale.notes ?? "").trim() && <p className="text-sm mt-2"><span className="text-slate-500 block mb-1">ملاحظات</span><span className="font-medium">{(selectedSale.notes ?? "").replace(/نقل ملكية/g, "نقل الملكية")}</span></p>}

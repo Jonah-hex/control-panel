@@ -181,7 +181,7 @@ export default function ReservationsPage() {
     deposit_amount: "",
     deposit_paid: false,
     expiry_days: "7",
-    deposit_receipt_method: "cash" as "cash" | "transfer",
+    deposit_receipt_method: "cash" as "cash" | "transfer" | "none",
     customer_iban_or_account: "",
     customer_bank_name: "",
     notes: "",
@@ -566,9 +566,9 @@ export default function ReservationsPage() {
         marketer_id: marketerIdFromForm,
         marketer_name: finalMarketerName,
         marketer_phone: finalMarketerPhone,
-        deposit_amount: createForm.deposit_amount ? parseFloat(createForm.deposit_amount) : null,
-        deposit_paid: createForm.deposit_paid,
-        deposit_paid_date: createForm.deposit_paid ? new Date().toISOString() : null,
+        deposit_amount: createForm.deposit_receipt_method === "none" ? null : (createForm.deposit_amount ? parseFloat(createForm.deposit_amount) : null),
+        deposit_paid: createForm.deposit_receipt_method === "none" ? false : createForm.deposit_paid,
+        deposit_paid_date: createForm.deposit_receipt_method === "none" ? null : (createForm.deposit_paid ? new Date().toISOString() : null),
         expiry_date: expiryDate.toISOString(),
         status: "active",
         receipt_number: receiptNumber,
@@ -620,7 +620,7 @@ export default function ReservationsPage() {
       .update({ status: "reserved", updated_at: new Date().toISOString() })
       .eq("id", createForm.unit_id);
 
-    showToast("تم إنشاء الحجز وإصدار سند العربون بنجاح.", "success");
+    showToast(createForm.deposit_receipt_method === "none" ? "تم إنشاء الحجز بنجاح (بدون عربون)." : "تم إنشاء الحجز وإصدار سند العربون بنجاح.", "success");
     setCreateOpen(false);
     setCreateForm({
       building_id: "",
@@ -1273,6 +1273,59 @@ export default function ReservationsPage() {
                   />
                 </div>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">طريقة استلام العربون</label>
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="deposit_receipt_method"
+                      checked={createForm.deposit_receipt_method === "cash"}
+                      onChange={() => setCreateForm((f) => ({ ...f, deposit_receipt_method: "cash", customer_iban_or_account: "", customer_bank_name: "" }))}
+                      className="rounded-full"
+                    />
+                    <span className="text-sm font-medium text-gray-700">كاش</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="deposit_receipt_method"
+                      checked={createForm.deposit_receipt_method === "transfer"}
+                      onChange={() => setCreateForm((f) => ({ ...f, deposit_receipt_method: "transfer" }))}
+                      className="rounded-full"
+                    />
+                    <span className="text-sm font-medium text-gray-700">تحويل</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="deposit_receipt_method"
+                      checked={createForm.deposit_receipt_method === "none"}
+                      onChange={() => setCreateForm((f) => ({ ...f, deposit_receipt_method: "none", deposit_amount: "", deposit_paid: false, customer_iban_or_account: "", customer_bank_name: "" }))}
+                      className="rounded-full"
+                    />
+                    <span className="text-sm font-medium text-gray-700">بدون عربون</span>
+                  </label>
+                </div>
+              </div>
+              {createForm.deposit_receipt_method === "none" ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">صلاحية الحجز (أيام)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="7"
+                    value={createForm.expiry_days}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      const n = parseInt(v, 10);
+                      const clamped = Number.isNaN(n) ? "7" : String(Math.min(7, Math.max(1, n)));
+                      setCreateForm((f) => ({ ...f, expiry_days: v === "" ? "7" : clamped }));
+                    }}
+                    className="w-full max-w-[8rem] border border-gray-200 rounded-xl px-3 py-2"
+                  />
+                </div>
+              ) : (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">مبلغ العربون ({RIYAL_SYMBOL})</label>
@@ -1313,31 +1366,7 @@ export default function ReservationsPage() {
                   </label>
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">طريقة استلام العربون</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="deposit_receipt_method"
-                      checked={createForm.deposit_receipt_method === "cash"}
-                      onChange={() => setCreateForm((f) => ({ ...f, deposit_receipt_method: "cash", customer_iban_or_account: "", customer_bank_name: "" }))}
-                      className="rounded-full"
-                    />
-                    <span className="text-sm font-medium text-gray-700">كاش</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="deposit_receipt_method"
-                      checked={createForm.deposit_receipt_method === "transfer"}
-                      onChange={() => setCreateForm((f) => ({ ...f, deposit_receipt_method: "transfer" }))}
-                      className="rounded-full"
-                    />
-                    <span className="text-sm font-medium text-gray-700">تحويل</span>
-                  </label>
-                </div>
-              </div>
+              )}
               {createForm.deposit_receipt_method === "transfer" && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -1378,7 +1407,7 @@ export default function ReservationsPage() {
                   disabled={saving}
                   className="flex-1 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-medium hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 shadow-amber-500/25"
                 >
-                  {saving ? "جاري الحفظ..." : "إنشاء الحجز وإصدار سند العربون"}
+                  {saving ? "جاري الحفظ..." : createForm.deposit_receipt_method === "none" ? "إنشاء الحجز (بدون عربون)" : "إنشاء الحجز وإصدار سند العربون"}
                 </button>
                 <button
                   type="button"

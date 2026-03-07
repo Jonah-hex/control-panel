@@ -114,8 +114,7 @@ export default function TransferOwnershipForm({
       .from("reservations")
       .select("id, unit_id, building_id, deposit_amount, receipt_number, receipt_date, customer_name, customer_phone, marketer_name, marketer_phone, customer_iban_or_account, customer_bank_name, status")
       .eq("unit_id", unit.id)
-      .in("status", ["active", "pending", "confirmed", "reserved"])
-      .gt("deposit_amount", 0)
+      .in("status", ["active", "pending", "confirmed", "reserved", "completed"])
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -206,11 +205,12 @@ export default function TransferOwnershipForm({
       setSaveError("يرجى إدخال مبلغ الشيك.");
       return;
     }
-    if (reservation != null && depositIncluded === null) {
+    const hasDeposit = reservation != null && reservation.deposit_amount != null && Number(reservation.deposit_amount) > 0;
+    if (hasDeposit && depositIncluded === null) {
       setSaveError("حدد هل العربون مشمول في مبلغ الشراء أم سيتم استرداده.");
       return;
     }
-    if (reservation != null && depositIncluded === false && !depositRefundAccount.trim()) {
+    if (hasDeposit && depositIncluded === false && !depositRefundAccount.trim()) {
       setSaveError("أدخل رقم حساب المشتري لتحويل استرداد العربون.");
       return;
     }
@@ -372,17 +372,21 @@ export default function TransferOwnershipForm({
         return;
       }
 
-      if (reservation != null && depositIncluded !== null) {
+      if (reservation != null) {
+        const reservationUpdate: Record<string, unknown> = {
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          sale_id: saleRow.id,
+          updated_at: new Date().toISOString(),
+        };
+        const hasDepositAmount = reservation.deposit_amount != null && Number(reservation.deposit_amount) > 0;
+        if (hasDepositAmount && depositIncluded !== null) {
+          reservationUpdate.deposit_settlement_type = depositIncluded ? "included" : "refund";
+          reservationUpdate.customer_iban_or_account = depositIncluded ? null : (depositRefundAccount.trim() || null);
+        }
         await supabase
           .from("reservations")
-          .update({
-            status: "completed",
-            completed_at: new Date().toISOString(),
-            sale_id: saleRow.id,
-            deposit_settlement_type: depositIncluded ? "included" : "refund",
-            customer_iban_or_account: depositIncluded ? undefined : (depositRefundAccount.trim() || null),
-            updated_at: new Date().toISOString(),
-          })
+          .update(reservationUpdate)
           .eq("id", reservation.id);
       }
 
@@ -647,7 +651,7 @@ export default function TransferOwnershipForm({
       </div>
       </section>
 
-      {reservation != null && (reservation.deposit_amount == null || Number(reservation.deposit_amount) > 0) && (
+      {reservation != null && reservation.deposit_amount != null && Number(reservation.deposit_amount) > 0 && (
         <section>
           <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">الحجز والعربون</h4>
           <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-4">
@@ -758,7 +762,7 @@ export default function TransferOwnershipForm({
         <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">المرفقات</h4>
         <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
-            <div className="space-y-2">
+            <div className="space-y-3">
               <label className="block text-sm font-medium text-slate-700">صورة هوية العميل</label>
               <input
                 type="file"

@@ -180,7 +180,7 @@ export default function DashboardSidebar() {
       <button
         type="button"
         onClick={() => setOpenAndPersist(!open)}
-        className="absolute left-0 top-[12.25px] w-7 h-9 -translate-x-1/2 flex items-center justify-center z-30 bg-white/95 border border-slate-200/90 border-r-0 rounded-l-full rounded-r-none text-slate-500 shadow-sm hover:bg-amber-500 hover:text-white hover:border-amber-400 hover:shadow-md hover:shadow-amber-500/20 transition-all duration-300 ease-out focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:ring-offset-1 focus:ring-offset-white"
+        className="absolute -left-3 top-[18px] w-6 h-7 -translate-x-1/2 flex items-center justify-center z-30 bg-slate-100 border border-slate-300/90 border-r-0 rounded-l-full rounded-r-none text-slate-600 shadow-sm hover:bg-gradient-to-br hover:from-blue-600 hover:to-purple-600 hover:text-white hover:border-blue-400/80 hover:shadow-md hover:shadow-blue-500/30 transition-all duration-300 ease-out focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-1 focus:ring-offset-white"
         aria-label={open ? 'طي القائمة الجانبية' : 'توسيع القائمة الجانبية'}
       >
         {open ? (

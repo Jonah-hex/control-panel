@@ -1,97 +1,26 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Plus, ArrowLeft, Building2, LayoutDashboard, MapPin, Home, Search, Trash2, Eye, Crown } from 'lucide-react'
+import { Plus, Building2, LayoutDashboard, Home, Search, Trash2, Eye, Crown } from 'lucide-react'
 import { useDashboardAuth } from '@/hooks/useDashboardAuth'
 import { useSubscription } from '@/hooks/useSubscription'
-
-interface Building {
-  id: string
-  name: string
-  plot_number: string
-  neighborhood?: string
-  address?: string | null
-  phone?: string | null
-  build_status?: 'ready' | 'under_construction' | 'finishing' | 'new_project' | 'old' | null
-  year_built?: number | null
-  total_units: number
-  total_floors: number
-  owner_id: string
-  created_at: string
-}
-
-interface UnitStatusRow {
-  building_id: string
-  status: 'available' | 'reserved' | 'sold'
-}
+import { useBuildings } from '@/hooks/useBuildings'
+import { PageLoadingSkeleton } from '@/components/dashboard/PageLoadingSkeleton'
+import type { Building } from '@/types/database'
 
 export default function BuildingsPage() {
-  const [buildings, setBuildings] = useState<Building[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [buildingToDelete, setBuildingToDelete] = useState<Building | null>(null)
-  const [unitStatsByBuilding, setUnitStatsByBuilding] = useState<Record<string, { available: number; reserved: number; sold: number }>>({})
   const supabase = createClient()
   const { effectiveOwnerId, can, ready } = useDashboardAuth()
   const { planName, canAddBuilding, buildingsLimitLabel, loading: subscriptionLoading } = useSubscription()
-
-  useEffect(() => {
-    if (effectiveOwnerId) fetchBuildings()
-    else if (ready) setLoading(false)
-  }, [effectiveOwnerId, ready])
-
-  const fetchBuildings = async () => {
-    const ownerId = effectiveOwnerId
-    if (!ownerId) return
-    try {
-      setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data, error } = await supabase
-        .from('buildings')
-        .select('*')
-        .eq('owner_id', ownerId)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      
-      setBuildings(data || [])
-
-      const buildingIds = (data || []).map((building) => building.id)
-      if (buildingIds.length > 0) {
-        const { data: unitRows, error: unitsError } = await supabase
-          .from('units')
-          .select('building_id,status')
-          .in('building_id', buildingIds)
-
-        if (unitsError) throw unitsError
-
-        const stats = (unitRows || []).reduce((acc: Record<string, { available: number; reserved: number; sold: number }>, row: UnitStatusRow) => {
-          if (!acc[row.building_id]) {
-            acc[row.building_id] = { available: 0, reserved: 0, sold: 0 }
-          }
-
-          if (row.status === 'available') acc[row.building_id].available += 1
-          else if (row.status === 'reserved') acc[row.building_id].reserved += 1
-          else if (row.status === 'sold') acc[row.building_id].sold += 1
-
-          return acc
-        }, {})
-
-        setUnitStatsByBuilding(stats)
-      } else {
-        setUnitStatsByBuilding({})
-      }
-    } catch (error) {
-      console.error('Error fetching buildings:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { buildings, unitStatsByBuilding, loading, refetch } = useBuildings({
+    ownerId: effectiveOwnerId,
+    enabled: ready && !!effectiveOwnerId,
+  })
 
   const deleteBuilding = async (buildingId: string) => {
     try {
@@ -102,7 +31,7 @@ export default function BuildingsPage() {
 
       if (error) throw error
       
-      setBuildings(buildings.filter(b => b.id !== buildingId))
+      refetch()
     } catch (error) {
       console.error('Error deleting building:', error)
     }
@@ -256,12 +185,7 @@ export default function BuildingsPage() {
 
         {/* Buildings Grid (Table view matching dashboard style) */}
         {loading ? (
-          <div className="text-center py-12">
-            <div className="inline-block">
-              <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-            </div>
-            <p className="text-gray-600 mt-4">جاري التحميل...</p>
-          </div>
+          <PageLoadingSkeleton message="جاري التحميل..." size="md" variant="indigo" />
         ) : filteredBuildings.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-2xl border border-gray-200">
             <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -346,9 +270,9 @@ export default function BuildingsPage() {
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                             محجوزة <span className="font-bold text-amber-700">{unitStatsByBuilding[b.id]?.reserved ?? 0}</span>
                           </span>
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200/80 shadow-sm">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                            مباعة <span className="font-bold text-slate-600">{unitStatsByBuilding[b.id]?.sold ?? 0}</span>
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200/80 shadow-sm">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                            مباعة <span className="font-bold text-rose-700">{unitStatsByBuilding[b.id]?.sold ?? 0}</span>
                           </span>
                         </div>
                       </td>

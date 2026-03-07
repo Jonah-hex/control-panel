@@ -4,7 +4,7 @@
  * بادج حالة موحّد للمنصة — نقطة + نص + أطراف بيضاوية + حد + ظل.
  * يُستخدم لحالات الوحدات (متاحة/محجوزة/مباعة) وحالات الاستثمار (تحت الإنشاء/تم إعادة البيع/ملغي) وأي حالة أخرى.
  */
-export type StatusVariant = "emerald" | "amber" | "slate";
+export type StatusVariant = "emerald" | "amber" | "slate" | "rose";
 
 const VARIANT_CLASSES: Record<
   StatusVariant,
@@ -27,6 +27,12 @@ const VARIANT_CLASSES: Record<
     bg: "bg-slate-50",
     text: "text-slate-700",
     border: "border-slate-200/80",
+  },
+  rose: {
+    dot: "bg-rose-500",
+    bg: "bg-rose-50",
+    text: "text-rose-800",
+    border: "border-rose-200/80",
   },
 };
 

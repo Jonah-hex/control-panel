@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
+import { useMarketingReportsData } from "@/hooks/useMarketingReportsData";
+import { PageLoadingSkeleton } from "@/components/dashboard/PageLoadingSkeleton";
 import { showToast } from "@/app/dashboard/buildings/details/toast";
 import {
   LayoutDashboard,
@@ -31,43 +32,6 @@ import { RiyalIcon } from "@/components/icons/RiyalIcon";
 const RIYAL = "ر.س";
 
 type PeriodKey = "all" | "month" | "quarter" | "year" | "custom";
-
-interface ReservationRow {
-  id: string;
-  status: string;
-  reservation_date: string;
-  completed_at: string | null;
-  cancelled_at: string | null;
-  deposit_amount: number | null;
-  deposit_refunded?: boolean | null;
-  marketer_id: string | null;
-  building_id: string;
-  unit_id: string;
-  sale_id: string | null;
-  building?: { name: string } | null;
-  unit?: { unit_number: string; floor: number } | null;
-}
-
-interface SaleRow {
-  id: string;
-  sale_date: string;
-  sale_price: number;
-  commission_amount: number | null;
-  down_payment: number | null;
-  remaining_payment: number | null;
-  remaining_payment_due_date: string | null;
-  payment_status: string | null;
-  unit_id: string;
-  building_id: string;
-  building?: { name: string } | null;
-  unit?: { unit_number: string; floor: number } | null;
-}
-
-interface MarketerRow {
-  id: string;
-  name: string;
-  phone: string | null;
-}
 
 function getPeriodBounds(period: PeriodKey, customFrom?: string, customTo?: string): { from: Date; to: Date } {
   if (period === "custom" && customFrom && customTo) {
@@ -348,22 +312,18 @@ function SalesReportChart({
 export default function MarketingReportsPage() {
   const router = useRouter();
   const { can, ready, effectiveOwnerId } = useDashboardAuth();
-  const [loading, setLoading] = useState(true);
+  const { data, loading, error: fetchError, refetch: fetchData } = useMarketingReportsData({
+    ownerId: effectiveOwnerId,
+    enabled: ready && !!effectiveOwnerId && can("marketing_view"),
+  });
+  const { reservations, sales, marketers, buildingsMap, unitsMap, unitsStatusCounts } = data;
   const [period, setPeriod] = useState<PeriodKey>("all");
-  const [reservations, setReservations] = useState<ReservationRow[]>([]);
-  const [sales, setSales] = useState<SaleRow[]>([]);
-  const [marketers, setMarketers] = useState<MarketerRow[]>([]);
-  const [buildingsMap, setBuildingsMap] = useState<Record<string, string>>({});
-  const [unitsMap, setUnitsMap] = useState<Record<string, { unit_number: string; floor: number }>>({});
-  const [unitsStatusCounts, setUnitsStatusCounts] = useState<{ available: number; reserved: number; sold: number }>({ available: 0, reserved: 0, sold: 0 });
   const [customDateFrom, setCustomDateFrom] = useState("");
   const [customDateTo, setCustomDateTo] = useState("");
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [reservationsTableExpanded, setReservationsTableExpanded] = useState(false);
   const [remainingTableExpanded, setRemainingTableExpanded] = useState(false);
   const [salesTableExpanded, setSalesTableExpanded] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const supabase = createClient();
 
   const { from: periodFrom, to: periodTo } = useMemo(
     () => getPeriodBounds(period, customDateFrom, customDateTo),
@@ -493,97 +453,17 @@ export default function MarketingReportsPage() {
     };
   }, [filteredReservations, filteredSales, marketers, reservations, buildingsMap]);
 
-  const fetchData = useCallback(async () => {
-    if (!effectiveOwnerId) return;
-    setLoading(true);
-    setFetchError(null);
-    try {
-      const [resRes, salesRes, marketersRes, buildingsRes] = await Promise.all([
-        supabase
-          .from("reservations")
-          .select("id, status, reservation_date, completed_at, cancelled_at, deposit_amount, deposit_refunded, marketer_id, building_id, unit_id, sale_id")
-          .order("reservation_date", { ascending: false }),
-        supabase
-          .from("sales")
-          .select("id, sale_date, sale_price, commission_amount, down_payment, remaining_payment, remaining_payment_due_date, payment_status, unit_id, building_id")
-          .order("sale_date", { ascending: false }),
-        supabase
-          .from("reservation_marketers")
-          .select("id, name, phone")
-          .eq("owner_id", effectiveOwnerId)
-          .order("name"),
-        supabase.from("buildings").select("id, name").eq("owner_id", effectiveOwnerId),
-      ]);
-
-      if (resRes.error) throw new Error(resRes.error.message || "فشل تحميل الحجوزات");
-      if (salesRes.error) throw new Error(salesRes.error.message || "فشل تحميل المبيعات");
-
-      const resList = (resRes.data || []) as ReservationRow[];
-      const salesList = (salesRes.data || []) as SaleRow[];
-      const marketersList = (marketersRes.data || []) as MarketerRow[];
-      const buildingsList = buildingsRes.data || [];
-
-      const bMap: Record<string, string> = {};
-      buildingsList.forEach((b: { id: string; name: string }) => {
-        bMap[b.id] = b.name;
-      });
-      setBuildingsMap(bMap);
-
-      const buildingIdsForUnits = (buildingsList as { id: string }[]).map((b) => b.id);
-      if (buildingIdsForUnits.length) {
-        const { data: unitsAll } = await supabase.from("units").select("status").in("building_id", buildingIdsForUnits);
-        const list = (unitsAll || []) as { status: string }[];
-        setUnitsStatusCounts({
-          available: list.filter((u) => u.status === "available").length,
-          reserved: list.filter((u) => u.status === "reserved").length,
-          sold: list.filter((u) => u.status === "sold").length,
-        });
-      } else {
-        setUnitsStatusCounts({ available: 0, reserved: 0, sold: 0 });
-      }
-
-      const unitIds = [...new Set([...resList.map((r) => r.unit_id), ...salesList.map((s) => s.unit_id)])].filter(Boolean);
-      let uMap: Record<string, { unit_number: string; floor: number }> = {};
-      if (unitIds.length) {
-        const { data: unitsData } = await supabase.from("units").select("id, unit_number, floor").in("id", unitIds);
-        (unitsData || []).forEach((u: { id: string; unit_number: string; floor: number }) => {
-          uMap[u.id] = { unit_number: u.unit_number, floor: u.floor };
-        });
-      }
-      setUnitsMap(uMap);
-
-      setReservations(
-        resList.map((r) => ({
-          ...r,
-          building: r.building_id ? { name: bMap[r.building_id] ?? "—" } : null,
-          unit: r.unit_id ? (uMap[r.unit_id] ? { ...uMap[r.unit_id] } : null) : null,
-        }))
-      );
-      setSales(
-        salesList.map((s) => ({
-          ...s,
-          building: s.building_id ? { name: bMap[s.building_id] ?? "—" } : null,
-          unit: s.unit_id ? (uMap[s.unit_id] ? { ...uMap[s.unit_id] } : null) : null,
-        }))
-      );
-      setMarketers(marketersList);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "فشل تحميل البيانات";
-      setFetchError(msg);
-      showToast(msg, "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [effectiveOwnerId, supabase]);
-
   useEffect(() => {
     if (!ready) return;
     if (!can("marketing_view")) {
       router.replace("/dashboard");
       return;
     }
-    fetchData();
-  }, [ready, can, router, fetchData]);
+  }, [ready, can, router]);
+
+  useEffect(() => {
+    if (fetchError) showToast(fetchError, "error");
+  }, [fetchError]);
 
   const handlePrint = () => {
     window.print();
@@ -779,9 +659,7 @@ export default function MarketingReportsPage() {
           </div>
         )}
         {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="animate-spin w-10 h-10 border-2 border-amber-500 border-t-transparent rounded-full" />
-          </div>
+          <PageLoadingSkeleton message="جارٍ تحميل التقرير..." size="md" variant="amber" />
         ) : (
           <>
             {/* Executive summary */}
