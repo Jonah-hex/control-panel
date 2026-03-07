@@ -361,6 +361,7 @@ export default function ImagesGallery({
               <img
                 src={url}
                 alt={`صورة ${idx + 1}`}
+                loading="lazy"
                 className={`w-full h-full object-cover transition-transform duration-300 cursor-pointer ${!selectMode ? "group-hover:scale-110" : ""}`}
                 onClick={() => {
                   if (selectMode) toggleSelect(idx);

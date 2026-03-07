@@ -64,6 +64,7 @@ interface BuildingInvestorRow {
   realized_profit?: number | null;
   closing_percentage?: number | null;
   settlement_type?: string | null;
+  transferred_amount?: number | null;
 }
 
 interface SaleRow {
@@ -368,6 +369,8 @@ export default function InvestmentAnalyticsPage() {
     const profitOnly = filteredBuilding.filter((r) => r.closed && r.settlement_type === "profit_only");
     const paidWithCapital = withCapital.reduce((s, r) => s + r.capital + (r.realized ?? 0), 0);
     const paidProfitOnly = profitOnly.reduce((s, r) => s + (r.realized ?? 0), 0);
+    /** رأس المال القائم في العماير = مجموع (رأس المال − المُنقَل) لمخالصات «أرباح فقط» */
+    const capitalStillInBuildings = profitOnly.reduce((s, r) => s + Math.max(0, r.capital - (Number(r.transferred_amount) || 0)), 0);
     const closedWithPct = filteredBuilding.filter((r) => r.closed && r.capital > 0 && r.realized != null);
     const avgProfitPct =
       closedWithPct.length > 0
@@ -384,6 +387,7 @@ export default function InvestmentAnalyticsPage() {
       withCapitalCount: withCapital.length,
       profitOnlyCount: profitOnly.length,
       avgProfitPct,
+      capitalStillInBuildings,
     };
   }, [filteredBuilding]);
 
@@ -405,6 +409,7 @@ export default function InvestmentAnalyticsPage() {
       buildingProfit: summaryBuilding.totalRealized,
       unitsCount: summaryUnits.count,
       buildingCount: summaryBuilding.count,
+      capitalStillInBuildings: summaryBuilding.capitalStillInBuildings,
     };
   }, [summaryUnits, summaryBuilding]);
 
@@ -430,6 +435,7 @@ export default function InvestmentAnalyticsPage() {
         paidProfitOnly: 0,
         unitsCount: summaryUnits.count,
         buildingCount: 0,
+        capitalStillInBuildings: 0,
         label: "وحدات فقط",
       };
     }
@@ -452,6 +458,7 @@ export default function InvestmentAnalyticsPage() {
         paidProfitOnly: summaryBuilding.paidProfitOnly,
         unitsCount: 0,
         buildingCount: summaryBuilding.count,
+        capitalStillInBuildings: summaryBuilding.capitalStillInBuildings,
         label: "عمارة فقط",
       };
     }
@@ -469,6 +476,7 @@ export default function InvestmentAnalyticsPage() {
       paidProfitOnly: summaryBuilding.paidProfitOnly,
       unitsCount: summaryUnits.count,
       buildingCount: summaryBuilding.count,
+      capitalStillInBuildings: summaryBuilding.capitalStillInBuildings,
       label: "وحدات + عمارة",
     };
   }, [typeFilter, summaryUnits, summaryBuilding, unifiedSummary]);
@@ -552,8 +560,7 @@ export default function InvestmentAnalyticsPage() {
                 <BarChart3 className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-800">لوحة تحليلات الاستثمار</h1>
-                <p className="text-sm text-gray-500 mt-0.5">إحصائيات وتحليلات الملاك والمستثمرين</p>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-800">تحليلات الملاك والمستثمرين</h1>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -581,6 +588,11 @@ export default function InvestmentAnalyticsPage() {
           </div>
         ) : (
           <>
+            {/* نطاق التقرير — تحليل الملاك والمستثمرين فقط */}
+            <div className="mb-6 rounded-xl border border-teal-200/80 bg-teal-50/50 px-4 py-3 text-sm text-slate-700">
+              <span className="font-medium text-teal-800">نطاق التحليل:</span> هذا التحليل خاص بالملاك والمستثمرين فقط (استثمارات الوحدات والعمارة، أرباح محققة، مخالصات، صافي المنشأة). لتقارير الحجوزات والمبيعات وأداء المسوقين → <Link href="/dashboard/marketing/reports" className="text-teal-700 font-medium hover:underline">تقارير التسويق والمبيعات</Link>.
+            </div>
+
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-6">
               <div className="flex items-center gap-2 mb-3">
                 <Filter className="w-4 h-4 text-slate-500" />
@@ -884,6 +896,13 @@ export default function InvestmentAnalyticsPage() {
                   <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wide mb-0.5">إجمالي مخالصات العماير</p>
                   <p className="text-base font-bold text-slate-800 dir-ltr tabular-nums leading-tight">{formatNum(displaySummary.totalSettlementPaid)} <span className="text-xs font-normal text-slate-500">ر.س</span></p>
                 </div>
+                {(typeFilter === "all" || typeFilter === "building") && (
+                  <div className="rounded-lg border border-amber-200/80 bg-amber-50/90 px-3 py-2.5 shadow-sm">
+                    <p className="text-[11px] font-medium text-amber-800 uppercase tracking-wide mb-0.5">رأس المال القائم في العماير</p>
+                    <p className="text-base font-bold text-amber-800 dir-ltr tabular-nums leading-tight">{formatNum(displaySummary.capitalStillInBuildings ?? 0)} <span className="text-xs font-normal text-slate-500">ر.س</span></p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">مخالصات «أرباح فقط» — لم يُسترد</p>
+                  </div>
+                )}
               </div>
             </div>
 

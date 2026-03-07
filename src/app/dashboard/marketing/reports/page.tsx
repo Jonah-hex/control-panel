@@ -550,8 +550,8 @@ export default function MarketingReportsPage() {
                 <LineChart className="w-5 h-5 text-white" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-lg sm:text-xl font-bold text-gray-800 tracking-tight leading-tight">التقارير والتحليلات</h1>
-                <p className="text-xs text-gray-500 mt-0.5">ملخص وتقارير تفصيلية للحجوزات والمبيعات والمسوقين — إدارة التسويق والمبيعات</p>
+                <h1 className="text-lg sm:text-xl font-bold text-gray-800 tracking-tight leading-tight">تقارير التسويق والمبيعات</h1>
+                <p className="text-xs text-gray-500 mt-0.5">تحليل خاص بقسم التسويق والمبيعات فقط: حجوزات، مبيعات، عرابين، عمولات المسوقين، صافي الدخل — لا يشمل تحليل الملاك أو المستثمرين</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 flex-shrink-0 print:hidden">
@@ -662,6 +662,11 @@ export default function MarketingReportsPage() {
           <PageLoadingSkeleton message="جارٍ تحميل التقرير..." size="md" variant="amber" />
         ) : (
           <>
+            {/* نطاق التقرير — تحليل التسويق والمبيعات فقط */}
+            <div className="mb-6 rounded-xl border border-amber-200/80 bg-amber-50/50 px-4 py-3 text-sm text-slate-700">
+              <span className="font-medium text-amber-800">نطاق التقرير:</span> هذا التحليل خاص بقسم التسويق والمبيعات فقط (حجوزات، مبيعات، عرابين، عمولات المسوقين، صافي الدخل). لتحليل الملاك والمستثمرين والأرباح المحققة والمخالصات → <Link href="/dashboard/owners-investors/analytics" className="text-amber-700 font-medium hover:underline">تحليلات الملاك والمستثمرين</Link>.
+            </div>
+
             {/* Executive summary */}
             <section className="mb-8">
               <div className="flex flex-wrap items-center gap-3 mb-4">

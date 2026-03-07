@@ -137,10 +137,10 @@ export default function OwnersInvestorsPage() {
                   <BarChart3 className="w-8 h-8 text-white" />
                 </div>
                 <h3 className="font-bold text-gray-800 group-hover:text-white transition-colors duration-300 text-sm mb-1">
-                  تحليلات الاستثمار
+                  تحليلات الملاك والمستثمرين
                 </h3>
                 <p className="text-xs text-gray-500 group-hover:text-white/90 transition-colors duration-300">
-                  ملخصات الأرباح والخسائر ومدة الاستثمار — شارتات وفلاتر وبحث
+                  تحليل الاستثمارات والأرباح المحققة والمخالصات فقط — شارتات وفلاتر وبحث
                 </p>
               </div>
             </Link>

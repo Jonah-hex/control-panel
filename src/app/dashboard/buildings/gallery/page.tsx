@@ -9,6 +9,19 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { FaMapMarkerAlt, FaDoorClosed, FaBuilding, FaHome } from "react-icons/fa";
 
+/** عدد الصور المُحمّلة في كل دفعة (قابل للضبط عبر NEXT_PUBLIC_GALLERY_PAGE_SIZE، 6–48، الافتراضي 12) */
+const PAGE_SIZE = (() => {
+  const v = Number(process.env.NEXT_PUBLIC_GALLERY_PAGE_SIZE);
+  if (!Number.isFinite(v)) return 12;
+  return Math.min(48, Math.max(6, Math.round(v)));
+})();
+/**
+ * الحد الأقصى لعدد الصور لكل نوع (أمامية / خلفية / ملحق / عمارة) في كل عمارة.
+ * مُستنتج من سعة التخزين: 6 GB للمعرض، 200 عمارة، ~0.5 MB/صورة → ≈15 لكل نوع.
+ * راجع docs/gallery-storage-limit.md لاشتقاق الحد وتعديله حسب خطتك.
+ */
+const MAX_IMAGES_PER_TYPE = 15;
+
 const typeMeta: Record<
   string,
   { title: string; icon: React.ComponentType<{ className?: string }> }
@@ -30,6 +43,8 @@ function GalleryContent() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [buildingName, setBuildingName] = useState<string>("");
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     if (!buildingId) return;
@@ -43,51 +58,103 @@ function GalleryContent() {
       });
   }, [buildingId]);
 
+  const signUrls = async (rows: { id: number; url: string | null }[]) => {
+    return Promise.all(
+      rows.map(async (row) => {
+        const url = row.url ?? "";
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+          return { id: row.id, url };
+        }
+        const { data: signed } = await supabase.storage
+          .from("building-images")
+          .createSignedUrl(url, 3600);
+        return { id: row.id, url: signed?.signedUrl ?? url };
+      })
+    );
+  };
+
   useEffect(() => {
     if (!buildingId) return;
     setLoading(true);
-    const load = async () => {
+    setImages([]);
+    setHasMore(false);
+    const loadFirst = async () => {
       const { data: rows, error } = await supabase
         .from("building_images")
         .select("id, url")
         .eq("building_id", buildingId)
         .eq("type", type)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(0, PAGE_SIZE); // نطلب PAGE_SIZE+1 لمعرفة إن وُجد المزيد
       if (error) {
         setLoading(false);
         return;
       }
       if (!rows?.length) {
         setImages([]);
+        setHasMore(false);
         setLoading(false);
         return;
       }
-      // إذا كان url مساراً (بدون http) نستخدم روابط موقع موقعة لعرض الصور (يعمل مع الـ bucket الخاص)
-      const withDisplayUrls = await Promise.all(
-        rows.map(async (row) => {
-          const url = row.url ?? "";
-          if (url.startsWith("http://") || url.startsWith("https://")) {
-            return { id: row.id, url };
-          }
-          const { data: signed } = await supabase.storage
-            .from("building-images")
-            .createSignedUrl(url, 3600);
-          return { id: row.id, url: signed?.signedUrl ?? url };
-        })
-      );
+      setHasMore(rows.length > PAGE_SIZE);
+      const toSign = rows.length > PAGE_SIZE ? rows.slice(0, PAGE_SIZE) : rows;
+      const withDisplayUrls = await signUrls(toSign);
       setImages(withDisplayUrls);
       setLoading(false);
     };
-    load();
+    loadFirst();
   }, [buildingId, type]);
+
+  const loadMore = async () => {
+    if (!buildingId || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const offset = images.length;
+    const { data: rows, error } = await supabase
+      .from("building_images")
+      .select("id, url")
+      .eq("building_id", buildingId)
+      .eq("type", type)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
+    setLoadingMore(false);
+    if (error || !rows?.length) {
+      setHasMore(false);
+      return;
+    }
+    setHasMore(rows.length >= PAGE_SIZE);
+    const withDisplayUrls = await signUrls(rows);
+    setImages((prev) => [...prev, ...withDisplayUrls]);
+  };
 
   const handleAdd = async (files: FileList) => {
     if (!buildingId) return;
+    const fileList = Array.from(files);
+    if (!fileList.length) return;
+
+    const { count: currentCount, error: countError } = await supabase
+      .from("building_images")
+      .select("id", { count: "exact", head: true })
+      .eq("building_id", buildingId)
+      .eq("type", type);
+    if (countError || currentCount == null) {
+      showToast("تعذر التحقق من عدد الصور. حاول لاحقاً.", "error");
+      return;
+    }
+    const allowed = Math.max(0, MAX_IMAGES_PER_TYPE - currentCount);
+    if (allowed === 0) {
+      showToast(`الحد الأقصى ${MAX_IMAGES_PER_TYPE} صورة لهذا النوع (الشقة الأمامية/الخلفية/الملحق/العمارة).`, "error");
+      return;
+    }
+    if (fileList.length > allowed) {
+      showToast(`يمكنك رفع ${allowed} صورة كحد أقصى لهذا النوع (لديك ${currentCount} من ${MAX_IMAGES_PER_TYPE}).`, "error");
+      return;
+    }
+
     setUploading(true);
     let added = 0;
     let uploadOrInsertFailed = false;
     try {
-      for (const file of Array.from(files)) {
+      for (const file of fileList) {
         const filePath = `${buildingId}/${type}/${Date.now()}_${file.name}`;
         const { error: uploadError } = await supabase.storage
           .from("building-images")
@@ -106,30 +173,25 @@ function GalleryContent() {
         }
         added++;
       }
-      // إعادة جلب القائمة مع تحويل المسارات إلى روابط عرض (موقع موقعة أو عامة)
-      const { data: rows, error } = await supabase
-        .from("building_images")
-        .select("id, url")
-        .eq("building_id", buildingId)
-        .eq("type", type)
-        .order("created_at", { ascending: false });
-      if (!error && rows?.length) {
-        const withDisplayUrls = await Promise.all(
-          rows.map(async (row) => {
-            const url = row.url ?? "";
-            if (url.startsWith("http://") || url.startsWith("https://")) {
-              return { id: row.id, url };
-            }
-            const { data: signed } = await supabase.storage
-              .from("building-images")
-              .createSignedUrl(url, 3600);
-            return { id: row.id, url: signed?.signedUrl ?? url };
-          })
-        );
-        setImages(withDisplayUrls);
+      if (added > 0) {
+        showToast("تم رفع الصور بنجاح", "success");
+        // إعادة جلب الصفحة الأولى فقط (أحدث الصور تظهر أولاً)
+        const { data: rows } = await supabase
+          .from("building_images")
+          .select("id, url")
+          .eq("building_id", buildingId)
+          .eq("type", type)
+          .order("created_at", { ascending: false })
+          .range(0, PAGE_SIZE);
+        if (rows?.length) {
+          setHasMore(rows.length > PAGE_SIZE);
+          const toSign = rows.length > PAGE_SIZE ? rows.slice(0, PAGE_SIZE) : rows;
+          const withDisplayUrls = await signUrls(toSign);
+          setImages(withDisplayUrls);
+        }
+      } else if (uploadOrInsertFailed) {
+        showToast("فشل رفع الصور. تحقق من الصلاحيات والتخزين.", "error");
       }
-      if (added > 0) showToast("تم رفع الصور بنجاح", "success");
-      else if (uploadOrInsertFailed) showToast("فشل رفع الصور. تحقق من الصلاحيات والتخزين.", "error");
     } catch {
       showToast("فشل رفع بعض الصور", "error");
     } finally {
@@ -242,13 +304,18 @@ function GalleryContent() {
         </header>
 
         {/* عنوان القسم الحالي */}
-        <div className="flex items-center gap-2 mb-6">
-          <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-red-100 text-red-600">
-            <IconComponent className="w-5 h-5" />
-          </span>
-          <h2 className="text-lg font-bold text-gray-800">
-            {currentMeta.title}
-          </h2>
+        <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-red-100 text-red-600">
+              <IconComponent className="w-5 h-5" />
+            </span>
+            <h2 className="text-lg font-bold text-gray-800">
+              {currentMeta.title}
+            </h2>
+          </div>
+          <p className="text-xs text-slate-500">
+            الحد الأقصى {MAX_IMAGES_PER_TYPE} صورة لهذا النوع
+          </p>
         </div>
 
         {loading ? (
@@ -257,15 +324,36 @@ function GalleryContent() {
             <p className="text-red-700 font-medium">جاري تحميل الصور...</p>
           </div>
         ) : (
-          <ImagesGallery
-            images={images.map((img) => img.url)}
-            onAdd={handleAdd}
-            onDelete={handleDelete}
-            onDownload={handleDownload}
-            onShareCopy={handleShareCopy}
-            uploading={uploading}
-            emptyMessage={`لا توجد صور في «${currentMeta.title}» بعد. اسحب الصور هنا أو انقر للرفع.`}
-          />
+          <>
+            <ImagesGallery
+              images={images.map((img) => img.url)}
+              onAdd={handleAdd}
+              onDelete={handleDelete}
+              onDownload={handleDownload}
+              onShareCopy={handleShareCopy}
+              uploading={uploading}
+              emptyMessage={`لا توجد صور في «${currentMeta.title}» بعد. اسحب الصور هنا أو انقر للرفع.`}
+            />
+            {hasMore && (
+              <div className="mt-6 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => void loadMore()}
+                  disabled={loadingMore}
+                  className="px-6 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm border border-slate-200/80 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                >
+                  {loadingMore ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                      جاري التحميل...
+                    </span>
+                  ) : (
+                    "تحميل المزيد"
+                  )}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

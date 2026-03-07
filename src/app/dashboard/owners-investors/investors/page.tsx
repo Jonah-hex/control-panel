@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -27,6 +27,7 @@ import { phoneDigitsOnly, isValidPhone10Digits } from "@/lib/validation-utils";
 
 const INVESTOR_DOCS_BUCKET = "building-documents";
 const INVESTOR_DOCS_PREFIX = "investors";
+const UNIT_INVESTMENT_DOCS_PREFIX = "unit-investments";
 
 /** سياسة المسارين: docs/sales-and-investment-policy.md. إغلاق صفقة الاستثمار (رأس المال، الربح، نسبة الإغلاق): docs/investment-deal-closing-policy.md */
 
@@ -36,7 +37,11 @@ function formatNum(n: number): string {
 }
 function formatDateEn(d: string | null | undefined): string {
   if (!d) return "—";
-  return new Date(d + "T12:00:00").toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "numeric" });
+  const date = new Date(d + "T12:00:00");
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
 }
 
 /** مدة بين تاريخين: سنوات، أشهر، أيام */
@@ -72,7 +77,7 @@ function getRemaining(due: string): { years: number; months: number; days: numbe
 function settlementMethodLabel(m: string | null | undefined): string {
   if (!m) return "—";
   if (m === "transfer") return "حوالة";
-  if (m === "check") return "شيك";
+  if (m === "check") return "شيك مصدق";
   if (m === "cash") return "كاش";
   return m;
 }
@@ -154,6 +159,12 @@ interface BuildingInvestorRow {
   settlement_account_iban?: string | null;
   settlement_bank_name?: string | null;
   settlement_type?: string | null;
+  transferred_amount?: number | null;
+  transferred_from_building_investor_id?: string | null;
+  payment_method?: string | null;
+  payment_bank_name?: string | null;
+  payment_check_number?: string | null;
+  payment_check_image_path?: string | null;
 }
 
 interface UnitInvestmentRow {
@@ -173,6 +184,21 @@ interface UnitInvestmentRow {
   created_at: string;
   unit?: { unit_number: string; floor: number } | null;
   building?: Building | null;
+  transferred_from_building_investor_id?: string | null;
+  payment_method?: string | null;
+  payment_bank_name?: string | null;
+  payment_check_number?: string | null;
+  payment_check_image_path?: string | null;
+  contract_image_path?: string | null;
+  id_image_path?: string | null;
+}
+
+/** رأس المال القائم القابل للنقل (لمخالصة «أرباح فقط» فقط) */
+function capitalStillAvailable(row: BuildingInvestorRow): number {
+  if (row.settlement_type !== "profit_only" || !row.closed_at) return 0;
+  const total = Number(row.total_invested_amount) || 0;
+  const transferred = Number(row.transferred_amount) || 0;
+  return Math.max(0, total - transferred);
 }
 
 export default function InvestorsPage() {
@@ -196,10 +222,13 @@ export default function InvestorsPage() {
   const [saving, setSaving] = useState(false);
   const [uploadingContract, setUploadingContract] = useState(false);
   const [uploadingId, setUploadingId] = useState(false);
+  const [uploadingCheck, setUploadingCheck] = useState(false);
   const [contractFile, setContractFile] = useState<File | null>(null);
   const [idFile, setIdFile] = useState<File | null>(null);
+  const [checkImageFile, setCheckImageFile] = useState<File | null>(null);
   const [viewingContractUrl, setViewingContractUrl] = useState<string | null>(null);
   const [viewingIdUrl, setViewingIdUrl] = useState<string | null>(null);
+  const [viewingCheckImageUrl, setViewingCheckImageUrl] = useState<string | null>(null);
   const [closingUnitInvestment, setClosingUnitInvestment] = useState<(UnitInvestmentRow & { resalePrice?: number | null; profit?: number | null; buildingName?: string }) | null>(null);
   const [closingUnitSaleId, setClosingUnitSaleId] = useState("");
   const [closingBuildingInvestor, setClosingBuildingInvestor] = useState<BuildingInvestorRow | null>(null);
@@ -212,6 +241,45 @@ export default function InvestorsPage() {
   const [closingSettlementCashAmount, setClosingSettlementCashAmount] = useState("");
   const [closingSettlementCheckAmount, setClosingSettlementCheckAmount] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: "building" | "unit"; id: string; label: string } | null>(null);
+  const [buildingPage, setBuildingPage] = useState(1);
+  const [buildingPageSize, setBuildingPageSize] = useState(5);
+  const BUILDING_PAGE_SIZES = [5, 10, 25, 50, 100] as const;
+  const buildingTotalPages = Math.max(1, Math.ceil(buildingInvestors.length / buildingPageSize));
+  const buildingInvestorsPaginated = useMemo(
+    () => buildingInvestors.slice((buildingPage - 1) * buildingPageSize, buildingPage * buildingPageSize),
+    [buildingInvestors, buildingPage, buildingPageSize]
+  );
+  useEffect(() => {
+    if (buildingPage > buildingTotalPages && buildingTotalPages >= 1) setBuildingPage(1);
+  }, [buildingPage, buildingTotalPages]);
+  const [triggerFileInput, setTriggerFileInput] = useState<"contract" | "id" | null>(null);
+  const contractFileInputRef = useRef<HTMLInputElement>(null);
+  const idFileInputRef = useRef<HTMLInputElement>(null);
+  const checkFileInputRef = useRef<HTMLInputElement>(null);
+  const contractImageSectionRef = useRef<HTMLDivElement>(null);
+  const idImageSectionRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (modalOpen !== "building" || !triggerFileInput) return;
+    const t = setTimeout(() => {
+      if (triggerFileInput === "contract") {
+        contractImageSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else if (triggerFileInput === "id") {
+        idImageSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      setTriggerFileInput(null);
+    }, 100);
+    return () => clearTimeout(t);
+  }, [modalOpen, triggerFileInput]);
+  const [transferSource, setTransferSource] = useState<BuildingInvestorRow | null>(null);
+  const [transferTargetType, setTransferTargetType] = useState<"building" | "unit">("building");
+  const [transferAmount, setTransferAmount] = useState("");
+  const [transferBuildingId, setTransferBuildingId] = useState("");
+  const [transferUnitId, setTransferUnitId] = useState("");
+  const [transferProfitPct, setTransferProfitPct] = useState("15");
+  const [transferProfitPctTo, setTransferProfitPctTo] = useState("");
+  const [transferStartDate, setTransferStartDate] = useState("");
+  const [transferDueDate, setTransferDueDate] = useState("");
+  const [transferNotes, setTransferNotes] = useState("");
 
   const [formBuilding, setFormBuilding] = useState({
     building_id: "",
@@ -224,6 +292,10 @@ export default function InvestorsPage() {
     total_invested_amount: "",
     investment_start_date: "",
     investment_due_date: "",
+    payment_method: "",
+    payment_bank_name: "",
+    payment_check_number: "",
+    payment_check_image_path: "",
     contract_image_path: "",
     id_image_path: "",
     notes: "",
@@ -237,8 +309,20 @@ export default function InvestorsPage() {
     investor_id_number: "",
     purchase_price: "",
     purchase_date: "",
+    payment_method: "",
+    payment_bank_name: "",
+    payment_check_number: "",
+    payment_check_image_path: "",
+    contract_image_path: "",
+    id_image_path: "",
     notes: "",
   });
+  const [unitCheckImageFile, setUnitCheckImageFile] = useState<File | null>(null);
+  const unitCheckFileInputRef = useRef<HTMLInputElement>(null);
+  const [unitContractFile, setUnitContractFile] = useState<File | null>(null);
+  const [unitIdFile, setUnitIdFile] = useState<File | null>(null);
+  const unitContractFileInputRef = useRef<HTMLInputElement>(null);
+  const unitIdFileInputRef = useRef<HTMLInputElement>(null);
 
   const [formUnitResale, setFormUnitResale] = useState({ resale_sale_id: "" });
 
@@ -262,9 +346,13 @@ export default function InvestorsPage() {
         const { data } = await supabase.storage.from(INVESTOR_DOCS_BUCKET).createSignedUrl(viewingBuildingInvestor.id_image_path, 3600);
         setViewingIdUrl(data?.signedUrl ?? null);
       } else setViewingIdUrl(null);
+      if (viewingBuildingInvestor.payment_check_image_path) {
+        const { data } = await supabase.storage.from(INVESTOR_DOCS_BUCKET).createSignedUrl(viewingBuildingInvestor.payment_check_image_path, 3600);
+        setViewingCheckImageUrl(data?.signedUrl ?? null);
+      } else setViewingCheckImageUrl(null);
     };
     load();
-  }, [viewingBuildingInvestor?.id, viewingBuildingInvestor?.contract_image_path, viewingBuildingInvestor?.id_image_path, supabase]);
+  }, [viewingBuildingInvestor?.id, viewingBuildingInvestor?.contract_image_path, viewingBuildingInvestor?.id_image_path, viewingBuildingInvestor?.payment_check_image_path, supabase]);
 
   useEffect(() => {
     if (!effectiveOwnerId) return;
@@ -276,7 +364,7 @@ export default function InvestorsPage() {
         setBuildings(buildingList);
         const buildingIds = buildingList.map((b) => b.id);
 
-        const { data: biData } = await supabase.from("building_investors").select("*").eq("owner_id", effectiveOwnerId);
+        const { data: biData } = await supabase.from("building_investors").select("*").eq("owner_id", effectiveOwnerId).order("created_at", { ascending: false });
         if (biData) {
           const withBuildings = await Promise.all(
             (biData as BuildingInvestorRow[]).map(async (row) => {
@@ -298,7 +386,7 @@ export default function InvestorsPage() {
           if (sData) setSales(sData as typeof sales);
         }
 
-        const { data: uiData, error: uiError } = await supabase.from("unit_investments").select("*").eq("owner_id", effectiveOwnerId);
+        const { data: uiData, error: uiError } = await supabase.from("unit_investments").select("*").eq("owner_id", effectiveOwnerId).order("created_at", { ascending: false });
         if (uiError) {
           showToast("تحميل استثمارات الوحدات: " + (uiError.message || "خطأ"), "error");
         }
@@ -336,7 +424,7 @@ export default function InvestorsPage() {
         .eq("id", viewingUnitInvestment.id);
       if (error) throw error;
       showToast("تم تحديث ربط إعادة البيع");
-      const { data } = await supabase.from("unit_investments").select("*").eq("owner_id", effectiveOwnerId);
+      const { data } = await supabase.from("unit_investments").select("*").eq("owner_id", effectiveOwnerId).order("created_at", { ascending: false });
       if (data && Array.isArray(data)) {
         const enriched = (data as UnitInvestmentRow[]).map((r) => {
           const b = buildings.find((x) => x.id === r.building_id) ?? null;
@@ -369,7 +457,7 @@ export default function InvestorsPage() {
         .eq("id", closingUnitInvestment.id);
       if (error) throw error;
       showToast("تم إغلاق الصفقة وتوثيق الربط.");
-      const { data } = await supabase.from("unit_investments").select("*").eq("owner_id", effectiveOwnerId);
+      const { data } = await supabase.from("unit_investments").select("*").eq("owner_id", effectiveOwnerId).order("created_at", { ascending: false });
       if (data && Array.isArray(data)) {
         const enriched = (data as UnitInvestmentRow[]).map((r) => {
           const b = buildings.find((x) => x.id === r.building_id) ?? null;
@@ -423,7 +511,7 @@ export default function InvestorsPage() {
         .eq("id", closingBuildingInvestor.id);
       if (error) throw error;
       showToast("تم إغلاق صفقة الاستثمار. الربح المحقق: " + formatNum(realized) + " ر.س (" + pct + "%).");
-      const { data } = await supabase.from("building_investors").select("*").eq("owner_id", effectiveOwnerId);
+      const { data } = await supabase.from("building_investors").select("*").eq("owner_id", effectiveOwnerId).order("created_at", { ascending: false });
       if (data && Array.isArray(data)) {
         const withBuildings = (data as BuildingInvestorRow[]).map((row) => ({
           ...row,
@@ -460,12 +548,17 @@ export default function InvestorsPage() {
       total_invested_amount: "",
       investment_start_date: today,
       investment_due_date: "",
+      payment_method: "",
+      payment_bank_name: "",
+      payment_check_number: "",
+      payment_check_image_path: "",
       contract_image_path: "",
       id_image_path: "",
       notes: "",
     });
     setContractFile(null);
     setIdFile(null);
+    setCheckImageFile(null);
     setModalOpen("building");
   };
 
@@ -482,18 +575,165 @@ export default function InvestorsPage() {
       total_invested_amount: row.total_invested_amount != null ? String(row.total_invested_amount) : "",
       investment_start_date: row.investment_start_date || "",
       investment_due_date: row.investment_due_date || "",
+      payment_method: row.payment_method || "",
+      payment_bank_name: row.payment_bank_name || "",
+      payment_check_number: row.payment_check_number || "",
+      payment_check_image_path: row.payment_check_image_path || "",
       contract_image_path: row.contract_image_path || "",
       id_image_path: row.id_image_path || "",
       notes: row.notes || "",
     });
     setContractFile(null);
     setIdFile(null);
+    setCheckImageFile(null);
     setModalOpen("building");
   };
 
-  const uploadInvestorFile = async (investorId: string, file: File, type: "contract" | "id"): Promise<string | null> => {
+  const openTransferModal = (row: BuildingInvestorRow) => {
+    const available = capitalStillAvailable(row);
+    setTransferSource(row);
+    setTransferTargetType("building");
+    setTransferAmount(available > 0 ? String(available) : "");
+    setTransferBuildingId(buildings[0]?.id ?? "");
+    setTransferUnitId("");
+    setTransferProfitPct("15");
+    setTransferProfitPctTo("");
+    setTransferStartDate(new Date().toISOString().slice(0, 10));
+    setTransferDueDate("");
+    setTransferNotes("");
+    setViewingBuildingInvestor(null);
+  };
+
+  const submitTransferCapital = async () => {
+    if (!transferSource || !effectiveOwnerId) return;
+    const amountRaw = transferAmount.replace(/\D/g, "");
+    const amount = amountRaw ? parseFloat(amountRaw) : 0;
+    const available = capitalStillAvailable(transferSource);
+    if (amount <= 0 || amount > available) {
+      showToast(`المبلغ يجب أن يكون بين 1 و ${formatNum(available)} ر.س (رأس المال القائم المتاح)`, "error");
+      return;
+    }
+    if (transferTargetType === "building") {
+      if (!transferBuildingId) {
+        showToast("اختر العمارة المستهدفة", "error");
+        return;
+      }
+      const pctFrom = parseFloat(transferProfitPct.replace(/,/g, ".")) || 0;
+      const pctTo = transferProfitPctTo.trim() ? parseFloat(transferProfitPctTo.replace(/,/g, ".")) : null;
+      if (isNaN(pctFrom) || pctFrom < 0 || pctFrom > 100) {
+        showToast("نسبة الربح بين 0 و 100", "error");
+        return;
+      }
+      setSaving(true);
+      try {
+        const payload = {
+          building_id: transferBuildingId,
+          owner_id: effectiveOwnerId,
+          investor_name: transferSource.investor_name,
+          investor_phone: transferSource.investor_phone ?? null,
+          investor_email: transferSource.investor_email ?? null,
+          investor_id_number: transferSource.investor_id_number ?? null,
+          profit_percentage: pctFrom,
+          profit_percentage_to: pctTo != null && pctTo !== pctFrom ? pctTo : null,
+          agreement_type: "agreed_percentage",
+          total_invested_amount: amount,
+          investment_start_date: transferStartDate || null,
+          investment_due_date: transferDueDate || null,
+          notes: transferNotes.trim() || null,
+          transferred_from_building_investor_id: transferSource.id,
+        };
+        const { error: insertErr } = await supabase.from("building_investors").insert(payload);
+        if (insertErr) throw insertErr;
+        const newTransferred = (Number(transferSource.transferred_amount) || 0) + amount;
+        const { error: updateErr } = await supabase.from("building_investors").update({ transferred_amount: newTransferred }).eq("id", transferSource.id);
+        if (updateErr) throw updateErr;
+        showToast("تم نقل رأس المال إلى العمارة الجديدة");
+        setTransferSource(null);
+        const { data } = await supabase.from("building_investors").select("*").eq("owner_id", effectiveOwnerId).order("created_at", { ascending: false });
+        if (data) {
+          const withBuildings = (data as BuildingInvestorRow[]).map((row) => ({ ...row, building: buildings.find((b) => b.id === row.building_id) ?? null }));
+          setBuildingInvestors(withBuildings);
+        }
+      } catch (e: unknown) {
+        showToast((e as { message?: string })?.message || "فشل نقل رأس المال", "error");
+      } finally {
+        setSaving(false);
+      }
+    } else {
+      if (!transferBuildingId || !transferUnitId) {
+        showToast("اختر العمارة والوحدة المستهدفة", "error");
+        return;
+      }
+      setSaving(true);
+      try {
+        const payload = {
+          unit_id: transferUnitId,
+          building_id: transferBuildingId,
+          owner_id: effectiveOwnerId,
+          investor_name: transferSource.investor_name,
+          investor_phone: transferSource.investor_phone ?? null,
+          investor_email: transferSource.investor_email ?? null,
+          investor_id_number: transferSource.investor_id_number ?? null,
+          purchase_price: amount,
+          purchase_date: transferStartDate || new Date().toISOString().slice(0, 10),
+          status: "under_construction",
+          notes: transferNotes.trim() || null,
+          transferred_from_building_investor_id: transferSource.id,
+        };
+        const { error: insertErr } = await supabase.from("unit_investments").insert(payload);
+        if (insertErr) throw insertErr;
+        const newTransferred = (Number(transferSource.transferred_amount) || 0) + amount;
+        const { error: updateErr } = await supabase.from("building_investors").update({ transferred_amount: newTransferred }).eq("id", transferSource.id);
+        if (updateErr) throw updateErr;
+        showToast("تم نقل رأس المال إلى الوحدة الجديدة");
+        setTransferSource(null);
+        const { data: biData } = await supabase.from("building_investors").select("*").eq("owner_id", effectiveOwnerId).order("created_at", { ascending: false });
+        if (biData) {
+          const withBuildings = (biData as BuildingInvestorRow[]).map((row) => ({ ...row, building: buildings.find((b) => b.id === row.building_id) ?? null }));
+          setBuildingInvestors(withBuildings);
+        }
+        const { data: uiData } = await supabase.from("unit_investments").select("*").eq("owner_id", effectiveOwnerId).order("created_at", { ascending: false });
+        if (uiData && Array.isArray(uiData)) {
+          const enriched = (uiData as UnitInvestmentRow[]).map((r) => {
+            const b = buildings.find((x) => x.id === r.building_id) ?? null;
+            const u = units.find((x) => x.id === r.unit_id) ?? null;
+            return { ...r, building: b, unit: u ? { unit_number: String(u.unit_number), floor: u.floor } : null };
+          });
+          setUnitInvestments(enriched);
+        }
+      } catch (e: unknown) {
+        showToast((e as { message?: string })?.message || "فشل نقل رأس المال", "error");
+      } finally {
+        setSaving(false);
+      }
+    }
+  };
+
+  const uploadInvestorFile = async (investorId: string, file: File, type: "contract" | "id" | "check"): Promise<string | null> => {
     const ext = file.name.split(".").pop() || "jpg";
     const path = `${INVESTOR_DOCS_PREFIX}/${investorId}/${type}.${ext}`;
+    const { error } = await supabase.storage.from(INVESTOR_DOCS_BUCKET).upload(path, file, { contentType: file.type, upsert: true });
+    if (error) {
+      showToast("تعذر رفع الملف: " + (error.message || ""), "error");
+      return null;
+    }
+    return path;
+  };
+
+  const uploadUnitInvestmentCheckFile = async (unitInvestmentId: string, file: File): Promise<string | null> => {
+    const ext = file.name.split(".").pop() || "jpg";
+    const path = `${UNIT_INVESTMENT_DOCS_PREFIX}/${unitInvestmentId}/check.${ext}`;
+    const { error } = await supabase.storage.from(INVESTOR_DOCS_BUCKET).upload(path, file, { contentType: file.type, upsert: true });
+    if (error) {
+      showToast("تعذر رفع صورة الشيك: " + (error.message || ""), "error");
+      return null;
+    }
+    return path;
+  };
+
+  const uploadUnitInvestmentFile = async (unitInvestmentId: string, file: File, type: "contract" | "id"): Promise<string | null> => {
+    const ext = file.name.split(".").pop() || "jpg";
+    const path = `${UNIT_INVESTMENT_DOCS_PREFIX}/${unitInvestmentId}/${type}.${ext}`;
     const { error } = await supabase.storage.from(INVESTOR_DOCS_BUCKET).upload(path, file, { contentType: file.type, upsert: true });
     if (error) {
       showToast("تعذر رفع الملف: " + (error.message || ""), "error");
@@ -529,6 +769,7 @@ export default function InvestorsPage() {
       const amountRaw = formBuilding.total_invested_amount.replace(/\D/g, "");
       let contractPath = formBuilding.contract_image_path.trim() || null;
       let idPath = formBuilding.id_image_path.trim() || null;
+      let checkImagePath = formBuilding.payment_check_image_path?.trim() || null;
       let savedId = editingBuilding?.id;
 
       if (editingBuilding) {
@@ -544,6 +785,12 @@ export default function InvestorsPage() {
           setUploadingId(false);
           if (up) idPath = up;
         }
+        if (checkImageFile && formBuilding.payment_method === "check") {
+          setUploadingCheck(true);
+          const up = await uploadInvestorFile(editingBuilding.id, checkImageFile, "check");
+          setUploadingCheck(false);
+          if (up) checkImagePath = up;
+        }
         const payload = {
           building_id: formBuilding.building_id,
           owner_id: effectiveOwnerId,
@@ -556,6 +803,10 @@ export default function InvestorsPage() {
           total_invested_amount: amountRaw ? parseFloat(amountRaw) : null,
           investment_start_date: formBuilding.investment_start_date || null,
           investment_due_date: formBuilding.investment_due_date || null,
+          payment_method: formBuilding.payment_method?.trim() || null,
+          payment_bank_name: formBuilding.payment_method === "transfer" ? (formBuilding.payment_bank_name?.trim() || null) : null,
+          payment_check_number: formBuilding.payment_method === "check" ? (formBuilding.payment_check_number?.trim() || null) : null,
+          payment_check_image_path: formBuilding.payment_method === "check" ? checkImagePath : null,
           contract_image_path: contractPath,
           id_image_path: idPath,
           notes: formBuilding.notes.trim() || null,
@@ -576,6 +827,9 @@ export default function InvestorsPage() {
           total_invested_amount: amountRaw ? parseFloat(amountRaw) : null,
           investment_start_date: formBuilding.investment_start_date || null,
           investment_due_date: formBuilding.investment_due_date || null,
+          payment_method: formBuilding.payment_method?.trim() || null,
+          payment_bank_name: formBuilding.payment_method === "transfer" ? (formBuilding.payment_bank_name?.trim() || null) : null,
+          payment_check_number: formBuilding.payment_method === "check" ? (formBuilding.payment_check_number?.trim() || null) : null,
           contract_image_path: null,
           id_image_path: null,
           notes: formBuilding.notes.trim() || null,
@@ -583,7 +837,7 @@ export default function InvestorsPage() {
         const { data: inserted, error } = await supabase.from("building_investors").insert(payload).select("id").single();
         if (error) throw error;
         savedId = inserted?.id;
-        if (savedId && (contractFile || idFile)) {
+        if (savedId && (contractFile || idFile || (checkImageFile && formBuilding.payment_method === "check"))) {
           if (contractFile) {
             setUploadingContract(true);
             const up = await uploadInvestorFile(savedId, contractFile, "contract");
@@ -596,7 +850,17 @@ export default function InvestorsPage() {
             setUploadingId(false);
             if (up) idPath = up;
           }
-          await supabase.from("building_investors").update({ contract_image_path: contractPath, id_image_path: idPath }).eq("id", savedId);
+          if (checkImageFile && formBuilding.payment_method === "check") {
+            setUploadingCheck(true);
+            const up = await uploadInvestorFile(savedId, checkImageFile, "check");
+            setUploadingCheck(false);
+            if (up) checkImagePath = up;
+          }
+          await supabase.from("building_investors").update({
+            contract_image_path: contractPath,
+            id_image_path: idPath,
+            ...(formBuilding.payment_method === "check" ? { payment_check_image_path: checkImagePath } : {}),
+          }).eq("id", savedId);
         }
         showToast("تم إضافة المستثمر");
       }
@@ -604,7 +868,8 @@ export default function InvestorsPage() {
       setEditingBuilding(null);
       setContractFile(null);
       setIdFile(null);
-      const { data } = await supabase.from("building_investors").select("*").eq("owner_id", effectiveOwnerId);
+      setCheckImageFile(null);
+      const { data } = await supabase.from("building_investors").select("*").eq("owner_id", effectiveOwnerId).order("created_at", { ascending: false });
       if (data) {
         const withBuildings = (data as BuildingInvestorRow[]).map((row) => ({
           ...row,
@@ -629,8 +894,17 @@ export default function InvestorsPage() {
       investor_id_number: "",
       purchase_price: "",
       purchase_date: new Date().toISOString().slice(0, 10),
+      payment_method: "",
+      payment_bank_name: "",
+      payment_check_number: "",
+      payment_check_image_path: "",
+      contract_image_path: "",
+      id_image_path: "",
       notes: "",
     });
+    setUnitCheckImageFile(null);
+    setUnitContractFile(null);
+    setUnitIdFile(null);
     setFormUnitResale({ resale_sale_id: "" });
     setModalOpen("unit");
   };
@@ -646,8 +920,17 @@ export default function InvestorsPage() {
       investor_id_number: row.investor_id_number || "",
       purchase_price: String(row.purchase_price),
       purchase_date: row.purchase_date || "",
+      payment_method: row.payment_method || "",
+      payment_bank_name: row.payment_bank_name || "",
+      payment_check_number: row.payment_check_number || "",
+      payment_check_image_path: row.payment_check_image_path || "",
+      contract_image_path: row.contract_image_path || "",
+      id_image_path: row.id_image_path || "",
       notes: row.notes || "",
     });
+    setUnitCheckImageFile(null);
+    setUnitContractFile(null);
+    setUnitIdFile(null);
     setFormUnitResale({ resale_sale_id: row.resale_sale_id || "" });
     setModalOpen("unit");
   };
@@ -672,6 +955,27 @@ export default function InvestorsPage() {
     }
     setSaving(true);
     try {
+      let checkImagePath: string | null = formUnit.payment_check_image_path?.trim() || null;
+      if (unitCheckImageFile && formUnit.payment_method === "check") {
+        setUploadingCheck(true);
+        const uploaded = editingUnit
+          ? await uploadUnitInvestmentCheckFile(editingUnit.id, unitCheckImageFile)
+          : null;
+        setUploadingCheck(false);
+        if (uploaded) checkImagePath = uploaded;
+      }
+      let contractPath: string | null = formUnit.contract_image_path?.trim() || null;
+      let idPath: string | null = formUnit.id_image_path?.trim() || null;
+      if (editingUnit) {
+        if (unitContractFile) {
+          const uploaded = await uploadUnitInvestmentFile(editingUnit.id, unitContractFile, "contract");
+          if (uploaded) contractPath = uploaded;
+        }
+        if (unitIdFile) {
+          const uploaded = await uploadUnitInvestmentFile(editingUnit.id, unitIdFile, "id");
+          if (uploaded) idPath = uploaded;
+        }
+      }
       const payload = {
         unit_id: formUnit.unit_id,
         building_id: buildingId,
@@ -681,11 +985,16 @@ export default function InvestorsPage() {
         investor_id_number: formUnit.investor_id_number.trim() || null,
         purchase_price: price,
         purchase_date: formUnit.purchase_date || null,
+        payment_method: formUnit.payment_method?.trim() || null,
+        payment_bank_name: formUnit.payment_method === "transfer" ? (formUnit.payment_bank_name?.trim() || null) : null,
+        payment_check_number: formUnit.payment_method === "check" ? (formUnit.payment_check_number?.trim() || null) : null,
+        payment_check_image_path: formUnit.payment_method === "check" ? checkImagePath : null,
+        contract_image_path: contractPath,
+        id_image_path: idPath,
         notes: formUnit.notes.trim() || null,
       };
       if (editingUnit) {
         const updatePayload: Record<string, unknown> = { ...payload };
-        // لا نغيّر ربط إعادة البيع أو الحالة إذا كانت الوحدة مُخالصة (تم إعادة البيع)
         if (editingUnit.status !== "resold") {
           if (formUnitResale.resale_sale_id) {
             updatePayload.resale_sale_id = formUnitResale.resale_sale_id;
@@ -696,13 +1005,34 @@ export default function InvestorsPage() {
         if (error) throw error;
         showToast("تم تحديث الاستثمار");
       } else {
-        const { error } = await supabase.from("unit_investments").insert(payload);
+        const { data: inserted, error } = await supabase.from("unit_investments").insert(payload).select("id").single();
         if (error) throw error;
+        const savedId = (inserted as { id: string } | null)?.id;
+        if (savedId) {
+          const updates: { payment_check_image_path?: string; contract_image_path?: string; id_image_path?: string } = {};
+          if (unitCheckImageFile && formUnit.payment_method === "check") {
+            setUploadingCheck(true);
+            const uploaded = await uploadUnitInvestmentCheckFile(savedId, unitCheckImageFile);
+            setUploadingCheck(false);
+            if (uploaded) updates.payment_check_image_path = uploaded;
+          }
+          if (unitContractFile) {
+            const uploaded = await uploadUnitInvestmentFile(savedId, unitContractFile, "contract");
+            if (uploaded) updates.contract_image_path = uploaded;
+          }
+          if (unitIdFile) {
+            const uploaded = await uploadUnitInvestmentFile(savedId, unitIdFile, "id");
+            if (uploaded) updates.id_image_path = uploaded;
+          }
+          if (Object.keys(updates).length > 0) {
+            await supabase.from("unit_investments").update(updates).eq("id", savedId);
+          }
+        }
         showToast("تم إضافة استثمار الوحدة");
       }
       setModalOpen(null);
       setEditingUnit(null);
-      const { data } = await supabase.from("unit_investments").select("*").eq("owner_id", effectiveOwnerId);
+      const { data } = await supabase.from("unit_investments").select("*").eq("owner_id", effectiveOwnerId).order("created_at", { ascending: false });
       if (data && Array.isArray(data)) {
         const enriched = (data as UnitInvestmentRow[]).map((r) => {
           const b = buildings.find((x) => x.id === r.building_id) ?? null;
@@ -822,9 +1152,20 @@ export default function InvestorsPage() {
         ) : (
           <>
             {tab === "building" && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3">
-                  <p className="text-sm text-slate-600">مستثمرون بالعمارة — إدارة الاتفاقيات ونسب الأرباح</p>
+              <section className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 flex-wrap">
+                      <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-teal-500/15 text-teal-600">
+                        <TrendingUp className="w-5 h-5" />
+                      </span>
+                      مستثمرون بالعمارة
+                      {buildingInvestors.length > 0 && (
+                        <span className="text-sm font-normal text-slate-500 font-mono">— {buildingInvestors.length.toLocaleString("en")} مستثمر</span>
+                      )}
+                    </h2>
+                    <p className="text-sm text-slate-500 mt-0.5">إدارة الاتفاقيات ونسب الأرباح</p>
+                  </div>
                   {canEdit && (
                     <button type="button" onClick={openAddBuilding} className="inline-flex items-center gap-2 px-4 py-2.5 bg-teal-500 text-white rounded-xl text-sm font-semibold hover:bg-teal-600">
                       <Plus className="w-4 h-4" />
@@ -832,20 +1173,20 @@ export default function InvestorsPage() {
                     </button>
                   )}
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-700 border-b border-slate-200">
-                        <th className="text-center p-3 font-semibold">العمارة</th>
-                        <th className="text-center p-3 font-semibold">المستثمر</th>
-                        <th className="text-center p-3 font-semibold">نسبة الربح</th>
-                        <th className="text-center p-3 font-semibold">نوع العقد</th>
-                        <th className="text-center p-3 font-semibold">مبلغ الاستثمار</th>
-                        <th className="text-center p-3 font-semibold">الربح المتوقع</th>
-                        <th className="text-center p-3 font-semibold w-28">إجراء</th>
+                <div className="overflow-auto max-h-[32rem] border-b border-slate-100" style={{ minHeight: "8rem" }}>
+                  <table className="w-full text-sm text-center border-collapse">
+                    <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(0,0,0,0.06)]">
+                      <tr className="border-b border-slate-200">
+                        <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">العمارة</th>
+                        <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">المستثمر</th>
+                        <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">نسبة الربح</th>
+                        <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">نوع العقد</th>
+                        <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">مبلغ الاستثمار</th>
+                        <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">الربح المتوقع</th>
+                        <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50 w-28">إجراء</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody>
                       {buildingInvestors.length === 0 ? (
                         <tr>
                           <td colSpan={canEdit ? 7 : 6} className="p-8 text-center text-slate-500">
@@ -853,8 +1194,8 @@ export default function InvestorsPage() {
                           </td>
                         </tr>
                       ) : (
-                        buildingInvestors.map((row) => (
-                          <tr key={row.id} className="hover:bg-slate-50/50">
+                        buildingInvestorsPaginated.map((row) => (
+                          <tr key={row.id} className="border-b border-slate-100 hover:bg-teal-50/30 transition">
                             <td className="p-3 text-center font-medium text-slate-800">{row.building?.name ?? "—"}</td>
                             <td className="p-3 text-center">
                               <div className="font-medium text-slate-800">{row.investor_name}</div>
@@ -927,7 +1268,47 @@ export default function InvestorsPage() {
                     </tbody>
                   </table>
                 </div>
-              </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                    <span>عرض</span>
+                    <select
+                      value={buildingPageSize}
+                      onChange={(e) => { setBuildingPageSize(Number(e.target.value)); setBuildingPage(1); }}
+                      className="rounded-2xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-0 transition-all duration-200"
+                    >
+                      {BUILDING_PAGE_SIZES.map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                    <span className="font-mono">
+                      {buildingInvestors.length === 0
+                        ? "—"
+                        : `${((buildingPage - 1) * buildingPageSize + 1).toLocaleString("en")} - ${Math.min(buildingPage * buildingPageSize, buildingInvestors.length).toLocaleString("en")}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setBuildingPage((p) => Math.max(1, p - 1))}
+                      disabled={buildingPage <= 1}
+                      className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm focus:outline-none focus:ring-0"
+                    >
+                      السابق
+                    </button>
+                    <span className="px-2 py-1.5 text-sm text-slate-600 font-mono">
+                      {buildingPage.toLocaleString("en")} / {buildingTotalPages.toLocaleString("en")}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setBuildingPage((p) => Math.min(buildingTotalPages, p + 1))}
+                      disabled={buildingPage >= buildingTotalPages}
+                      className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm focus:outline-none focus:ring-0"
+                    >
+                      التالي
+                    </button>
+                  </div>
+                </div>
+              </section>
             )}
 
             {/* تأكيد الحذف من النظام */}
@@ -992,6 +1373,13 @@ export default function InvestorsPage() {
                       )}
                       <Row label="نوع العقد" value={viewingBuildingInvestor.agreement_type === "from_building_sales" ? "من مبيعات العمارة" : "نسبة متفق عليها"} />
                       <Row label="مبلغ الاستثمار" value={viewingBuildingInvestor.total_invested_amount != null ? `${formatNum(Number(viewingBuildingInvestor.total_invested_amount))} ر.س` : "—"} dirLtr />
+                      <Row label="طريقة الدفع" value={settlementMethodLabel(viewingBuildingInvestor.payment_method)} />
+                      {viewingBuildingInvestor.payment_method === "transfer" && viewingBuildingInvestor.payment_bank_name && (
+                        <Row label="على بنك" value={viewingBuildingInvestor.payment_bank_name} />
+                      )}
+                      {viewingBuildingInvestor.payment_method === "check" && viewingBuildingInvestor.payment_check_number && (
+                        <Row label="رقم الشيك" value={viewingBuildingInvestor.payment_check_number} dirLtr />
+                      )}
                       <Row
                         label="الربح المتوقع"
                         value={
@@ -1011,75 +1399,42 @@ export default function InvestorsPage() {
                       <Row label="بدء الاستثمار" value={formatDateEn(viewingBuildingInvestor.investment_start_date)} dirLtr />
                       <Row label="استحقاق المبلغ" value={formatDateEn(viewingBuildingInvestor.investment_due_date)} dirLtr />
                       {(duration || remaining != null) && (
-                        <div className="grid grid-cols-2 gap-3 pt-3 mt-3 border-t border-slate-100">
+                        <div className="flex flex-wrap gap-2 pt-2 mt-2 border-t border-slate-100">
                           {duration && (
-                            <div className="rounded-xl bg-slate-50/80 px-3 py-2.5">
-                              <p className="text-[11px] text-slate-500 uppercase tracking-wider mb-0.5">مدة العقد</p>
-                              <p className="text-sm font-semibold text-slate-800 tabular-nums">{formatDuration(duration.years, duration.months, duration.days)}</p>
+                            <div className="rounded-full border border-slate-200/70 bg-slate-50 px-3 py-1.5 flex items-center gap-2 shadow-sm min-w-0">
+                              <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide shrink-0">مدة العقد</span>
+                              <span className="text-xs font-bold text-slate-700 tabular-nums">{(formatDuration(duration.years, duration.months, duration.days))}</span>
                             </div>
                           )}
                           {remaining != null ? (
-                            <div className="rounded-xl bg-teal-50/80 px-3 py-2.5">
-                              <p className="text-[11px] text-teal-600 uppercase tracking-wider mb-0.5">المتبقي من العقد</p>
-                              <p className="text-sm font-semibold text-teal-800 tabular-nums">{formatDuration(remaining.years, remaining.months, remaining.days)}</p>
+                            <div className="rounded-full border border-teal-200/70 bg-teal-50 px-3 py-1.5 flex items-center gap-2 shadow-sm min-w-0">
+                              <span className="text-[10px] font-medium text-teal-600 uppercase tracking-wide shrink-0">المتبقي من العقد</span>
+                              <span className="text-xs font-bold text-teal-700 tabular-nums">{formatDuration(remaining.years, remaining.months, remaining.days)}</span>
                             </div>
                           ) : due && new Date(due + "T12:00:00").getTime() < Date.now() ? (
-                            <div className="rounded-xl bg-amber-50/80 px-3 py-2.5">
-                              <p className="text-[11px] text-amber-600 uppercase tracking-wider mb-0.5">المتبقي من العقد</p>
-                              <p className="text-sm font-semibold text-amber-800">منتهي</p>
+                            <div className="rounded-full border border-amber-200/70 bg-amber-50 px-3 py-1.5 flex items-center gap-2 shadow-sm min-w-0">
+                              <span className="text-[10px] font-medium text-amber-600 uppercase tracking-wide shrink-0">المتبقي من العقد</span>
+                              <span className="text-xs font-bold text-amber-800">منتهي</span>
                             </div>
                           ) : null}
                         </div>
                       )}
                       {viewingBuildingInvestor.notes && <Row label="ملاحظات" value={viewingBuildingInvestor.notes} />}
                     </div>
-                    {viewingBuildingInvestor.closed_at != null && (
-                      <div className="rounded-xl border border-emerald-200/80 overflow-hidden shadow-sm mt-4">
-                        <div className="bg-gradient-to-l from-emerald-500 to-teal-500 px-4 py-3 text-center">
-                          <p className="text-lg font-bold text-white tracking-wide">مخالصة</p>
-                        </div>
-                        <div className="bg-emerald-50/90 p-4 space-y-2 text-sm">
-                        {viewingBuildingInvestor.settlement_method && (
-                          <p className="text-emerald-800 font-semibold pb-2 border-b border-emerald-100/80">تم المخالصة بـ {settlementMethodLabel(viewingBuildingInvestor.settlement_method)}</p>
-                        )}
-                        <div className="grid grid-cols-1 gap-2">
-                          {viewingBuildingInvestor.settlement_type && (
-                            <div className="flex justify-between"><span className="text-slate-600">نوع المخالصة</span><span className="font-medium">{settlementTypeLabel(viewingBuildingInvestor.settlement_type)}</span></div>
-                          )}
-                          <div className="flex justify-between"><span className="text-slate-600">نسبة الإغلاق النهائية</span><span className="font-semibold dir-ltr text-emerald-700">{viewingBuildingInvestor.closing_percentage != null ? `${Number(viewingBuildingInvestor.closing_percentage)}%` : "—"}</span></div>
-                          <div className="flex justify-between"><span className="text-slate-600">الربح المحقق (ر.س)</span><span className="font-semibold dir-ltr text-emerald-700">{viewingBuildingInvestor.realized_profit != null ? `${formatNum(Number(viewingBuildingInvestor.realized_profit))} ر.س` : "—"}</span></div>
-                          {viewingBuildingInvestor.total_invested_amount != null && viewingBuildingInvestor.realized_profit != null && (
-                            <div className="flex justify-between"><span className="text-slate-600">الإجمالي</span><span className="font-bold dir-ltr text-emerald-800">{formatNum(Number(viewingBuildingInvestor.total_invested_amount) + Number(viewingBuildingInvestor.realized_profit))} ر.س</span></div>
-                          )}
-                          <div className="flex justify-between"><span className="text-slate-600">تاريخ الإغلاق</span><span className="font-medium">{viewingBuildingInvestor.closed_at ? formatDateEn(viewingBuildingInvestor.closed_at) : "—"}</span></div>
-                          {viewingBuildingInvestor.settlement_account_iban && <div className="flex justify-between"><span className="text-slate-600">رقم الحساب / الآيبان</span><span className="font-medium dir-ltr">{viewingBuildingInvestor.settlement_account_iban}</span></div>}
-                          {viewingBuildingInvestor.settlement_bank_name && <div className="flex justify-between"><span className="text-slate-600">اسم البنك</span><span className="font-medium">{viewingBuildingInvestor.settlement_bank_name}</span></div>}
-                          {(() => {
-                            const t = getClosingTimingLabel(viewingBuildingInvestor.closed_at, viewingBuildingInvestor.investment_due_date);
-                            return t ? (
-                              <div className={`pt-2 mt-2 border-t border-emerald-100/80 rounded-lg px-2 py-1.5 ${t.variant === "early" ? "bg-teal-50/80 text-teal-800" : t.variant === "late" ? "bg-amber-50/80 text-amber-800" : "bg-slate-50/80 text-slate-700"}`}>
-                                <span className="text-xs font-medium">{t.label}</span>
-                              </div>
-                            ) : null;
-                          })()}
-                        </div>
-                        </div>
-                      </div>
-                    )}
                     <div className="space-y-3 pt-2 border-t border-slate-100">
                       <p className="text-sm font-medium text-slate-700 text-center">المرفقات</p>
                       <div className="flex flex-wrap gap-2 justify-center">
                         {viewingBuildingInvestor.contract_image_path ? (
                           viewingContractUrl ? (
-                            <a href={viewingContractUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-teal-50 text-teal-700 text-sm font-medium hover:bg-teal-100">
+                            <a href={viewingContractUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors">
                               عرض صورة العقد
                             </a>
                           ) : (
                             <span className="text-xs text-slate-500">عقد مرفق — جاري التحميل...</span>
                           )
                         ) : canEdit ? (
-                          <button type="button" onClick={() => { setViewingBuildingInvestor(null); openEditBuilding(viewingBuildingInvestor); }} className="inline-flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/80 text-amber-800 text-sm font-medium shadow-sm hover:shadow hover:from-amber-100 hover:to-orange-100 hover:border-amber-300 transition-all duration-200">
-                            <FileUp className="w-4 h-4 text-amber-600 shrink-0" />
+                          <button type="button" onClick={() => { setTriggerFileInput("contract"); setViewingBuildingInvestor(null); openEditBuilding(viewingBuildingInvestor); }} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors">
+                            <FileUp className="w-4 h-4 shrink-0" />
                             إرفاق صورة العقد
                           </button>
                         ) : (
@@ -1087,34 +1442,43 @@ export default function InvestorsPage() {
                         )}
                         {viewingBuildingInvestor.id_image_path ? (
                           viewingIdUrl ? (
-                            <a href={viewingIdUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-teal-50 text-teal-700 text-sm font-medium hover:bg-teal-100">
+                            <a href={viewingIdUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors">
                               عرض صورة الهوية
                             </a>
                           ) : (
                             <span className="text-xs text-slate-500">هوية مرفقة — جاري التحميل...</span>
                           )
                         ) : canEdit ? (
-                          <button type="button" onClick={() => { setViewingBuildingInvestor(null); openEditBuilding(viewingBuildingInvestor); }} className="inline-flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl bg-gradient-to-br from-sky-50 to-teal-50 border border-sky-200/80 text-sky-800 text-sm font-medium shadow-sm hover:shadow hover:from-sky-100 hover:to-teal-100 hover:border-sky-300 transition-all duration-200">
-                            <CreditCard className="w-4 h-4 text-sky-600 shrink-0" />
+                          <button type="button" onClick={() => { setTriggerFileInput("id"); setViewingBuildingInvestor(null); openEditBuilding(viewingBuildingInvestor); }} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors">
+                            <CreditCard className="w-4 h-4 shrink-0" />
                             إرفاق صورة الهوية
                           </button>
                         ) : (
                           <span className="text-xs text-slate-500">لم تُرفق هوية</span>
                         )}
+                        {viewingBuildingInvestor.payment_method === "check" && viewingBuildingInvestor.payment_check_image_path ? (
+                          viewingCheckImageUrl ? (
+                            <a href={viewingCheckImageUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors">
+                              عرض صورة الشيك
+                            </a>
+                          ) : (
+                            <span className="text-xs text-slate-500">صورة الشيك — جاري التحميل...</span>
+                          )
+                        ) : null}
                       </div>
                     </div>
                     {canEdit && (
-                      <div className="pt-2 flex gap-2">
-                        <button type="button" onClick={() => { setViewingBuildingInvestor(null); openEditBuilding(viewingBuildingInvestor); }} className="flex-1 py-2.5 rounded-xl border border-teal-500 text-teal-600 font-medium hover:bg-teal-50">
+                      <div className="pt-2 flex flex-wrap gap-2 justify-center">
+                        <button type="button" onClick={() => { setViewingBuildingInvestor(null); openEditBuilding(viewingBuildingInvestor); }} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-teal-500 text-white text-sm font-medium hover:bg-teal-600 transition-colors">
                           تعديل
                         </button>
-                        <button type="button" onClick={() => setViewingBuildingInvestor(null)} className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200">
+                        <button type="button" onClick={() => setViewingBuildingInvestor(null)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors">
                           إغلاق
                         </button>
                       </div>
                     )}
                     {!canEdit && (
-                      <button type="button" onClick={() => setViewingBuildingInvestor(null)} className="w-full py-2.5 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200">
+                      <button type="button" onClick={() => setViewingBuildingInvestor(null)} className="w-full py-2 rounded-full border border-slate-200 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors">
                         إغلاق
                       </button>
                     )}
@@ -1123,6 +1487,119 @@ export default function InvestorsPage() {
               </div>
               );
             })()}
+
+            {transferSource && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-slate-800">نقل رأس المال إلى عمارة أو وحدة جديدة</h3>
+                    <button type="button" onClick={() => setTransferSource(null)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    <p className="text-sm text-slate-600">
+                      المستثمر: <strong>{transferSource.investor_name}</strong> — رأس المال المتاح للنقل: <span className="dir-ltr font-semibold text-amber-700">{formatNum(capitalStillAvailable(transferSource))} ر.س</span>
+                    </p>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">الوجهة</label>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => setTransferTargetType("building")} className={`flex-1 py-2.5 rounded-xl border text-sm font-medium ${transferTargetType === "building" ? "border-teal-500 bg-teal-50 text-teal-800" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                          عمارة جديدة
+                        </button>
+                        <button type="button" onClick={() => setTransferTargetType("unit")} className={`flex-1 py-2.5 rounded-xl border text-sm font-medium ${transferTargetType === "unit" ? "border-teal-500 bg-teal-50 text-teal-800" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                          وحدة جديدة
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">مبلغ النقل (ر.س)</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={transferAmount ? formatNum(parseInt(transferAmount.replace(/\D/g, ""), 10) || 0) : ""}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/\D/g, "");
+                          const num = raw ? parseInt(raw, 10) : 0;
+                          const max = capitalStillAvailable(transferSource);
+                          if (max <= 0) setTransferAmount("");
+                          else setTransferAmount(String(Math.min(num, max)));
+                        }}
+                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm dir-ltr focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                        placeholder={String(capitalStillAvailable(transferSource))}
+                      />
+                    </div>
+                    {transferTargetType === "building" && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">العمارة المستهدفة</label>
+                          <select value={transferBuildingId} onChange={(e) => setTransferBuildingId(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500">
+                            {buildings.map((b) => (
+                              <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">نسبة الربح %</label>
+                            <input type="number" min={0} max={100} step={0.5} value={transferProfitPct} onChange={(e) => setTransferProfitPct(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">إلى % (اختياري)</label>
+                            <input type="number" min={0} max={100} step={0.5} value={transferProfitPctTo} onChange={(e) => setTransferProfitPctTo(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">تاريخ البدء</label>
+                            <input type="date" value={transferStartDate} onChange={(e) => setTransferStartDate(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">تاريخ الاستحقاق</label>
+                            <input type="date" value={transferDueDate} onChange={(e) => setTransferDueDate(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {transferTargetType === "unit" && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">العمارة</label>
+                          <select value={transferBuildingId} onChange={(e) => { setTransferBuildingId(e.target.value); setTransferUnitId(""); }} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500">
+                            {buildings.map((b) => (
+                              <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">الوحدة</label>
+                          <select value={transferUnitId} onChange={(e) => setTransferUnitId(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500">
+                            <option value="">— اختر الوحدة —</option>
+                            {units.filter((u) => u.building_id === transferBuildingId).map((u) => (
+                              <option key={u.id} value={u.id}>وحدة {u.unit_number} — د{u.floor}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">تاريخ الشراء</label>
+                          <input type="date" value={transferStartDate} onChange={(e) => setTransferStartDate(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
+                        </div>
+                      </>
+                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">ملاحظات (اختياري)</label>
+                      <textarea value={transferNotes} onChange={(e) => setTransferNotes(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" rows={2} />
+                    </div>
+                  </div>
+                  <div className="flex gap-3 p-4 border-t border-slate-100">
+                    <button type="button" onClick={() => setTransferSource(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-medium hover:bg-slate-50">إلغاء</button>
+                    <button type="button" onClick={submitTransferCapital} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-amber-500 text-white font-medium hover:bg-amber-600 disabled:opacity-60">
+                      {saving ? "جاري التنفيذ..." : "تأكيد النقل"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {tab === "unit" && (
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -1231,7 +1708,64 @@ export default function InvestorsPage() {
                 <Row label="المستثمر" value={viewingUnitInvestment.investor_name} />
                 <Row label="الجوال" value={viewingUnitInvestment.investor_phone ?? "—"} dirLtr />
                 <Row label="رقم الهوية" value={viewingUnitInvestment.investor_id_number ?? "—"} dirLtr />
+                {(viewingUnitInvestment.contract_image_path || viewingUnitInvestment.id_image_path) && (
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    {viewingUnitInvestment.contract_image_path && (
+                      <a
+                        href="#"
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          const { data } = await supabase.storage.from(INVESTOR_DOCS_BUCKET).createSignedUrl(viewingUnitInvestment.contract_image_path!, 3600);
+                          if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+                        }}
+                        className="text-teal-600 hover:underline text-sm font-medium"
+                      >
+                        عرض صورة العقد
+                      </a>
+                    )}
+                    {viewingUnitInvestment.id_image_path && (
+                      <a
+                        href="#"
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          const { data } = await supabase.storage.from(INVESTOR_DOCS_BUCKET).createSignedUrl(viewingUnitInvestment.id_image_path!, 3600);
+                          if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+                        }}
+                        className="text-teal-600 hover:underline text-sm font-medium"
+                      >
+                        عرض صورة الهوية
+                      </a>
+                    )}
+                  </div>
+                )}
                 <Row label="سعر الشراء" value={`${formatNum(Number(viewingUnitInvestment.purchase_price))} ر.س`} dirLtr />
+                {viewingUnitInvestment.payment_method && (
+                  <>
+                    <Row label="طريقة الدفع" value={settlementMethodLabel(viewingUnitInvestment.payment_method)} />
+                    {viewingUnitInvestment.payment_method === "transfer" && viewingUnitInvestment.payment_bank_name && (
+                      <Row label="على بنك" value={viewingUnitInvestment.payment_bank_name} />
+                    )}
+                    {viewingUnitInvestment.payment_method === "check" && viewingUnitInvestment.payment_check_number && (
+                      <Row label="رقم الشيك" value={viewingUnitInvestment.payment_check_number} dirLtr />
+                    )}
+                    {viewingUnitInvestment.payment_method === "check" && viewingUnitInvestment.payment_check_image_path && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-600 font-medium shrink-0">صورة الشيك</span>
+                        <a
+                          href="#"
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            const { data } = await supabase.storage.from(INVESTOR_DOCS_BUCKET).createSignedUrl(viewingUnitInvestment.payment_check_image_path!, 3600);
+                            if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+                          }}
+                          className="text-teal-600 hover:underline text-sm"
+                        >
+                          عرض صورة الشيك
+                        </a>
+                      </div>
+                    )}
+                  </>
+                )}
                 <Row label="تاريخ الشراء" value={viewingUnitInvestment.purchase_date ? formatDateEn(viewingUnitInvestment.purchase_date) : "—"} dirLtr />
                 <Row label="حالة مشروع الاستثمار" value={viewingUnitInvestment.status === "resold" ? "تم إعادة البيع" : viewingUnitInvestment.status === "cancelled" ? "ملغي" : "تحت الإنشاء"} />
                 <div className="pt-2 border-t border-slate-100 space-y-2">
@@ -1268,21 +1802,6 @@ export default function InvestorsPage() {
                 <Row label="سعر إعادة البيع" value={viewingUnitInvestment.resalePrice != null ? `${formatNum(Number(viewingUnitInvestment.resalePrice))} ر.س` : "—"} dirLtr />
                 <Row label="الربح" value={viewingUnitInvestment.profit != null ? `+${formatNum(Number(viewingUnitInvestment.profit))} ر.س` : "—"} dirLtr />
                 {viewingUnitInvestment.notes && <Row label="ملاحظات" value={viewingUnitInvestment.notes} />}
-              </div>
-              <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-                {canEdit && (
-                  <>
-                    <button type="button" onClick={() => { setViewingUnitInvestment(null); openEditUnit(viewingUnitInvestment); }} className="flex-1 min-w-[100px] py-2.5 rounded-xl border border-teal-500 text-teal-600 font-medium hover:bg-teal-50 text-sm">
-                      تعديل
-                    </button>
-                    <button type="button" onClick={() => setDeleteConfirm({ type: "unit", id: viewingUnitInvestment.id, label: viewingUnitInvestment.investor_name })} className="flex-1 min-w-[100px] py-2.5 rounded-xl border border-red-200 text-red-600 font-medium hover:bg-red-50 text-sm">
-                      حذف
-                    </button>
-                  </>
-                )}
-                <button type="button" onClick={() => setViewingUnitInvestment(null)} className="flex-1 min-w-[100px] py-2.5 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 text-sm">
-                  إغلاق
-                </button>
               </div>
             </div>
           </div>
@@ -1403,24 +1922,38 @@ export default function InvestorsPage() {
                     )}
                     <div className="flex justify-between"><span className="text-slate-600">نسبة الإغلاق النهائية</span><span className="font-semibold dir-ltr text-teal-700">{closingBuildingInvestor.closing_percentage != null && closingBuildingInvestor.closing_percentage !== undefined ? Number(closingBuildingInvestor.closing_percentage) + "%" : (closingBuildingInvestor.total_invested_amount != null && closingBuildingInvestor.realized_profit != null ? ((Number(closingBuildingInvestor.realized_profit) / Number(closingBuildingInvestor.total_invested_amount)) * 100).toFixed(1) + "%" : "—")}</span></div>
                     <div className="flex justify-between"><span className="text-slate-600">الربح المحقق (ر.س)</span><span className="font-semibold dir-ltr text-emerald-700">{closingBuildingInvestor.realized_profit != null ? `${formatNum(Number(closingBuildingInvestor.realized_profit))} ر.س` : "—"}</span></div>
-                    {closingBuildingInvestor.total_invested_amount != null && closingBuildingInvestor.realized_profit != null && (
-                      <div className="flex justify-between"><span className="text-slate-600">الإجمالي</span><span className="font-bold dir-ltr text-emerald-800">{formatNum(Number(closingBuildingInvestor.total_invested_amount) + Number(closingBuildingInvestor.realized_profit))} ر.س</span></div>
+                    {closingBuildingInvestor.realized_profit != null && (
+                      <div className="flex justify-between"><span className="text-slate-600">{closingBuildingInvestor.settlement_type === "profit_only" ? "مبلغ المخالصة (أرباح فقط)" : "الإجمالي (رأس المال + الربح)"}</span><span className="font-bold dir-ltr text-emerald-800">{closingBuildingInvestor.settlement_type === "profit_only" ? formatNum(Number(closingBuildingInvestor.realized_profit)) : (closingBuildingInvestor.total_invested_amount != null ? formatNum(Number(closingBuildingInvestor.total_invested_amount) + Number(closingBuildingInvestor.realized_profit)) : "—")} ر.س</span></div>
                     )}
+                    {closingBuildingInvestor.settlement_type === "profit_only" && (() => { const cap = capitalStillAvailable(closingBuildingInvestor); return cap > 0 ? (<div className="flex justify-between"><span className="text-slate-600">رأس المال القائم في العمارة</span><span className="font-semibold dir-ltr text-amber-700">{formatNum(cap)} ر.س</span></div>) : null; })()}
                     <div className="flex justify-between"><span className="text-slate-600">تاريخ الإغلاق</span><span className="font-medium">{closingBuildingInvestor.closed_at ? formatDateEn(closingBuildingInvestor.closed_at) : "—"}</span></div>
                     {closingBuildingInvestor.settlement_account_iban && <div className="flex justify-between"><span className="text-slate-600">رقم الحساب / الآيبان</span><span className="font-medium dir-ltr">{closingBuildingInvestor.settlement_account_iban}</span></div>}
                     {closingBuildingInvestor.settlement_bank_name && <div className="flex justify-between"><span className="text-slate-600">اسم البنك</span><span className="font-medium">{closingBuildingInvestor.settlement_bank_name}</span></div>}
                     {(() => {
                       const t = getClosingTimingLabel(closingBuildingInvestor.closed_at, closingBuildingInvestor.investment_due_date);
                       return t ? (
-                        <div className={`pt-2 mt-2 border-t border-emerald-100/80 rounded-lg px-2 py-1.5 ${t.variant === "early" ? "bg-teal-50/80 text-teal-800" : t.variant === "late" ? "bg-amber-50/80 text-amber-800" : "bg-slate-50/80 text-slate-700"}`}>
-                          <span className="text-xs font-medium">{t.label}</span>
+                        <div className="flex justify-between items-center gap-2 pt-2 border-t border-emerald-100/80">
+                          <span className="text-slate-600 text-sm">توقيت الإغلاق</span>
+                          <span className={`text-xs font-medium text-right ${t.variant === "early" ? "text-teal-700" : t.variant === "late" ? "text-amber-700" : "text-slate-600"}`}>{t.label}</span>
                         </div>
                       ) : null;
                     })()}
                   </div>
                   </div>
                 </div>
-              ) : (
+              ) : null}
+              {closingBuildingInvestor.closed_at && closingBuildingInvestor.settlement_type === "profit_only" && capitalStillAvailable(closingBuildingInvestor) > 0 && (
+                <div className="rounded-xl border border-amber-200/80 bg-amber-50/30 p-4 space-y-3">
+                  <p className="text-sm font-semibold text-amber-800">نقل رأس المال</p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    <button type="button" onClick={() => { setClosingBuildingInvestor(null); setClosingBuildingPercentage(""); setClosingSettlementMethod(""); setClosingSettlementAccountIban(""); setClosingSettlementBankName(""); setClosingSettlementType(""); setClosingStep(1); setClosingSettlementCashAmount(""); setClosingSettlementCheckAmount(""); openTransferModal(closingBuildingInvestor); }} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-amber-400 bg-white text-amber-700 text-sm font-medium hover:bg-amber-100 transition-colors">
+                      <TrendingUp className="w-4 h-4 shrink-0" />
+                      نقل رأس المال إلى عمارة أو وحدة
+                    </button>
+                  </div>
+                </div>
+              )}
+              {!closingBuildingInvestor.closed_at && (
                 <>
                   {/* مؤشر الخطوات */}
                   <div className="flex items-center justify-center gap-1 sm:gap-2">
@@ -1459,6 +1992,9 @@ export default function InvestorsPage() {
                         <button type="button" onClick={() => setClosingSettlementType("profit_only")} className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${closingSettlementType === "profit_only" ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>الأرباح فقط</button>
                         <button type="button" onClick={() => setClosingSettlementType("with_capital")} className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${closingSettlementType === "with_capital" ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>مع رأس المال</button>
                       </div>
+                      {closingSettlementType === "profit_only" && computedProfit != null && (
+                        <p className="text-sm text-slate-600">إجمالي المخالصة: <span className="font-bold dir-ltr text-emerald-700">{formatNum(computedProfit)} ر.س</span></p>
+                      )}
                       {closingSettlementType === "with_capital" && computedProfit != null && (
                         <p className="text-sm text-slate-600">إجمالي المخالصة: <span className="font-bold dir-ltr text-emerald-700">{formatNum(capital + computedProfit)} ر.س</span></p>
                       )}
@@ -1476,26 +2012,34 @@ export default function InvestorsPage() {
                     <div className="space-y-3">
                       <p className="text-sm font-semibold text-slate-700">طريقة المخالصة</p>
                       <div className="flex flex-wrap gap-2">
-                        {(["حوالة", "شيك", "كاش"] as const).map((method) => (
-                          <button key={method} type="button" onClick={() => setClosingSettlementMethod(method)} className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${closingSettlementMethod === method ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>{method}</button>
+                        {([{ value: "حوالة", label: "حوالة" }, { value: "شيك", label: "شيك مصدق" }, { value: "كاش", label: "كاش" }] as const).map(({ value, label }) => (
+                          <button key={value} type="button" onClick={() => setClosingSettlementMethod(value)} className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${closingSettlementMethod === value ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>{label}</button>
                         ))}
                       </div>
                       {closingSettlementMethod === "حوالة" && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                          <div>
+                        <div className="flex flex-wrap items-end gap-2 pt-1">
+                          <div className="min-w-0 flex-1 max-w-[300px]">
                             <label className="block text-xs font-medium text-slate-600 mb-0.5">رقم الحساب أو الآيبان</label>
-                            <input type="text" value={closingSettlementAccountIban} onChange={(e) => setClosingSettlementAccountIban(e.target.value)} placeholder="رقم الحساب / الآيبان" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm dir-ltr focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
+                            <input type="text" value={closingSettlementAccountIban} onChange={(e) => setClosingSettlementAccountIban(e.target.value)} placeholder="رقم الحساب / الآيبان" className="w-full border border-slate-200 rounded-full px-4 py-2 text-sm dir-ltr focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
                           </div>
-                          <div>
+                          <div className="min-w-0 flex-1 max-w-[180px]">
                             <label className="block text-xs font-medium text-slate-600 mb-0.5">اسم البنك</label>
-                            <input type="text" value={closingSettlementBankName} onChange={(e) => setClosingSettlementBankName(e.target.value)} placeholder="اسم البنك" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
+                            <input type="text" value={closingSettlementBankName} onChange={(e) => setClosingSettlementBankName(e.target.value)} placeholder="اسم البنك" className="w-full border border-slate-200 rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
                           </div>
                         </div>
                       )}
                       {closingSettlementMethod === "شيك" && settlementAmount != null && (
-                        <div className="pt-1">
-                          <p className="text-xs font-medium text-slate-600 mb-0.5">مبلغ الشيك (ر.س)</p>
-                          <p className="text-sm font-bold text-emerald-700 dir-ltr">{formatNum(settlementAmount)} ر.س</p>
+                        <div className="flex flex-wrap items-end gap-2 pt-1">
+                          <div>
+                            <label className="block text-xs font-medium text-slate-600 mb-0.5">مبلغ الشيك (ر.س)</label>
+                            <div className="border border-slate-200 rounded-full px-4 py-2 text-sm font-bold text-emerald-700 dir-ltr bg-emerald-50/50 min-w-0">
+                              {formatNum(settlementAmount)} ر.س
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-[140px] max-w-[200px]">
+                            <label className="block text-xs font-medium text-slate-600 mb-0.5">من بنك</label>
+                            <input type="text" value={closingSettlementBankName} onChange={(e) => setClosingSettlementBankName(e.target.value)} placeholder="اسم البنك" className="w-full border border-slate-200 rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
+                          </div>
                         </div>
                       )}
                       {closingSettlementMethod === "كاش" && settlementAmount != null && (
@@ -1519,7 +2063,7 @@ export default function InvestorsPage() {
                       <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-sm space-y-1">
                         <p>نسبة الإغلاق: <span className="font-medium dir-ltr">{closingBuildingPercentage}%</span> — الربح المحقق: <span className="font-medium dir-ltr text-emerald-700">{computedProfit != null ? formatNum(computedProfit) + " ر.س" : "—"}</span></p>
                         <p>نوع المخالصة: {closingSettlementType === "with_capital" ? "مع رأس المال" : "الأرباح فقط"}{closingSettlementType === "with_capital" && computedProfit != null ? ` (إجمالي ${formatNum(capital + computedProfit)} ر.س)` : ""}</p>
-                        <p>طريقة المخالصة: {closingSettlementMethod}</p>
+                        <p>طريقة المخالصة: {closingSettlementMethod === "شيك" ? "شيك مصدق" : closingSettlementMethod}</p>
                       </div>
                       <div className="flex justify-between pt-1">
                         <button type="button" onClick={() => setClosingStep(3)} className="px-4 py-2 rounded-full border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50">السابق</button>
@@ -1632,34 +2176,100 @@ export default function InvestorsPage() {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">نوع العقد</label>
                     <select
                       value={formBuilding.agreement_type}
                       onChange={(e) => setFormBuilding((p) => ({ ...p, agreement_type: e.target.value as "agreed_percentage" | "from_building_sales" }))}
-                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                      className="w-full h-[42px] border border-slate-200 rounded-xl px-4 py-2 text-sm leading-normal focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
                     >
                       <option value="agreed_percentage">نسبة متفق عليها</option>
                       <option value="from_building_sales">من مبيعات العمارة</option>
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">مبلغ الاستثمار (ر.س)</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={formBuilding.total_invested_amount ? formatNum(parseInt(formBuilding.total_invested_amount.replace(/\D/g, ""), 10) || 0) : ""}
+                      onChange={(e) => setFormBuilding((p) => ({ ...p, total_invested_amount: e.target.value.replace(/\D/g, "") }))}
+                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm dir-ltr focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                    />
+                    {(expectedFrom != null && expectedFrom > 0) && (
+                      <p className="mt-2 text-sm font-semibold text-teal-700 bg-teal-50 rounded-xl px-3 py-2 dir-ltr">
+                        {expectedTo != null
+                          ? `الربح المتوقع: ${formatNum(Math.round(expectedFrom))} – ${formatNum(Math.round(expectedTo))} ر.س`
+                          : `الربح المتوقع: ${formatNum(Math.round(expectedFrom))} ر.س`}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">مبلغ الاستثمار (ر.س)</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={formBuilding.total_invested_amount ? formatNum(parseInt(formBuilding.total_invested_amount.replace(/\D/g, ""), 10) || 0) : ""}
-                    onChange={(e) => setFormBuilding((p) => ({ ...p, total_invested_amount: e.target.value.replace(/\D/g, "") }))}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm dir-ltr focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
-                  />
-                  {(expectedFrom != null && expectedFrom > 0) && (
-                    <p className="mt-2 text-sm font-semibold text-teal-700 bg-teal-50 rounded-xl px-3 py-2 dir-ltr">
-                      {expectedTo != null
-                        ? `الربح المتوقع: ${formatNum(Math.round(expectedFrom))} – ${formatNum(Math.round(expectedTo))} ر.س`
-                        : `الربح المتوقع: ${formatNum(Math.round(expectedFrom))} ر.س`}
-                    </p>
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold text-slate-700">طريقة الدفع</p>
+                  <div className="flex flex-wrap gap-2">
+                    {([{ value: "transfer", label: "حوالة" }, { value: "check", label: "شيك مصدق" }, { value: "cash", label: "كاش" }] as const).map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setFormBuilding((p) => ({ ...p, payment_method: value }))}
+                        className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${formBuilding.payment_method === value ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {formBuilding.payment_method === "transfer" && (
+                    <div className="pt-1">
+                      <label className="block text-xs font-medium text-slate-600 mb-0.5">على بنك</label>
+                      <input
+                        type="text"
+                        value={formBuilding.payment_bank_name}
+                        onChange={(e) => setFormBuilding((p) => ({ ...p, payment_bank_name: e.target.value }))}
+                        placeholder="على بنك"
+                        className="w-full max-w-[280px] border border-slate-200 rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                      />
+                    </div>
+                  )}
+                  {formBuilding.payment_method === "check" && (
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">رقم الشيك</label>
+                        <input
+                          type="text"
+                          value={formBuilding.payment_check_number}
+                          onChange={(e) => setFormBuilding((p) => ({ ...p, payment_check_number: e.target.value }))}
+                          placeholder="رقم الشيك"
+                          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm dir-ltr focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">صورة الشيك</label>
+                        <input
+                          ref={checkFileInputRef}
+                          type="file"
+                          accept="image/*,.pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) setCheckImageFile(f);
+                            e.target.value = "";
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => checkFileInputRef.current?.click()}
+className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200/80 bg-emerald-50/60 text-emerald-800 text-sm font-medium hover:bg-emerald-50/90 hover:border-emerald-300 transition-colors"
+                    >
+                          <FileUp className="w-4 h-4 shrink-0" />
+                          {checkImageFile ? checkImageFile.name : formBuilding.payment_check_image_path ? "مرفق — تغيير" : "اختر ملف"}
+                        </button>
+                        {(formBuilding.payment_check_image_path || checkImageFile) && (
+                          <p className="text-xs text-teal-600 mt-1">{checkImageFile ? "سيتم رفع الملف عند الحفظ" : "مرفق"}</p>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -1682,35 +2292,53 @@ export default function InvestorsPage() {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div ref={contractImageSectionRef}>
                     <label className="block text-sm font-medium text-slate-700 mb-1">صورة العقد</label>
                     <input
+                      ref={contractFileInputRef}
                       type="file"
                       accept="image/*,.pdf,.doc,.docx"
-                      className="w-full text-sm text-slate-600 file:mr-2 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-teal-50 file:text-teal-700 file:font-medium"
+                      className="hidden"
                       onChange={(e) => {
                         const f = e.target.files?.[0];
                         if (f) setContractFile(f);
                         e.target.value = "";
                       }}
                     />
+                    <button
+                      type="button"
+                      onClick={() => contractFileInputRef.current?.click()}
+                      className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200/80 bg-emerald-50/60 text-emerald-800 text-sm font-medium hover:bg-emerald-50/90 hover:border-emerald-300 transition-colors"
+                    >
+                      <FileUp className="w-4 h-4 shrink-0" />
+                      {contractFile ? contractFile.name : formBuilding.contract_image_path ? "مرفق — تغيير" : "اختر ملف"}
+                    </button>
                     {(formBuilding.contract_image_path || contractFile) && (
                       <p className="text-xs text-teal-600 mt-1">{contractFile ? "سيتم رفع الملف عند الحفظ" : "مرفق"}</p>
                     )}
                   </div>
-                  <div>
+                  <div ref={idImageSectionRef}>
                     <label className="block text-sm font-medium text-slate-700 mb-1">صورة الهوية</label>
                     <input
+                      ref={idFileInputRef}
                       type="file"
                       accept="image/*"
-                      className="w-full text-sm text-slate-600 file:mr-2 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-teal-50 file:text-teal-700 file:font-medium"
+                      className="hidden"
                       onChange={(e) => {
                         const f = e.target.files?.[0];
                         if (f) setIdFile(f);
                         e.target.value = "";
                       }}
                     />
+                    <button
+                      type="button"
+                      onClick={() => idFileInputRef.current?.click()}
+                      className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200/80 bg-emerald-50/60 text-emerald-800 text-sm font-medium hover:bg-emerald-50/90 hover:border-emerald-300 transition-colors"
+                    >
+                      <FileUp className="w-4 h-4 shrink-0" />
+                      {idFile ? idFile.name : formBuilding.id_image_path ? "مرفق — تغيير" : "اختر ملف"}
+                    </button>
                     {(formBuilding.id_image_path || idFile) && (
                       <p className="text-xs text-teal-600 mt-1">{idFile ? "سيتم رفع الملف عند الحفظ" : "مرفق"}</p>
                     )}
@@ -1838,13 +2466,128 @@ export default function InvestorsPage() {
                   onChange={(e) => setFormUnit((p) => ({ ...p, purchase_price: e.target.value.replace(/\D/g, "") }))}
                   className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm dir-ltr"
                 />
-                <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                  المستثمر مربوط بالوحدة التي اخترتها. عند إتمام بيع الوحدة من المالك (أو من المنصة) إلى المشتري الجديد يُربَط البيع هنا ويُحسب الربح تلقائياً (سعر البيع − سعر الشراء).
-                </p>
+              </div>
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-slate-700">طريقة الدفع</p>
+                <div className="flex flex-wrap gap-2">
+                  {([{ value: "transfer", label: "حوالة" }, { value: "check", label: "شيك مصدق" }, { value: "cash", label: "كاش" }] as const).map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setFormUnit((p) => ({ ...p, payment_method: value }))}
+                      className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${formUnit.payment_method === value ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {formUnit.payment_method === "transfer" && (
+                  <div className="pt-1">
+                    <label className="block text-xs font-medium text-slate-600 mb-0.5">على بنك</label>
+                    <input
+                      type="text"
+                      value={formUnit.payment_bank_name}
+                      onChange={(e) => setFormUnit((p) => ({ ...p, payment_bank_name: e.target.value }))}
+                      placeholder="على بنك"
+                      className="w-full max-w-[280px] border border-slate-200 rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                    />
+                  </div>
+                )}
+                {formUnit.payment_method === "check" && (
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">رقم الشيك</label>
+                      <input
+                        type="text"
+                        value={formUnit.payment_check_number}
+                        onChange={(e) => setFormUnit((p) => ({ ...p, payment_check_number: e.target.value }))}
+                        placeholder="رقم الشيك"
+                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm dir-ltr focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">صورة الشيك</label>
+                      <input
+                        ref={unitCheckFileInputRef}
+                        type="file"
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) setUnitCheckImageFile(f);
+                          e.target.value = "";
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => unitCheckFileInputRef.current?.click()}
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200/80 bg-emerald-50/60 text-emerald-800 text-sm font-medium hover:bg-emerald-50/90 hover:border-emerald-300 transition-colors"
+                      >
+                        <FileUp className="w-4 h-4 shrink-0" />
+                        {unitCheckImageFile ? unitCheckImageFile.name : formUnit.payment_check_image_path ? "مرفق — تغيير" : "اختر ملف"}
+                      </button>
+                      {(formUnit.payment_check_image_path || unitCheckImageFile) && (
+                        <p className="text-xs text-teal-600 mt-1">{unitCheckImageFile ? "سيتم رفع الملف عند الحفظ" : "مرفق"}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">تاريخ الشراء</label>
                 <input type="date" value={formUnit.purchase_date} onChange={(e) => setFormUnit((p) => ({ ...p, purchase_date: e.target.value }))} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">صورة العقد</label>
+                  <input
+                    ref={unitContractFileInputRef}
+                    type="file"
+                    accept="image/*,.pdf,.doc,.docx"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) setUnitContractFile(f);
+                      e.target.value = "";
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => unitContractFileInputRef.current?.click()}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200/80 bg-emerald-50/60 text-emerald-800 text-sm font-medium hover:bg-emerald-50/90 hover:border-emerald-300 transition-colors"
+                  >
+                    <FileUp className="w-4 h-4 shrink-0" />
+                    {unitContractFile ? unitContractFile.name : formUnit.contract_image_path ? "مرفق — تغيير" : "اختر ملف"}
+                  </button>
+                  {(formUnit.contract_image_path || unitContractFile) && (
+                    <p className="text-xs text-teal-600 mt-1">{unitContractFile ? "سيتم رفع الملف عند الحفظ" : "مرفق"}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">صورة الهوية</label>
+                  <input
+                    ref={unitIdFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) setUnitIdFile(f);
+                      e.target.value = "";
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => unitIdFileInputRef.current?.click()}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200/80 bg-emerald-50/60 text-emerald-800 text-sm font-medium hover:bg-emerald-50/90 hover:border-emerald-300 transition-colors"
+                  >
+                    <FileUp className="w-4 h-4 shrink-0" />
+                    {unitIdFile ? unitIdFile.name : formUnit.id_image_path ? "مرفق — تغيير" : "اختر ملف"}
+                  </button>
+                  {(formUnit.id_image_path || unitIdFile) && (
+                    <p className="text-xs text-teal-600 mt-1">{unitIdFile ? "سيتم رفع الملف عند الحفظ" : "مرفق"}</p>
+                  )}
+                </div>
               </div>
               {editingUnit && (
                 <div>

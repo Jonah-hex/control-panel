@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS building_investors (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- أعمدة إضافية لـ building_investors تُضاف عبر migrations: closed_at, realized_profit, closing_percentage,
+-- settlement_method, settlement_account_iban, settlement_bank_name, settlement_type, transferred_amount,
+-- transferred_from_building_investor_id, payment_method (انظر supabase_migrations/)
 CREATE INDEX IF NOT EXISTS idx_building_investors_building ON building_investors(building_id);
 CREATE INDEX IF NOT EXISTS idx_building_investors_owner ON building_investors(owner_id);
 

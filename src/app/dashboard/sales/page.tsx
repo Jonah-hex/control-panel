@@ -624,7 +624,7 @@ export default function SalesPage() {
                           ))}
                         </select>
                         <span className="font-mono">
-                          {((reservationsPage - 1) * reservationsPageSize + 1).toLocaleString("en")}–{Math.min(reservationsPage * reservationsPageSize, reservations.length).toLocaleString("en")} من {reservations.length.toLocaleString("en")}
+                          {((reservationsPage - 1) * reservationsPageSize + 1).toLocaleString("en")} - {Math.min(reservationsPage * reservationsPageSize, reservations.length).toLocaleString("en")}
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
@@ -637,7 +637,7 @@ export default function SalesPage() {
                           السابق
                         </button>
                         <span className="px-2 py-1.5 text-sm text-slate-600 font-mono">
-                          ص {reservationsPage.toLocaleString("en")} / {reservationsTotalPages.toLocaleString("en")}
+                          {reservationsPage.toLocaleString("en")} / {reservationsTotalPages.toLocaleString("en")}
                         </span>
                         <button
                           type="button"
@@ -757,7 +757,7 @@ export default function SalesPage() {
                           ))}
                         </select>
                         <span className="font-mono">
-                          {((salesPage - 1) * salesPageSize + 1).toLocaleString("en")}–{Math.min(salesPage * salesPageSize, sales.length).toLocaleString("en")} من {sales.length.toLocaleString("en")}
+                          {((salesPage - 1) * salesPageSize + 1).toLocaleString("en")} - {Math.min(salesPage * salesPageSize, sales.length).toLocaleString("en")}
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
@@ -770,7 +770,7 @@ export default function SalesPage() {
                           السابق
                         </button>
                         <span className="px-2 py-1.5 text-sm text-slate-600 font-mono">
-                          ص {salesPage.toLocaleString("en")} / {salesTotalPages.toLocaleString("en")}
+                          {salesPage.toLocaleString("en")} / {salesTotalPages.toLocaleString("en")}
                         </span>
                         <button
                           type="button"

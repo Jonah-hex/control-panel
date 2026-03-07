@@ -23,8 +23,13 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
+import { showToast } from "../details/toast";
 
 const BUCKET = "building-documents";
+/** الحد الأقصى لحجم الملف الواحد بالميجابايت (رفع مستندات المبنى) */
+const MAX_FILE_SIZE_MB = 15;
+/** المساحة الإجمالية المسموحة لمستندات كل عمارة بالجيجابايت */
+const MAX_STORAGE_PER_BUILDING_GB = 1;
 
 interface BuildingFolder {
   id: string;
@@ -106,7 +111,22 @@ export default function BuildingDocumentsPage() {
   const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
   const [restoringDefault, setRestoringDefault] = useState(false);
   const [confirmBulkDeleteOpen, setConfirmBulkDeleteOpen] = useState(false);
+  const [totalStorageUsedBytes, setTotalStorageUsedBytes] = useState<number | null>(null);
   const supabase = createClient();
+
+  const loadTotalStorageUsed = useCallback(async () => {
+    if (!buildingId) return;
+    const { data, error } = await supabase
+      .from("building_documents")
+      .select("file_size")
+      .eq("building_id", buildingId);
+    if (error) {
+      setTotalStorageUsedBytes(null);
+      return;
+    }
+    const total = (data || []).reduce((sum, row) => sum + (row.file_size ?? 0), 0);
+    setTotalStorageUsedBytes(total);
+  }, [buildingId, supabase]);
 
   /** وضع القائمة مرن: فوق/تحت/يمين/يسار حسب المساحة في الشاشة (fixed + إحداثيات محسوبة) */
   const openDocMenu = (docId: string, ev: React.MouseEvent) => {
@@ -238,6 +258,11 @@ path.unshift(stripNumbering(f.name));
     loadDocuments();
   }, [buildingId, canAccess, currentFolderId, loadDocuments]);
 
+  useEffect(() => {
+    if (!buildingId || !canAccess) return;
+    loadTotalStorageUsed();
+  }, [buildingId, canAccess, loadTotalStorageUsed]);
+
   const currentFolder = currentFolderId
     ? folders.find((f) => f.id === currentFolderId)
     : null;
@@ -343,6 +368,7 @@ path.unshift(stripNumbering(f.name));
     setConfirmBulkDeleteOpen(false);
     loadFolders();
     loadDocuments();
+    loadTotalStorageUsed();
   };
 
   const updateFolderName = async () => {
@@ -416,6 +442,7 @@ path.unshift(stripNumbering(f.name));
       await supabase.storage.from(BUCKET).remove([confirmDelete.doc.storage_path]);
       await supabase.from("building_documents").delete().eq("id", confirmDelete.doc.id);
       loadDocuments();
+      loadTotalStorageUsed();
       if (previewDoc?.id === confirmDelete.doc.id) closePreview();
     }
     closeConfirmModal();
@@ -442,6 +469,7 @@ path.unshift(stripNumbering(f.name));
     setUploading(false);
     e.target.value = "";
     loadDocuments();
+    loadTotalStorageUsed();
   };
 
   /** جلب الملف كـ blob من التخزين (يتجنب CORS ويعمل للمعاينة والتحميل) */

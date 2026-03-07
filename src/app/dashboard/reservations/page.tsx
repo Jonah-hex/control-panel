@@ -1075,7 +1075,7 @@ export default function ReservationsPage() {
                     السابق
                   </button>
                   <span className="px-2 py-1.5 text-sm text-slate-600 font-mono">
-                    ص {reservationsPage.toLocaleString("en")} / {reservationsTotalPages.toLocaleString("en")}
+                    {reservationsPage.toLocaleString("en")} / {reservationsTotalPages.toLocaleString("en")}
                   </span>
                   <button
                     type="button"

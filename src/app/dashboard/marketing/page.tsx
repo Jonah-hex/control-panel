@@ -142,10 +142,10 @@ export default function MarketingPage() {
                 <LineChart className="w-8 h-8 text-white" />
               </div>
               <h3 className="font-bold text-gray-800 group-hover:text-white transition-colors duration-300 text-sm mb-1">
-                التقارير والتحليلات
+                تقارير التسويق والمبيعات
               </h3>
               <p className="text-xs text-gray-500 group-hover:text-white/90 transition-colors duration-300">
-                ملخص وتقارير تفصيلية للحجوزات والمبيعات وأداء المسوقين — فلترة بالفترة وطباعة
+                تحليل الحجوزات والمبيعات والمسوقين والعمولات فقط — فلترة بالفترة وطباعة
               </p>
             </div>
           </Link>
