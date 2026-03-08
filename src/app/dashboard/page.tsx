@@ -137,7 +137,9 @@ export default function DashboardPage() {
   const [buildings, setBuildings] = useState<Building[]>([])
   const [buildingsForAssoc, setBuildingsForAssoc] = useState<BuildingAssocRow[]>([])
   const [units, setUnits] = useState<Unit[]>([])
-  const [reservations, setReservations] = useState<Array<{ id: string; unit_id: string; building_id: string; created_at: string; created_by_name?: string | null; customer_name: string; status: string; expiry_date?: string | null; marketer_name?: string | null; completed_at?: string | null; sale_id?: string | null }>>([])
+  const [reservations, setReservations] = useState<Array<{ id: string; unit_id: string; building_id: string; created_at: string; created_by?: string | null; created_by_name?: string | null; customer_name: string; status: string; expiry_date?: string | null; marketer_name?: string | null; completed_at?: string | null; sale_id?: string | null }>>([])
+  /** موظفو المالك (لربط الحجوزات بالمسمى الوظيفي: مدير مبيعات، مدير حجوزات، إلخ) */
+  const [employeesList, setEmployeesList] = useState<Array<{ auth_user_id: string; full_name: string; job_title: string | null }>>([])
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -367,15 +369,17 @@ export default function DashboardPage() {
 
       const buildingIds = (data || []).map(b => b.id)
       if (buildingIds.length > 0) {
-        const [unitsRes, resRes, salesPartialRes, investorsDueRes] = await Promise.all([
+        const [unitsRes, resRes, salesPartialRes, investorsDueRes, employeesRes] = await Promise.all([
           supabase.from('units').select('*').in('building_id', buildingIds),
-          supabase.from('reservations').select('id, unit_id, building_id, created_at, created_by_name, customer_name, status, expiry_date, marketer_name, completed_at, sale_id').in('building_id', buildingIds).order('created_at', { ascending: false }),
+          supabase.from('reservations').select('id, unit_id, building_id, created_at, created_by, created_by_name, customer_name, status, expiry_date, marketer_name, completed_at, sale_id').in('building_id', buildingIds).order('created_at', { ascending: false }),
           supabase.from('sales').select('id, building_id, remaining_payment, remaining_payment_due_date, buyer_name').in('building_id', buildingIds).eq('payment_status', 'partial').gt('remaining_payment', 0),
-          supabase.from('building_investors').select('id, building_id, investor_name, investment_due_date').eq('owner_id', ownerId).not('investment_due_date', 'is', null)
+          supabase.from('building_investors').select('id, building_id, investor_name, investment_due_date').eq('owner_id', ownerId).not('investment_due_date', 'is', null),
+          supabase.from('dashboard_employees').select('auth_user_id, full_name, job_title').eq('owner_id', ownerId).eq('is_active', true)
         ])
         if (unitsRes.error) throw unitsRes.error
         setUnits(unitsRes.data || [])
         setReservations(Array.isArray(resRes.data) ? resRes.data : [])
+        setEmployeesList((employeesRes.data || []) as Array<{ auth_user_id: string; full_name: string; job_title: string | null }>)
         setSalesWithRemaining((salesPartialRes.data || []) as Array<{ id: string; building_id: string; remaining_payment: number; remaining_payment_due_date?: string | null; buyer_name?: string | null }>)
         setBuildingInvestorsWithDueDate((investorsDueRes.data || []) as Array<{ id: string; building_id: string; investor_name: string; investment_due_date: string }>)
       } else {
@@ -383,6 +387,7 @@ export default function DashboardPage() {
         setReservations([])
         setSalesWithRemaining([])
         setBuildingInvestorsWithDueDate([])
+        setEmployeesList([])
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -755,19 +760,48 @@ export default function DashboardPage() {
     for (const u of units) {
       const bName = buildings.find(b => b.id === u.building_id)?.name || '—'
       if (u.status === 'sold') {
-        // تم البيع: نعرض اسم المسوق من الحجز المكتمل إن وُجد، وإلا اسم المشتري أو "المسوق"
+        // تم البيع: مسوق → "بواسطة المسوق: الاسم" | موظف (من حسابه) → "بواسطة: اسم الموظف" من created_by_name | وإلا "بواسطة: الإدارة"
         const completedRes = reservations.find(r => r.unit_id === u.id && (r.status === 'completed' || r.sale_id != null || r.completed_at != null))
-        const byName = (completedRes?.marketer_name && String(completedRes.marketer_name).trim()) || (u as Unit & { owner_name?: string }).owner_name || 'المسوق'
-        fromUnits.push({
-          id: u.id + '-sold',
-          type: 'sold',
-          building_name: bName,
-          building_id: u.building_id,
-          user_name: byName,
-          user_role_label: 'مسوق',
-          timestamp: u.updated_at || u.created_at,
-          details: `تم بيع الوحدة ${u.unit_number} (الدور ${u.floor})`
-        })
+        const marketerName = completedRes?.marketer_name && String(completedRes.marketer_name).trim()
+        const createdByName = completedRes?.created_by_name && String(completedRes.created_by_name).trim()
+        if (marketerName) {
+          fromUnits.push({
+            id: u.id + '-sold',
+            type: 'sold',
+            building_name: bName,
+            building_id: u.building_id,
+            user_name: marketerName,
+            user_role_label: 'بواسطة المسوق',
+            timestamp: u.updated_at || u.created_at,
+            details: `تم بيع الوحدة ${u.unit_number} (الدور ${u.floor})`
+          })
+        } else if (createdByName) {
+          const createdByUserId = completedRes?.created_by ?? null
+          const emp = createdByUserId ? employeesList.find(e => e.auth_user_id === createdByUserId) : null
+          const jobTitle = emp?.job_title?.trim() || null
+          const displayName = jobTitle ? `${createdByName} (${jobTitle})` : createdByName
+          fromUnits.push({
+            id: u.id + '-sold',
+            type: 'sold',
+            building_name: bName,
+            building_id: u.building_id,
+            user_name: displayName,
+            user_role_label: 'بواسطة',
+            timestamp: u.updated_at || u.created_at,
+            details: `تم بيع الوحدة ${u.unit_number} (الدور ${u.floor})`
+          })
+        } else {
+          fromUnits.push({
+            id: u.id + '-sold',
+            type: 'sold',
+            building_name: bName,
+            building_id: u.building_id,
+            user_name: 'الإدارة',
+            user_role_label: 'بواسطة',
+            timestamp: u.updated_at || u.created_at,
+            details: `تم بيع الوحدة ${u.unit_number} (الدور ${u.floor})`
+          })
+        }
       }
     }
     const fromReservations: Activity[] = reservations.map(r => {
@@ -899,7 +933,7 @@ export default function DashboardPage() {
     return [...fromUnits, ...fromReservations, ...fromExpiredReservations, ...fromBuildings, ...fromAssoc, ...fromMeterAdded, ...fromOwnershipTransferred, ...fromRemainingPaymentCollected, ...fromRemainingPaymentCollectedLate]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 7)
-  }, [units, buildings, reservations, associationEndReminders, meterAddedLogs, ownershipTransferredLogs, remainingPaymentCollectedLogs, remainingPaymentCollectedLateLogs])
+  }, [units, buildings, reservations, employeesList, associationEndReminders, meterAddedLogs, ownershipTransferredLogs, remainingPaymentCollectedLogs, remainingPaymentCollectedLateLogs])
 
   // عرض النشاطات حسب الصلاحيات (خاص بلوحة الموظف)
   const filteredActivities = useMemo(() => {

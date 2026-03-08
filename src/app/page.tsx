@@ -140,8 +140,13 @@ export default function HomePage() {
               },
               {
                 icon: TrendingUp,
-                title: 'الحجوزات والمبيعات',
-                description: 'إدارة احترافية لسجل الحجوزات والمبيعات مع تنبيهات ذكية'
+                title: 'إدارة التسويق والمبيعات',
+                description: 'إدارة احترافية لسجل التسويق والمبيعات مع تنبيهات ذكية'
+              },
+              {
+                icon: Users,
+                title: 'إدارة الملاك والمستثمرين',
+                description: 'إدارة بيانات الملاك والمستثمرين ومتابعة استثماراتهم وعقودهم في مكان واحد'
               },
               {
                 icon: BarChart3,
@@ -152,11 +157,6 @@ export default function HomePage() {
                 icon: Users,
                 title: 'موظفون بصلاحيات',
                 description: 'العمل على المنصة حسب الصلاحيات لكل موظف'
-              },
-              {
-                icon: Activity,
-                title: 'سجل النشاطات',
-                description: 'تتبع كل التغييرات والإضافات في العماير والوحدات في مكان واحد'
               }
             ].map((feature, i) => (
               <div key={i} className="stat-card feature-card p-8 rounded-xl border border-slate-800 bg-slate-800/30 hover:bg-slate-800/50 transition duration-300 group hover:scale-105 animate-slideInUp overflow-hidden" style={{animationDelay: `${0.1 + i * 0.08}s`}}>
@@ -175,7 +175,7 @@ export default function HomePage() {
           </div>
 
           <p className="text-center mt-12 text-slate-300 text-base sm:text-lg leading-relaxed max-w-3xl mx-auto">
-            والكثير من المميزات لتسهيل جميع أعمالك العقارية بأحدث الطرق — منصة عماير Pro مدعومة بالذكاء الصناعي لخدمتك بشكل أذكى وأسرع.
+            والكثير من المميزات لتسهيل جميع أعمالك العقارية بأحدث الطرق — عماير Pro عمايرك بين إيديك بشكل أذكى وأسرع.
           </p>
         </div>
       </div>
@@ -190,7 +190,7 @@ export default function HomePage() {
               {
                 icon: Lightbulb,
                 title: 'سهل الاستخدام',
-                description: 'واجهة بسيطة وسهلة'
+                description: 'واجهة تحكم بسيطة وسهلة'
               },
               {
                 icon: Zap,

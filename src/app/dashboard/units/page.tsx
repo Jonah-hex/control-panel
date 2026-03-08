@@ -475,13 +475,13 @@ function UnitsFilterContent() {
                   if (raw === '' || /^\d*$/.test(raw)) setSearchTerm(raw)
                   else setSearchTerm(e.target.value)
                 }}
-                className="w-full pr-10 pl-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className="w-full pr-10 pl-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               />
             </div>
             <select
               value={facingFilter}
               onChange={(e) => setFacingFilter(e.target.value as 'all' | 'front' | 'back')}
-              className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             >
               <option value="all">كل الاتجاهات</option>
               <option value="front">أمامية</option>
@@ -490,7 +490,7 @@ function UnitsFilterContent() {
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value as 'all' | 'apartment' | 'studio')}
-              className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             >
               <option value="all">كل الأنواع</option>
               <option value="apartment">شقة</option>
@@ -499,7 +499,7 @@ function UnitsFilterContent() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as 'all' | 'available' | 'reserved' | 'sold')}
-              className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             >
               <option value="all">كل الحالات</option>
               <option value="available">متاحة</option>

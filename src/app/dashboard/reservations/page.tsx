@@ -645,7 +645,12 @@ export default function ReservationsPage() {
 
   const handleCancel = async () => {
     if (!cancelOpen) return;
+    if (!cancelReason.trim()) {
+      showToast("الرجاء إدخال سبب الإلغاء.", "error");
+      return;
+    }
     setSaving(true);
+    const hadNoDeposit = cancelOpen.deposit_amount == null || Number(cancelOpen.deposit_amount) === 0;
     const { error: updRes } = await supabase
       .from("reservations")
       .update({
@@ -653,6 +658,7 @@ export default function ReservationsPage() {
         cancellation_reason: cancelReason.trim() || null,
         cancelled_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        ...(hadNoDeposit ? { deposit_refunded: true } : {}),
       })
       .eq("id", cancelOpen.id);
     if (updRes) {
@@ -765,7 +771,7 @@ export default function ReservationsPage() {
               </div>
               <div className="min-w-0">
                 <h1 className="text-lg sm:text-xl font-bold text-gray-800 tracking-tight leading-tight">إدارة الحجوزات</h1>
-                <p className="text-xs text-gray-500 mt-0.5">سجل الحجوزات — إلغاء الحجز — استرداد العرابين — إتمام البيع من إدارة التسويق والمبيعات</p>
+                <p className="text-xs text-gray-500 mt-0.5">إدارة الحجوزات والعرابين وإتمام البيع</p>
               </div>
             </div>
             {can("reservations") && (
@@ -955,10 +961,10 @@ export default function ReservationsPage() {
                         {formatDateNumeric(r.status === "completed" ? r.completed_at : r.status === "cancelled" ? r.cancelled_at : r.expiry_date)}
                       </td>
                       <td className="p-3">
-                        {r.deposit_amount != null ? `${r.deposit_amount} ${RIYAL_SYMBOL}` : "—"}
+                        {r.deposit_amount != null && Number(r.deposit_amount) > 0 ? `${r.deposit_amount} ${RIYAL_SYMBOL}` : "—"}
                         {r.status !== "completed" && (
-                          <span className={`text-xs block ${r.deposit_refunded ? "text-slate-600" : r.deposit_paid ? "text-emerald-600" : "text-gray-500"}`}>
-                            {r.deposit_refunded ? "مسترد" : r.deposit_paid ? "مدفوع" : "غير مدفوع"}
+                          <span className={`text-xs block ${r.deposit_amount == null || Number(r.deposit_amount) === 0 ? "text-gray-500" : r.deposit_refunded ? "text-slate-600" : r.deposit_paid ? "text-emerald-600" : "text-gray-500"}`}>
+                            {r.deposit_amount == null || Number(r.deposit_amount) === 0 ? "بدون عربون" : r.deposit_refunded ? "مسترد" : r.deposit_paid ? "مدفوع" : "غير مدفوع"}
                           </span>
                         )}
                       </td>
@@ -986,7 +992,11 @@ export default function ReservationsPage() {
                           }`}
                         >
                           {r.status === "cancelled"
-                            ? (r.deposit_refunded ? "حجز ملغي — مسترد" : "ملغي بدون استرداد العربون")
+                            ? (r.deposit_amount == null || Number(r.deposit_amount) === 0
+                                ? "ملغي (بدون عربون)"
+                                : r.deposit_refunded
+                                  ? "حجز ملغي — مسترد"
+                                  : "ملغي بدون استرداد العربون")
                             : (STATUS_LABEL[r.status] ?? r.status)}
                           {r.status === "completed" && r.deposit_settlement_type === "included" && " — تم المخالصة"}
                           {r.status === "completed" && r.deposit_settlement_type === "refund" && " — تم مخالصة الاسترداد"}
@@ -1430,11 +1440,12 @@ export default function ReservationsPage() {
             <p className="text-sm text-gray-600 mb-4">
               الوحدة {getUnit(cancelOpen)?.unit_number} — العميل {cancelOpen.customer_name}. سيتم تحرير الوحدة وإرجاعها إلى «متاحة».
             </p>
-            <label className="block text-sm font-medium text-gray-700 mb-1">سبب الإلغاء (اختياري)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">سبب الإلغاء *</label>
             <textarea
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
               rows={2}
+              required
               className="w-full border border-gray-200 rounded-xl px-3 py-2 mb-4"
               placeholder="سبب إلغاء الحجز"
             />
@@ -1540,8 +1551,9 @@ export default function ReservationsPage() {
               let label: string;
               let colorClass: string;
               if (receiptPreview.status === "cancelled") {
-                label = receiptPreview.deposit_refunded ? "مُسْتَرَد" : "مُلْغَى";
-                colorClass = receiptPreview.deposit_refunded ? "text-emerald-500/40" : "text-red-400/40";
+                const hadDeposit = receiptPreview.deposit_amount != null && Number(receiptPreview.deposit_amount) > 0;
+                label = hadDeposit && receiptPreview.deposit_refunded ? "مُسْتَرَد" : "مُلْغَى";
+                colorClass = hadDeposit && receiptPreview.deposit_refunded ? "text-emerald-500/40" : "text-red-400/40";
               } else {
                 label = receiptPreview.deposit_settlement_type === "refund" ? "مُسْتَرَد" : "مُخَالَصَة";
                 colorClass = receiptPreview.deposit_settlement_type === "refund" ? "text-emerald-500/40" : "text-slate-400/40";
@@ -1581,9 +1593,11 @@ export default function ReservationsPage() {
                     <tr>
                       <td className="py-2 text-slate-500">حالة العربون</td>
                       <td className="py-2 font-medium">
-                        {receiptPreview.deposit_refunded
-                          ? (receiptPreview.deposit_refund_method === "transfer" ? "مسترد — تحويل" : "مسترد — كاش")
-                          : "ملغي بدون استرداد العربون"}
+                        {receiptPreview.deposit_amount == null || Number(receiptPreview.deposit_amount) === 0
+                          ? "بدون عربون"
+                          : receiptPreview.deposit_refunded
+                            ? (receiptPreview.deposit_refund_method === "transfer" ? "مسترد — تحويل" : "مسترد — كاش")
+                            : "ملغي بدون استرداد العربون"}
                       </td>
                     </tr>
                   </>

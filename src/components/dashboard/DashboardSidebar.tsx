@@ -19,6 +19,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Wifi,
 } from 'lucide-react'
 import { RiyalIcon } from '@/components/icons/RiyalIcon'
@@ -31,6 +32,23 @@ type NavItem = {
   icon: React.ComponentType<{ size?: number | string; className?: string }>
   permission?: string
 }
+
+type NavGroup = {
+  label: string
+  icon: React.ComponentType<{ size?: number | string; className?: string }>
+  permission?: string
+  children: { href: string; label: string; permission?: string }[]
+}
+
+const reportsGroup: NavGroup = {
+  label: 'التقارير',
+  icon: BarChart3,
+  children: [
+    { href: '/dashboard/marketing/reports', label: 'تقارير التسويق والمبيعات', permission: 'marketing_view' },
+    { href: '/dashboard/owners-investors/analytics', label: 'تقارير الملاك والمستثمرين', permission: 'owners_view' },
+  ],
+}
+
 const navConfig: NavItem[] = [
   { href: '/dashboard', label: 'الرئيسية', icon: LayoutDashboard },
   { href: '/dashboard/buildings', label: 'العماير', icon: Building2, permission: 'buildings' },
@@ -39,7 +57,6 @@ const navConfig: NavItem[] = [
   { href: '/dashboard/sales', label: 'المبيعات', icon: RiyalIcon, permission: 'sales' },
   { href: '/dashboard/owners-investors', label: 'الملاك والمستثمرون', icon: Users, permission: 'owners_view' },
   { href: '/dashboard/marketing', label: 'التسويق', icon: Megaphone, permission: 'marketing_view' },
-  { href: '/dashboard/marketing/reports', label: 'التقارير', icon: BarChart3, permission: 'marketing_view' },
   { href: '/dashboard/tasks', label: 'المهام', icon: CheckSquare },
   { href: '/dashboard/appointments', label: 'المواعيد', icon: Calendar },
   { href: '/dashboard/activities', label: 'السجلات', icon: Activity, permission: 'activities' },
@@ -54,6 +71,7 @@ export default function DashboardSidebar() {
   const { can, currentUserDisplayName, isOwner, ready, user } = useDashboardAuth()
   const isConnected = ready && !!user
   const [open, setOpen] = useState(true)
+  const [reportsExpanded, setReportsExpanded] = useState(false)
 
   useEffect(() => {
     try {
@@ -61,6 +79,15 @@ export default function DashboardSidebar() {
       if (stored !== null) setOpen(stored === '1')
     } catch {}
   }, [])
+
+  useEffect(() => {
+    if (
+      pathname.startsWith('/dashboard/marketing/reports') ||
+      pathname.startsWith('/dashboard/owners-investors/analytics')
+    ) {
+      setReportsExpanded(true)
+    }
+  }, [pathname])
 
   const setOpenAndPersist = (value: boolean) => {
     setOpen(value)
@@ -79,6 +106,18 @@ export default function DashboardSidebar() {
     if (item.permission === 'owners_view') return can('owners_view') || can('investors_view')
     return can(item.permission as Parameters<typeof can>[0])
   })
+
+  const canSeeReports =
+    can('marketing_view') || can('owners_view') || can('investors_view')
+  const reportChildren = reportsGroup.children.filter((child) => {
+    if (!child.permission) return true
+    if (child.permission === 'owners_view') return can('owners_view') || can('investors_view')
+    return can(child.permission as Parameters<typeof can>[0])
+  })
+  const isReportsActive =
+    pathname.startsWith('/dashboard/marketing/reports') ||
+    pathname.startsWith('/dashboard/owners-investors/analytics')
+  const ReportsIcon = reportsGroup.icon
 
   return (
     <aside
@@ -105,7 +144,6 @@ export default function DashboardSidebar() {
       {/* التنقل — محاذي مع الحاوية */}
       <nav className="dashboard-sidebar-nav flex-1 overflow-y-auto overflow-x-hidden py-3 px-3 flex flex-col gap-1 min-h-0">
         {navItems.map((item) => {
-          // تمييز الرابط الحالي فقط: إما تطابق تام أو أطول مسار يطابق (لتجنب تمييز "التسويق" و"التقارير" معاً)
           const isExact = pathname === item.href
           const isChildPath = pathname.startsWith(item.href + '/')
           const hasStricterMatch = navItems.some(
@@ -114,35 +152,106 @@ export default function DashboardSidebar() {
           const active = isExact || (isChildPath && !hasStricterMatch)
           const Icon = item.icon
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`
-                flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-right no-underline transition-all duration-200 w-full min-w-0 overflow-hidden
-                focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-1 focus:ring-offset-white
-                ${active
-                  ? 'bg-gradient-to-l from-blue-50 to-indigo-50 border border-blue-200/70 text-slate-800 shadow-md shadow-blue-500/10'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800 border border-transparent hover:border-slate-100'
-                }
-              `}
-              aria-current={active ? 'page' : undefined}
-            >
-              {Icon === RiyalIcon ? (
-                <RiyalIcon
-                  className={`w-5 h-5 flex-shrink-0 ${active ? 'text-blue-600' : 'text-slate-500'}`}
-                />
-              ) : (
-                <Icon
-                  size={20}
-                  className={`flex-shrink-0 ${active ? 'text-blue-600' : 'text-slate-500'}`}
-                />
+            <div key={item.href} className="flex flex-col gap-0.5">
+              <Link
+                href={item.href}
+                className={`
+                  flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-right no-underline transition-all duration-200 w-full min-w-0 overflow-hidden
+                  focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-1 focus:ring-offset-white
+                  ${active
+                    ? 'bg-gradient-to-l from-blue-50 to-indigo-50 border border-blue-200/70 text-slate-800 shadow-md shadow-blue-500/10'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800 border border-transparent hover:border-slate-100'
+                  }
+                `}
+                aria-current={active ? 'page' : undefined}
+              >
+                {Icon === RiyalIcon ? (
+                  <RiyalIcon
+                    className={`w-5 h-5 flex-shrink-0 ${active ? 'text-blue-600' : 'text-slate-500'}`}
+                  />
+                ) : (
+                  <Icon
+                    size={20}
+                    className={`flex-shrink-0 ${active ? 'text-blue-600' : 'text-slate-500'}`}
+                  />
+                )}
+                {open && (
+                  <span className={`text-sm font-medium whitespace-nowrap truncate min-w-0 flex-1 ${active ? 'text-slate-800 font-semibold' : ''}`}>
+                    {item.label}
+                  </span>
+                )}
+              </Link>
+              {/* قائمة التقارير: منسدلة عند توسيع الشريط، أو أيقونة فقط عند طيه */}
+              {item.href === '/dashboard/marketing' && canSeeReports && reportChildren.length > 0 && (
+                open ? (
+                <div className="flex flex-col gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setReportsExpanded((p) => !p)}
+                    className={`
+                      flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-right no-underline w-full min-w-0 overflow-hidden transition-all duration-200
+                      focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-1 focus:ring-offset-white
+                      ${isReportsActive
+                        ? 'bg-gradient-to-l from-blue-50 to-indigo-50 border border-blue-200/70 text-slate-800 shadow-md shadow-blue-500/10'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800 border border-transparent hover:border-slate-100'
+                      }
+                    `}
+                    aria-expanded={reportsExpanded}
+                  >
+                    <ReportsIcon
+                      size={20}
+                      className={`flex-shrink-0 ${isReportsActive ? 'text-blue-600' : 'text-slate-500'}`}
+                    />
+                    <span className={`text-sm font-medium whitespace-nowrap truncate min-w-0 flex-1 ${isReportsActive ? 'text-slate-800 font-semibold' : ''}`}>
+                      التقارير
+                    </span>
+                    <ChevronDown
+                      size={16}
+                      className={`flex-shrink-0 text-slate-400 transition-transform duration-200 ${reportsExpanded ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                  {reportsExpanded && (
+                    <div className="flex flex-col gap-1 mt-0.5">
+                      {reportChildren.map((child) => {
+                        const childActive = pathname === child.href || pathname.startsWith(child.href + '/')
+                        return (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            className={`
+                              flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-right no-underline transition-all duration-200 w-full min-w-0 overflow-hidden
+                              focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-1 focus:ring-offset-white
+                              ${childActive
+                                ? 'bg-gradient-to-l from-blue-50 to-indigo-50 border border-blue-200/70 text-slate-800 shadow-md shadow-blue-500/10'
+                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800 border border-transparent hover:border-slate-100'
+                              }
+                            `}
+                            aria-current={childActive ? 'page' : undefined}
+                          >
+                            <span className={`text-xs font-medium whitespace-nowrap truncate min-w-0 flex-1 ${childActive ? 'text-slate-800 font-semibold' : ''}`}>
+                              {child.label}
+                            </span>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+                ) : (
+                  <Link
+                    href={reportChildren[0]?.href ?? '/dashboard/marketing/reports'}
+                    className={`
+                      flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-xl text-right no-underline transition-all duration-200 w-full min-w-0
+                      focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-1 focus:ring-offset-white
+                      ${isReportsActive ? 'bg-gradient-to-l from-blue-50 to-indigo-50 border border-blue-200/70 text-slate-800' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800 border border-transparent'}
+                    `}
+                    title="التقارير"
+                  >
+                    <ReportsIcon size={20} className={`flex-shrink-0 ${isReportsActive ? 'text-blue-600' : 'text-slate-500'}`} />
+                  </Link>
+                )
               )}
-              {open && (
-                <span className={`text-sm font-medium whitespace-nowrap truncate min-w-0 flex-1 ${active ? 'text-slate-800 font-semibold' : ''}`}>
-                  {item.label}
-                </span>
-              )}
-            </Link>
+            </div>
           )
         })}
       </nav>

@@ -87,6 +87,7 @@ export interface Reservation {
   deposit_amount?: number | null
   deposit_refunded?: boolean | null
   created_at: string
+  created_by?: string | null
   created_by_name?: string | null
   customer_name?: string | null
   expiry_date?: string | null
