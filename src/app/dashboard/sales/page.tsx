@@ -40,6 +40,7 @@ type SaleRow = {
   remaining_payment?: number | null;
   remaining_payment_due_date?: string | null;
   remaining_payment_collected_at?: string | null;
+  commission_received_at?: string | null;
   contract_url?: string | null;
   notes: string | null;
   created_at: string;
@@ -144,12 +145,25 @@ export default function SalesPage() {
   const [postponeDueDateOpen, setPostponeDueDateOpen] = useState(false);
   const [postponeNewDueDate, setPostponeNewDueDate] = useState("");
   const [postponingRemaining, setPostponingRemaining] = useState(false);
+  const [commissionReceivedDateLocal, setCommissionReceivedDateLocal] = useState("");
+  const [savingCommissionReceived, setSavingCommissionReceived] = useState(false);
+  const [showCommissionReceivedDateField, setShowCommissionReceivedDateField] = useState(false);
 
   useEffect(() => {
     setPostponeDueDateOpen(false);
     setPostponeNewDueDate("");
     setConfirmRemainingCollectOpen(false);
   }, [selectedSale?.id]);
+
+  useEffect(() => {
+    if (selectedSale?.commission_received_at) {
+      setCommissionReceivedDateLocal(selectedSale.commission_received_at.slice(0, 10));
+      setShowCommissionReceivedDateField(true);
+    } else {
+      setCommissionReceivedDateLocal(new Date().toISOString().slice(0, 10));
+      setShowCommissionReceivedDateField(false);
+    }
+  }, [selectedSale?.id, selectedSale?.commission_received_at]);
 
   useEffect(() => {
     if (!selectedSale?.id) {
@@ -174,7 +188,7 @@ export default function SalesPage() {
   async function fetchSalesWithRelations() {
     const { data: salesData, error } = await supabase
       .from("sales")
-      .select("id, buyer_name, buyer_email, buyer_phone, buyer_id_number, sale_date, sale_price, commission_amount, payment_method, payment_status, bank_name, down_payment, remaining_payment, remaining_payment_due_date, remaining_payment_collected_at, contract_url, notes, created_at, unit_id, building_id")
+      .select("id, buyer_name, buyer_email, buyer_phone, buyer_id_number, sale_date, sale_price, commission_amount, payment_method, payment_status, bank_name, down_payment, remaining_payment, remaining_payment_due_date, remaining_payment_collected_at, commission_received_at, contract_url, notes, created_at, unit_id, building_id")
       .order("created_at", { ascending: false });
     if (error) return { error, rows: [] as SaleRow[] };
     const rows = (salesData || []) as (SaleRow & { unit_id: string; building_id: string })[];
@@ -372,6 +386,42 @@ export default function SalesPage() {
       showToast("حدث خطأ أثناء التأكيد", "error");
     } finally {
       setConfirmingRemaining(false);
+    }
+  };
+
+  /** حفظ تاريخ استلام العمولة للمسوق */
+  const handleSaveCommissionReceived = async () => {
+    if (!selectedSale?.id) return;
+    const dateStr = commissionReceivedDateLocal.trim();
+    if (!dateStr) {
+      showToast("اختر تاريخ استلام العمولة", "error");
+      return;
+    }
+    const parsed = new Date(dateStr + "T12:00:00");
+    if (Number.isNaN(parsed.getTime())) {
+      showToast("تاريخ غير صالح", "error");
+      return;
+    }
+    setSavingCommissionReceived(true);
+    try {
+      const iso = parsed.toISOString();
+      const { error } = await supabase
+        .from("sales")
+        .update({ commission_received_at: iso, updated_at: new Date().toISOString() })
+        .eq("id", selectedSale.id);
+      if (error) {
+        showToast(error.message || "تعذر حفظ تاريخ الاستلام", "error");
+        setSavingCommissionReceived(false);
+        return;
+      }
+      setSelectedSale({ ...selectedSale, commission_received_at: iso });
+      const { rows } = await fetchSalesWithRelations();
+      setSales(rows);
+      showToast("تم تسجيل تاريخ استلام العمولة.");
+    } catch {
+      showToast("حدث خطأ أثناء الحفظ", "error");
+    } finally {
+      setSavingCommissionReceived(false);
     }
   };
 
@@ -960,6 +1010,50 @@ export default function SalesPage() {
                         {(saleLinkedReservation?.marketer_name ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">اسم المسوق</span><span className="font-medium">{saleLinkedReservation?.marketer_name}</span></p>}
                         {(saleLinkedReservation?.marketer_phone ?? "").trim() && <p className="flex justify-between text-sm"><span className="text-slate-500">جوال المسوق</span><span className="font-medium dir-ltr">{saleLinkedReservation?.marketer_phone}</span></p>}
                         <p className="flex justify-between text-sm"><span className="text-slate-500">عمولة البيع</span><span className="font-medium">{selectedSale.commission_amount != null ? `${Number(selectedSale.commission_amount).toLocaleString("en")} ر.س` : "لا يوجد عمولة بيع"}</span></p>
+                        {selectedSale.commission_amount != null && selectedSale.commission_amount > 0 && (
+                          <div className="pt-2 border-t border-slate-200/80 space-y-2">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={!!selectedSale.commission_received_at || showCommissionReceivedDateField}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setShowCommissionReceivedDateField(true);
+                                    setCommissionReceivedDateLocal(new Date().toISOString().slice(0, 10));
+                                  } else {
+                                    setShowCommissionReceivedDateField(false);
+                                  }
+                                }}
+                                className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                              />
+                              <span className="text-sm font-medium text-slate-700">تأكيد استلام العمولة</span>
+                            </label>
+                            {showCommissionReceivedDateField && (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <input
+                                  type="date"
+                                  value={commissionReceivedDateLocal}
+                                  onChange={(e) => setCommissionReceivedDateLocal(e.target.value)}
+                                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm dir-ltr"
+                                />
+                                {!selectedSale.commission_received_at ? (
+                                  <button
+                                    type="button"
+                                    onClick={handleSaveCommissionReceived}
+                                    disabled={savingCommissionReceived}
+                                    className="px-3 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 disabled:opacity-60"
+                                  >
+                                    {savingCommissionReceived ? "جاري..." : "حفظ"}
+                                  </button>
+                                ) : (
+                                  <span className="text-sm text-slate-600 dir-ltr">
+                                    تم الاستلام في {new Date(selectedSale.commission_received_at).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </section>
                   )}

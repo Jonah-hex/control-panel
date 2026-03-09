@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, User2, UserPlus, LayoutDashboard, LineChart, Clock, CheckSquare } from "lucide-react";
+import { Calendar, User2, UserPlus, LayoutDashboard, LineChart } from "lucide-react";
 import { RiyalIcon } from "@/components/icons/RiyalIcon";
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
 
@@ -146,42 +146,6 @@ export default function MarketingPage() {
               </h3>
               <p className="text-xs text-gray-500 group-hover:text-white/90 transition-colors duration-300">
                 تحليل الحجوزات والمبيعات والمسوقين والعمولات فقط — فلترة بالفترة وطباعة
-              </p>
-            </div>
-          </Link>
-
-          <Link
-            href="/dashboard/appointments"
-            className={`${cardBase} p-6 hover:shadow-xl hover:-translate-y-1 cursor-pointer`}
-          >
-            <div className={cardOverlay} />
-            <div className="relative z-10 text-center">
-              <div className={`${iconBox} group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
-                <Clock className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="font-bold text-gray-800 group-hover:text-white transition-colors duration-300 text-sm mb-1">
-                المواعيد
-              </h3>
-              <p className="text-xs text-gray-500 group-hover:text-white/90 transition-colors duration-300">
-                جدولة المواعيد والمعاينات والاجتماعات — عرض وتعديل وإضافة
-              </p>
-            </div>
-          </Link>
-
-          <Link
-            href="/dashboard/tasks"
-            className={`${cardBase} p-6 hover:shadow-xl hover:-translate-y-1 cursor-pointer`}
-          >
-            <div className={cardOverlay} />
-            <div className="relative z-10 text-center">
-              <div className={`${iconBox} group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
-                <CheckSquare className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="font-bold text-gray-800 group-hover:text-white transition-colors duration-300 text-sm mb-1">
-                المهام والملاحظات
-              </h3>
-              <p className="text-xs text-gray-500 group-hover:text-white/90 transition-colors duration-300">
-                توجيهات لمدير التسويق/المبيعات — تعيين موظف، قبول، جدولة موعد
               </p>
             </div>
           </Link>

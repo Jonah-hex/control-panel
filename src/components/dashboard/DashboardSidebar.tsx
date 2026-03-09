@@ -60,7 +60,7 @@ const navConfig: NavItem[] = [
   { href: '/dashboard/tasks', label: 'المهام', icon: CheckSquare },
   { href: '/dashboard/appointments', label: 'المواعيد', icon: Calendar },
   { href: '/dashboard/activities', label: 'السجلات', icon: Activity, permission: 'activities' },
-  { href: '/dashboard/security', label: 'الأمن', icon: ShieldCheck, permission: 'security' },
+  { href: '/dashboard/security', label: 'الأمان', icon: ShieldCheck, permission: 'security' },
 ]
 
 const SIDEBAR_OPEN_KEY = 'dashboard-sidebar-open'
@@ -119,6 +119,16 @@ export default function DashboardSidebar() {
     pathname.startsWith('/dashboard/owners-investors/analytics')
   const ReportsIcon = reportsGroup.icon
 
+  /** قائمة عناصر الشريط: روابط عادية + كتلة التقارير منفصلة بعد التسويق لتجنب التشابك */
+  type SidebarEntry = { type: 'link'; item: NavItem } | { type: 'reports' }
+  const sidebarEntries: SidebarEntry[] = []
+  for (const item of navItems) {
+    sidebarEntries.push({ type: 'link', item })
+    if (item.href === '/dashboard/marketing' && canSeeReports && reportChildren.length > 0) {
+      sidebarEntries.push({ type: 'reports' })
+    }
+  }
+
   return (
     <aside
       dir="rtl"
@@ -143,20 +153,96 @@ export default function DashboardSidebar() {
 
       {/* التنقل — محاذي مع الحاوية */}
       <nav className="dashboard-sidebar-nav flex-1 overflow-y-auto overflow-x-hidden py-3 px-3 flex flex-col gap-1 min-h-0">
-        {navItems.map((item) => {
+        {sidebarEntries.map((entry, index) => {
+          if (entry.type === 'reports') {
+            return (
+              <div key="reports" className="flex flex-col gap-0.5 w-full">
+                {open ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setReportsExpanded((p) => !p)}
+                      className={`
+                        flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-right no-underline w-full min-w-0 overflow-hidden transition-all duration-200 cursor-pointer select-none
+                        focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-1 focus:ring-offset-white
+                        ${isReportsActive
+                          ? 'bg-gradient-to-l from-blue-50 to-indigo-50 border border-blue-200/70 text-slate-800 shadow-md shadow-blue-500/10'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800 border border-transparent hover:border-slate-100'
+                        }
+                      `}
+                      aria-expanded={reportsExpanded}
+                    >
+                      <ReportsIcon
+                        size={20}
+                        className={`flex-shrink-0 ${isReportsActive ? 'text-blue-600' : 'text-slate-500'}`}
+                      />
+                      <span className={`text-sm font-medium whitespace-nowrap truncate min-w-0 flex-1 ${isReportsActive ? 'text-slate-800 font-semibold' : ''}`}>
+                        التقارير
+                      </span>
+                      <ChevronDown
+                        size={16}
+                        className={`flex-shrink-0 text-slate-400 transition-transform duration-200 ${reportsExpanded ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+                    {reportsExpanded && (
+                      <div className="flex flex-col gap-1 mt-0.5">
+                        {reportChildren.map((child) => {
+                          const childActive = pathname === child.href || pathname.startsWith(child.href + '/')
+                          return (
+                            <Link
+                              key={child.href}
+                              href={child.href}
+                              className={`
+                                flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-right no-underline transition-all duration-200 w-full min-w-0 overflow-hidden cursor-pointer select-none
+                                focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-1 focus:ring-offset-white
+                                ${childActive
+                                  ? 'bg-gradient-to-l from-blue-50 to-indigo-50 border border-blue-200/70 text-slate-800 shadow-md shadow-blue-500/10'
+                                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800 border border-transparent hover:border-slate-100'
+                                }
+                              `}
+                              aria-current={childActive ? 'page' : undefined}
+                            >
+                              <span className={`text-xs font-medium whitespace-nowrap truncate min-w-0 flex-1 ${childActive ? 'text-slate-800 font-semibold' : ''}`}>
+                                {child.label}
+                              </span>
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <Link
+                    href={reportChildren[0]?.href ?? '/dashboard/marketing/reports'}
+                    className={`
+                      flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-xl text-right no-underline transition-all duration-200 w-full min-w-0 cursor-pointer select-none
+                      focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-1 focus:ring-offset-white
+                      ${isReportsActive ? 'bg-gradient-to-l from-blue-50 to-indigo-50 border border-blue-200/70 text-slate-800' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800 border border-transparent'}
+                    `}
+                    title="التقارير"
+                  >
+                    <ReportsIcon size={20} className={`flex-shrink-0 ${isReportsActive ? 'text-blue-600' : 'text-slate-500'}`} />
+                  </Link>
+                )}
+              </div>
+            )
+          }
+          const item = entry.item
           const isExact = pathname === item.href
           const isChildPath = pathname.startsWith(item.href + '/')
           const hasStricterMatch = navItems.some(
             (o) => o.href !== item.href && pathname.startsWith(o.href) && o.href.length > item.href.length
           )
-          const active = isExact || (isChildPath && !hasStricterMatch)
+          const isReportRoute = pathname.startsWith('/dashboard/marketing/reports') || pathname.startsWith('/dashboard/owners-investors/analytics')
+          const isParentOfReportRoute = (item.href === '/dashboard/marketing' || item.href === '/dashboard/owners-investors') && isReportRoute
+          const active = !isParentOfReportRoute && (isExact || (isChildPath && !hasStricterMatch))
           const Icon = item.icon
           return (
-            <div key={item.href} className="flex flex-col gap-0.5">
+            <div key={item.href} className="flex flex-col gap-0.5 w-full">
               <Link
                 href={item.href}
                 className={`
-                  flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-right no-underline transition-all duration-200 w-full min-w-0 overflow-hidden
+                  flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-right no-underline transition-all duration-200 w-full min-w-0 overflow-hidden cursor-pointer select-none
                   focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-1 focus:ring-offset-white
                   ${active
                     ? 'bg-gradient-to-l from-blue-50 to-indigo-50 border border-blue-200/70 text-slate-800 shadow-md shadow-blue-500/10'
@@ -181,76 +267,6 @@ export default function DashboardSidebar() {
                   </span>
                 )}
               </Link>
-              {/* قائمة التقارير: منسدلة عند توسيع الشريط، أو أيقونة فقط عند طيه */}
-              {item.href === '/dashboard/marketing' && canSeeReports && reportChildren.length > 0 && (
-                open ? (
-                <div className="flex flex-col gap-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setReportsExpanded((p) => !p)}
-                    className={`
-                      flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-right no-underline w-full min-w-0 overflow-hidden transition-all duration-200
-                      focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-1 focus:ring-offset-white
-                      ${isReportsActive
-                        ? 'bg-gradient-to-l from-blue-50 to-indigo-50 border border-blue-200/70 text-slate-800 shadow-md shadow-blue-500/10'
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800 border border-transparent hover:border-slate-100'
-                      }
-                    `}
-                    aria-expanded={reportsExpanded}
-                  >
-                    <ReportsIcon
-                      size={20}
-                      className={`flex-shrink-0 ${isReportsActive ? 'text-blue-600' : 'text-slate-500'}`}
-                    />
-                    <span className={`text-sm font-medium whitespace-nowrap truncate min-w-0 flex-1 ${isReportsActive ? 'text-slate-800 font-semibold' : ''}`}>
-                      التقارير
-                    </span>
-                    <ChevronDown
-                      size={16}
-                      className={`flex-shrink-0 text-slate-400 transition-transform duration-200 ${reportsExpanded ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-                  {reportsExpanded && (
-                    <div className="flex flex-col gap-1 mt-0.5">
-                      {reportChildren.map((child) => {
-                        const childActive = pathname === child.href || pathname.startsWith(child.href + '/')
-                        return (
-                          <Link
-                            key={child.href}
-                            href={child.href}
-                            className={`
-                              flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-right no-underline transition-all duration-200 w-full min-w-0 overflow-hidden
-                              focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-1 focus:ring-offset-white
-                              ${childActive
-                                ? 'bg-gradient-to-l from-blue-50 to-indigo-50 border border-blue-200/70 text-slate-800 shadow-md shadow-blue-500/10'
-                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800 border border-transparent hover:border-slate-100'
-                              }
-                            `}
-                            aria-current={childActive ? 'page' : undefined}
-                          >
-                            <span className={`text-xs font-medium whitespace-nowrap truncate min-w-0 flex-1 ${childActive ? 'text-slate-800 font-semibold' : ''}`}>
-                              {child.label}
-                            </span>
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-                ) : (
-                  <Link
-                    href={reportChildren[0]?.href ?? '/dashboard/marketing/reports'}
-                    className={`
-                      flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-xl text-right no-underline transition-all duration-200 w-full min-w-0
-                      focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-1 focus:ring-offset-white
-                      ${isReportsActive ? 'bg-gradient-to-l from-blue-50 to-indigo-50 border border-blue-200/70 text-slate-800' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800 border border-transparent'}
-                    `}
-                    title="التقارير"
-                  >
-                    <ReportsIcon size={20} className={`flex-shrink-0 ${isReportsActive ? 'text-blue-600' : 'text-slate-500'}`} />
-                  </Link>
-                )
-              )}
             </div>
           )
         })}
@@ -261,7 +277,7 @@ export default function DashboardSidebar() {
         {open && (
           <Link
             href="/user"
-            className="group flex items-center gap-3 p-3 rounded-xl mb-2 border border-blue-200/60 bg-white hover:bg-gradient-to-l hover:from-blue-50/50 hover:to-indigo-50/30 hover:border-blue-200/80 hover:shadow-md shadow-sm transition-all duration-200 no-underline text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-2 focus:ring-offset-white rounded-xl"
+            className="group flex items-center gap-3 p-3 rounded-xl mb-2 border border-blue-200/60 bg-white hover:bg-gradient-to-l hover:from-blue-50/50 hover:to-indigo-50/30 hover:border-blue-200/80 hover:shadow-md shadow-sm transition-all duration-200 no-underline text-slate-800 cursor-pointer select-none focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-2 focus:ring-offset-white rounded-xl"
           >
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-sm font-bold text-white flex-shrink-0 shadow-lg shadow-blue-500/30 ring-1 ring-white/70 group-hover:shadow-blue-500/40 transition-shadow">
               {currentUserDisplayName?.charAt(0) || 'م'}
@@ -278,7 +294,7 @@ export default function DashboardSidebar() {
         <button
           type="button"
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800 hover:border-slate-200 border border-transparent transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-1 focus:ring-offset-white"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800 hover:border-slate-200 border border-transparent transition-all duration-200 cursor-pointer select-none focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-1 focus:ring-offset-white"
         >
           <LogOut size={18} className="flex-shrink-0" />
           {open && <span>تسجيل الخروج</span>}

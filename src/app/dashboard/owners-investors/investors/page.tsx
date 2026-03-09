@@ -1708,63 +1708,13 @@ export default function InvestorsPage() {
                 <Row label="المستثمر" value={viewingUnitInvestment.investor_name} />
                 <Row label="الجوال" value={viewingUnitInvestment.investor_phone ?? "—"} dirLtr />
                 <Row label="رقم الهوية" value={viewingUnitInvestment.investor_id_number ?? "—"} dirLtr />
-                {(viewingUnitInvestment.contract_image_path || viewingUnitInvestment.id_image_path) && (
-                  <div className="flex flex-wrap items-center gap-3 pt-1">
-                    {viewingUnitInvestment.contract_image_path && (
-                      <a
-                        href="#"
-                        onClick={async (e) => {
-                          e.preventDefault();
-                          const { data } = await supabase.storage.from(INVESTOR_DOCS_BUCKET).createSignedUrl(viewingUnitInvestment.contract_image_path!, 3600);
-                          if (data?.signedUrl) window.open(data.signedUrl, "_blank");
-                        }}
-                        className="text-teal-600 hover:underline text-sm font-medium"
-                      >
-                        عرض صورة العقد
-                      </a>
-                    )}
-                    {viewingUnitInvestment.id_image_path && (
-                      <a
-                        href="#"
-                        onClick={async (e) => {
-                          e.preventDefault();
-                          const { data } = await supabase.storage.from(INVESTOR_DOCS_BUCKET).createSignedUrl(viewingUnitInvestment.id_image_path!, 3600);
-                          if (data?.signedUrl) window.open(data.signedUrl, "_blank");
-                        }}
-                        className="text-teal-600 hover:underline text-sm font-medium"
-                      >
-                        عرض صورة الهوية
-                      </a>
-                    )}
-                  </div>
-                )}
                 <Row label="سعر الشراء" value={`${formatNum(Number(viewingUnitInvestment.purchase_price))} ر.س`} dirLtr />
-                {viewingUnitInvestment.payment_method && (
-                  <>
-                    <Row label="طريقة الدفع" value={settlementMethodLabel(viewingUnitInvestment.payment_method)} />
-                    {viewingUnitInvestment.payment_method === "transfer" && viewingUnitInvestment.payment_bank_name && (
-                      <Row label="على بنك" value={viewingUnitInvestment.payment_bank_name} />
-                    )}
-                    {viewingUnitInvestment.payment_method === "check" && viewingUnitInvestment.payment_check_number && (
-                      <Row label="رقم الشيك" value={viewingUnitInvestment.payment_check_number} dirLtr />
-                    )}
-                    {viewingUnitInvestment.payment_method === "check" && viewingUnitInvestment.payment_check_image_path && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-600 font-medium shrink-0">صورة الشيك</span>
-                        <a
-                          href="#"
-                          onClick={async (e) => {
-                            e.preventDefault();
-                            const { data } = await supabase.storage.from(INVESTOR_DOCS_BUCKET).createSignedUrl(viewingUnitInvestment.payment_check_image_path!, 3600);
-                            if (data?.signedUrl) window.open(data.signedUrl, "_blank");
-                          }}
-                          className="text-teal-600 hover:underline text-sm"
-                        >
-                          عرض صورة الشيك
-                        </a>
-                      </div>
-                    )}
-                  </>
+                <Row label="طريقة الدفع" value={viewingUnitInvestment.payment_method ? settlementMethodLabel(viewingUnitInvestment.payment_method) : "—"} />
+                {viewingUnitInvestment.payment_method === "transfer" && viewingUnitInvestment.payment_bank_name && (
+                  <Row label="على بنك" value={viewingUnitInvestment.payment_bank_name} />
+                )}
+                {viewingUnitInvestment.payment_method === "check" && viewingUnitInvestment.payment_check_number && (
+                  <Row label="رقم الشيك" value={viewingUnitInvestment.payment_check_number} dirLtr />
                 )}
                 <Row label="تاريخ الشراء" value={viewingUnitInvestment.purchase_date ? formatDateEn(viewingUnitInvestment.purchase_date) : "—"} dirLtr />
                 <Row label="حالة مشروع الاستثمار" value={viewingUnitInvestment.status === "resold" ? "تم إعادة البيع" : viewingUnitInvestment.status === "cancelled" ? "ملغي" : "تحت الإنشاء"} />
@@ -1802,6 +1752,64 @@ export default function InvestorsPage() {
                 <Row label="سعر إعادة البيع" value={viewingUnitInvestment.resalePrice != null ? `${formatNum(Number(viewingUnitInvestment.resalePrice))} ر.س` : "—"} dirLtr />
                 <Row label="الربح" value={viewingUnitInvestment.profit != null ? `+${formatNum(Number(viewingUnitInvestment.profit))} ر.س` : "—"} dirLtr />
                 {viewingUnitInvestment.notes && <Row label="ملاحظات" value={viewingUnitInvestment.notes} />}
+                <div className="space-y-3 pt-2 border-t border-slate-100">
+                  <p className="text-sm font-medium text-slate-700 text-center">المرفقات</p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {viewingUnitInvestment.contract_image_path ? (
+                      <a
+                        href="#"
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          const { data } = await supabase.storage.from(INVESTOR_DOCS_BUCKET).createSignedUrl(viewingUnitInvestment.contract_image_path!, 3600);
+                          if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+                        }}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors"
+                      >
+                        عرض صورة العقد
+                      </a>
+                    ) : (
+                      <span className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-100 bg-slate-50 text-slate-500 text-sm font-medium">
+                        لم يُرفق عقد
+                      </span>
+                    )}
+                    {viewingUnitInvestment.id_image_path ? (
+                      <a
+                        href="#"
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          const { data } = await supabase.storage.from(INVESTOR_DOCS_BUCKET).createSignedUrl(viewingUnitInvestment.id_image_path!, 3600);
+                          if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+                        }}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors"
+                      >
+                        عرض صورة الهوية
+                      </a>
+                    ) : (
+                      <span className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-100 bg-slate-50 text-slate-500 text-sm font-medium">
+                        لم تُرفق هوية
+                      </span>
+                    )}
+                    {viewingUnitInvestment.payment_method === "check" && (
+                      viewingUnitInvestment.payment_check_image_path ? (
+                        <a
+                          href="#"
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            const { data } = await supabase.storage.from(INVESTOR_DOCS_BUCKET).createSignedUrl(viewingUnitInvestment.payment_check_image_path!, 3600);
+                            if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+                          }}
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors"
+                        >
+                          عرض صورة الشيك
+                        </a>
+                      ) : (
+                        <span className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-100 bg-slate-50 text-slate-500 text-sm font-medium">
+                          لم تُرفق صورة الشيك
+                        </span>
+                      )
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -2506,7 +2514,7 @@ className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 roun
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">صورة الشيك</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">إرفاق صورة الشيك</label>
                       <input
                         ref={unitCheckFileInputRef}
                         type="file"
@@ -2537,56 +2545,57 @@ className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 roun
                 <label className="block text-sm font-medium text-slate-700 mb-1">تاريخ الشراء</label>
                 <input type="date" value={formUnit.purchase_date} onChange={(e) => setFormUnit((p) => ({ ...p, purchase_date: e.target.value }))} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">صورة العقد</label>
-                  <input
-                    ref={unitContractFileInputRef}
-                    type="file"
-                    accept="image/*,.pdf,.doc,.docx"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) setUnitContractFile(f);
-                      e.target.value = "";
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => unitContractFileInputRef.current?.click()}
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200/80 bg-emerald-50/60 text-emerald-800 text-sm font-medium hover:bg-emerald-50/90 hover:border-emerald-300 transition-colors"
-                  >
-                    <FileUp className="w-4 h-4 shrink-0" />
-                    {unitContractFile ? unitContractFile.name : formUnit.contract_image_path ? "مرفق — تغيير" : "اختر ملف"}
-                  </button>
-                  {(formUnit.contract_image_path || unitContractFile) && (
-                    <p className="text-xs text-teal-600 mt-1">{unitContractFile ? "سيتم رفع الملف عند الحفظ" : "مرفق"}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">صورة الهوية</label>
-                  <input
-                    ref={unitIdFileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) setUnitIdFile(f);
-                      e.target.value = "";
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => unitIdFileInputRef.current?.click()}
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200/80 bg-emerald-50/60 text-emerald-800 text-sm font-medium hover:bg-emerald-50/90 hover:border-emerald-300 transition-colors"
-                  >
-                    <FileUp className="w-4 h-4 shrink-0" />
-                    {unitIdFile ? unitIdFile.name : formUnit.id_image_path ? "مرفق — تغيير" : "اختر ملف"}
-                  </button>
-                  {(formUnit.id_image_path || unitIdFile) && (
-                    <p className="text-xs text-teal-600 mt-1">{unitIdFile ? "سيتم رفع الملف عند الحفظ" : "مرفق"}</p>
-                  )}
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <p className="text-sm font-medium text-slate-700 text-center">المرفقات</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <div>
+                    <input
+                      ref={unitContractFileInputRef}
+                      type="file"
+                      accept="image/*,.pdf,.doc,.docx"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) setUnitContractFile(f);
+                        e.target.value = "";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => unitContractFileInputRef.current?.click()}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200/80 bg-emerald-50/60 text-emerald-800 text-sm font-medium hover:bg-emerald-50/90 hover:border-emerald-300 transition-colors"
+                    >
+                      <FileUp className="w-4 h-4 shrink-0" />
+                      {unitContractFile ? unitContractFile.name : formUnit.contract_image_path ? "مرفق — تغيير" : "إرفاق صورة العقد"}
+                    </button>
+                    {(formUnit.contract_image_path || unitContractFile) && (
+                      <p className="text-xs text-teal-600 mt-1 text-center">{unitContractFile ? "سيتم رفع الملف عند الحفظ" : "مرفق"}</p>
+                    )}
+                  </div>
+                  <div>
+                    <input
+                      ref={unitIdFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) setUnitIdFile(f);
+                        e.target.value = "";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => unitIdFileInputRef.current?.click()}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200/80 bg-emerald-50/60 text-emerald-800 text-sm font-medium hover:bg-emerald-50/90 hover:border-emerald-300 transition-colors"
+                    >
+                      <FileUp className="w-4 h-4 shrink-0" />
+                      {unitIdFile ? unitIdFile.name : formUnit.id_image_path ? "مرفق — تغيير" : "إرفاق صورة الهوية"}
+                    </button>
+                    {(formUnit.id_image_path || unitIdFile) && (
+                      <p className="text-xs text-teal-600 mt-1 text-center">{unitIdFile ? "سيتم رفع الملف عند الحفظ" : "مرفق"}</p>
+                    )}
+                  </div>
                 </div>
               </div>
               {editingUnit && (

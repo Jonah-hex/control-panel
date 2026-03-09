@@ -13,6 +13,8 @@ const RIYAL = "ر.س";
 interface CommissionRow {
   customerName: string;
   buildingName: string;
+  unitNumber: string;
+  handoverDate: string;
   commission: number;
   receivedAt: string;
 }
@@ -56,7 +58,7 @@ export default function MarketerCommissionsPage() {
 
       const { data: salesData } = await supabase
         .from("sales")
-        .select("id, sale_date, commission_amount, building_id, buyer_name")
+        .select("id, sale_date, commission_amount, building_id, buyer_name, unit_id, commission_received_at")
         .in("id", saleIds);
 
       const sales = (salesData || []) as {
@@ -65,8 +67,11 @@ export default function MarketerCommissionsPage() {
         commission_amount: number | null;
         building_id: string | null;
         buyer_name: string | null;
+        unit_id: string | null;
+        commission_received_at: string | null;
       }[];
       const buildingIds = [...new Set(sales.map((s) => s.building_id).filter(Boolean))] as string[];
+      const unitIds = [...new Set(sales.map((s) => s.unit_id).filter(Boolean))] as string[];
 
       let buildingMap: Record<string, string> = {};
       if (buildingIds.length > 0) {
@@ -79,6 +84,21 @@ export default function MarketerCommissionsPage() {
         });
       }
 
+      let unitMap: Record<string, { unit_number: string; floor: number }> = {};
+      let handoverMap: Record<string, string> = {};
+      if (unitIds.length > 0) {
+        const [unitsRes, handoversRes] = await Promise.all([
+          supabase.from("units").select("id, unit_number, floor").in("id", unitIds),
+          supabase.from("unit_handovers").select("unit_id, handover_date").in("unit_id", unitIds),
+        ]);
+        (unitsRes.data || []).forEach((u: { id: string; unit_number: string; floor: number }) => {
+          unitMap[u.id] = { unit_number: u.unit_number ?? "—", floor: u.floor ?? 0 };
+        });
+        (handoversRes.data || []).forEach((h: { unit_id: string; handover_date: string | null }) => {
+          if (h.handover_date) handoverMap[h.unit_id] = h.handover_date.slice(0, 10);
+        });
+      }
+
       const resBySaleId = new Map<string, { customer_name?: string | null }>();
       reservations.forEach((r) => resBySaleId.set(r.sale_id, { customer_name: r.customer_name }));
 
@@ -88,11 +108,17 @@ export default function MarketerCommissionsPage() {
           (s.buyer_name && String(s.buyer_name).trim()) ||
           (res?.customer_name && String(res.customer_name).trim()) ||
           "—";
+        const unit = s.unit_id ? unitMap[s.unit_id] : null;
+        const unitNumber = unit ? `${unit.unit_number} (د${unit.floor})` : "—";
+        const handoverDate = s.unit_id && handoverMap[s.unit_id] ? handoverMap[s.unit_id] : "—";
+        const receivedAt = ((s.commission_received_at && s.commission_received_at.slice(0, 10)) || s.sale_date?.slice(0, 10)) ?? "—";
         return {
           customerName,
           buildingName: s.building_id ? buildingMap[s.building_id] ?? "—" : "—",
+          unitNumber,
+          handoverDate,
           commission: s.commission_amount ?? 0,
-          receivedAt: s.sale_date?.slice(0, 10) ?? "—",
+          receivedAt,
         };
       });
 
@@ -175,6 +201,8 @@ export default function MarketerCommissionsPage() {
                   <tr>
                     <th className="text-right py-2.5 px-3 font-semibold text-slate-600">اسم العميل</th>
                     <th className="text-right py-2.5 px-3 font-semibold text-slate-600">اسم المشروع</th>
+                    <th className="text-right py-2.5 px-3 font-semibold text-slate-600">رقم الوحدة</th>
+                    <th className="text-right py-2.5 px-3 font-semibold text-slate-600">تاريخ الإفراغ</th>
                     <th className="text-right py-2.5 px-3 font-semibold text-slate-600">العمولة</th>
                     <th className="text-right py-2.5 px-3 font-semibold text-slate-600">تاريخ استلام العمولة</th>
                   </tr>
@@ -184,6 +212,8 @@ export default function MarketerCommissionsPage() {
                     <tr key={i} className="hover:bg-amber-50/30 transition">
                       <td className="py-3 px-3 text-slate-800 font-medium">{r.customerName}</td>
                       <td className="py-3 px-3 text-slate-600">{r.buildingName}</td>
+                      <td className="py-3 px-3 text-slate-600">{r.unitNumber}</td>
+                      <td className="py-3 px-3 text-slate-600 dir-ltr">{r.handoverDate}</td>
                       <td className="py-3 px-3 dir-ltr text-amber-700 font-semibold">{r.commission.toLocaleString("ar-SA")} {RIYAL}</td>
                       <td className="py-3 px-3 text-slate-600 dir-ltr">{r.receivedAt}</td>
                     </tr>

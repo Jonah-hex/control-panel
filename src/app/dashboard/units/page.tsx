@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, useMemo, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -81,7 +81,10 @@ function UnitsFilterContent() {
   const [typeFilter, setTypeFilter] = useState<'all' | 'apartment' | 'studio'>('all')
   const [filtersInitialized, setFiltersInitialized] = useState(false)
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null)
-  
+  const TABLE_PAGE_SIZES = [10, 18, 25, 50, 100] as const
+  const [unitsPage, setUnitsPage] = useState(1)
+  const [unitsPageSize, setUnitsPageSize] = useState(18)
+
   const supabase = createClient()
   const { can, ready, effectiveOwnerId } = useDashboardAuth()
 
@@ -247,19 +250,30 @@ function UnitsFilterContent() {
     }
   }
 
-  const filteredUnits = units.filter((unit) => {
-    const statusMatches = statusFilter === 'all' || unit.status === statusFilter
-    const facingMatches = facingFilter === 'all' || unit.facing === facingFilter
-    const typeMatches = typeFilter === 'all' || unit.type === typeFilter
-    const term = searchTerm.trim().toLowerCase()
-    const termDigits = searchTerm.trim().replace(/,/g, '')
-    const searchMatches =
-      term.length === 0 ||
-      unit.unit_number?.toLowerCase().includes(term) ||
-      unit.building?.name?.toLowerCase().includes(term) ||
-      (unit.price != null && termDigits !== '' && String(unit.price).includes(termDigits))
-    return statusMatches && facingMatches && typeMatches && searchMatches
-  })
+  const filteredUnits = useMemo(() => {
+    return units.filter((unit) => {
+      const statusMatches = statusFilter === 'all' || unit.status === statusFilter
+      const facingMatches = facingFilter === 'all' || unit.facing === facingFilter
+      const typeMatches = typeFilter === 'all' || unit.type === typeFilter
+      const term = searchTerm.trim().toLowerCase()
+      const termDigits = searchTerm.trim().replace(/,/g, '')
+      const searchMatches =
+        term.length === 0 ||
+        unit.unit_number?.toLowerCase().includes(term) ||
+        unit.building?.name?.toLowerCase().includes(term) ||
+        (unit.price != null && termDigits !== '' && String(unit.price).includes(termDigits))
+      return statusMatches && facingMatches && typeMatches && searchMatches
+    })
+  }, [units, statusFilter, facingFilter, typeFilter, searchTerm])
+
+  const unitsTotalPages = Math.max(1, Math.ceil(filteredUnits.length / unitsPageSize))
+  const paginatedUnits = useMemo(
+    () => filteredUnits.slice((unitsPage - 1) * unitsPageSize, unitsPage * unitsPageSize),
+    [filteredUnits, unitsPage, unitsPageSize]
+  )
+  useEffect(() => {
+    if (unitsPage > unitsTotalPages && unitsTotalPages >= 1) setUnitsPage(1)
+  }, [unitsPage, unitsTotalPages])
 
   const totalUnits = units.length
   const availableUnits = units.filter((unit) => unit.status === 'available').length
@@ -531,12 +545,12 @@ function UnitsFilterContent() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredUnits.map((unit, index) => (
+                  {paginatedUnits.map((unit, index) => (
                     <tr
                       key={unit.id}
                       onClick={() => setSelectedUnit(unit)}
                       className="border-b border-gray-100 hover:bg-emerald-50/40 transition-colors cursor-pointer"
-                      data-seq={index + 1}
+                      data-seq={(unitsPage - 1) * unitsPageSize + index + 1}
                     >
                       <td className="px-4 py-4 text-right min-w-[180px]" onClick={(e) => e.stopPropagation()}>
                         <Link href={can('building_details') ? `/dashboard/buildings/details?buildingId=${unit.building_id}` : `/dashboard/buildings`} className="text-emerald-700 hover:underline font-semibold">
@@ -571,6 +585,52 @@ function UnitsFilterContent() {
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                <span>عرض</span>
+                <select
+                  value={unitsPageSize}
+                  onChange={(e) => {
+                    const n = Number(e.target.value)
+                    if (TABLE_PAGE_SIZES.includes(n)) {
+                      setUnitsPageSize(n)
+                      setUnitsPage(1)
+                    }
+                  }}
+                  className="rounded-2xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-0 transition-all duration-200 min-w-[4.5rem]"
+                  aria-label="عدد الصفوف في الصفحة"
+                >
+                  {TABLE_PAGE_SIZES.map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+                <span className="font-mono">
+                  {((unitsPage - 1) * unitsPageSize + 1).toLocaleString('en')}–
+                  {Math.min(unitsPage * unitsPageSize, filteredUnits.length).toLocaleString('en')} من {filteredUnits.length.toLocaleString('en')}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setUnitsPage((p) => Math.max(1, p - 1))}
+                  disabled={unitsPage <= 1}
+                  className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-0"
+                >
+                  السابق
+                </button>
+                <span className="px-2 py-1.5 text-sm text-slate-600 font-mono">
+                  {unitsPage.toLocaleString('en')} / {unitsTotalPages.toLocaleString('en')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setUnitsPage((p) => Math.min(unitsTotalPages, p + 1))}
+                  disabled={unitsPage >= unitsTotalPages}
+                  className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-0"
+                >
+                  التالي
+                </button>
+              </div>
             </div>
           </div>
         ) : (

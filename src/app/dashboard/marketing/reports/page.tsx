@@ -322,8 +322,14 @@ export default function MarketingReportsPage() {
   const [customDateTo, setCustomDateTo] = useState("");
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [reservationsTableExpanded, setReservationsTableExpanded] = useState(false);
-  const [remainingTableExpanded, setRemainingTableExpanded] = useState(false);
   const [salesTableExpanded, setSalesTableExpanded] = useState(false);
+  const TABLE_PAGE_SIZES = [10, 25, 50, 100] as const;
+  const [byBuildingPage, setByBuildingPage] = useState(1);
+  const [byBuildingPageSize, setByBuildingPageSize] = useState(10);
+  const [remainingPage, setRemainingPage] = useState(1);
+  const [remainingPageSize, setRemainingPageSize] = useState(10);
+  const [marketersPage, setMarketersPage] = useState(1);
+  const [marketersPageSize, setMarketersPageSize] = useState(10);
 
   const { from: periodFrom, to: periodTo } = useMemo(
     () => getPeriodBounds(period, customDateFrom, customDateTo),
@@ -430,8 +436,7 @@ export default function MarketingReportsPage() {
     const topMarketersBySales = marketers
       .map((m) => ({ ...m, ...byMarketer[m.id], completed: byMarketer[m.id]?.completed ?? 0, commission: byMarketer[m.id]?.commission ?? 0, reservations: byMarketer[m.id]?.reservations ?? 0 }))
       .filter((m) => m.completed > 0)
-      .sort((a, b) => b.completed - a.completed || (b.commission ?? 0) - (a.commission ?? 0))
-      .slice(0, 4);
+      .sort((a, b) => b.completed - a.completed || (b.commission ?? 0) - (a.commission ?? 0));
     return {
       totalReservations: filteredReservations.length,
       active,
@@ -452,6 +457,32 @@ export default function MarketingReportsPage() {
       topMarketersBySales,
     };
   }, [filteredReservations, filteredSales, marketers, reservations, buildingsMap]);
+
+  const byBuildingTotalPages = Math.max(1, Math.ceil((stats?.byBuilding?.length ?? 0) / byBuildingPageSize));
+  const paginatedByBuilding = useMemo(
+    () => (stats?.byBuilding ?? []).slice((byBuildingPage - 1) * byBuildingPageSize, byBuildingPage * byBuildingPageSize),
+    [stats?.byBuilding, byBuildingPage, byBuildingPageSize]
+  );
+  const remainingTotalPages = Math.max(1, Math.ceil(salesWithRemaining.length / remainingPageSize));
+  const paginatedRemaining = useMemo(
+    () => salesWithRemaining.slice((remainingPage - 1) * remainingPageSize, remainingPage * remainingPageSize),
+    [salesWithRemaining, remainingPage, remainingPageSize]
+  );
+  const marketersTotalPages = Math.max(1, Math.ceil((stats?.topMarketersBySales?.length ?? 0) / marketersPageSize));
+  const paginatedMarketers = useMemo(
+    () => (stats?.topMarketersBySales ?? []).slice((marketersPage - 1) * marketersPageSize, marketersPage * marketersPageSize),
+    [stats?.topMarketersBySales, marketersPage, marketersPageSize]
+  );
+
+  useEffect(() => {
+    if (byBuildingPage > byBuildingTotalPages && byBuildingTotalPages >= 1) setByBuildingPage(1);
+  }, [byBuildingPage, byBuildingTotalPages]);
+  useEffect(() => {
+    if (remainingPage > remainingTotalPages && remainingTotalPages >= 1) setRemainingPage(1);
+  }, [remainingPage, remainingTotalPages]);
+  useEffect(() => {
+    if (marketersPage > marketersTotalPages && marketersTotalPages >= 1) setMarketersPage(1);
+  }, [marketersPage, marketersTotalPages]);
 
   useEffect(() => {
     if (!ready) return;
@@ -662,11 +693,6 @@ export default function MarketingReportsPage() {
           <PageLoadingSkeleton message="جارٍ تحميل التقرير..." size="md" variant="amber" />
         ) : (
           <>
-            {/* نطاق التقرير — تحليل التسويق والمبيعات فقط */}
-            <div className="mb-6 rounded-xl border border-amber-200/80 bg-amber-50/50 px-4 py-3 text-sm text-slate-700">
-              <span className="font-medium text-amber-800">نطاق التقرير:</span> هذا التحليل خاص بقسم التسويق والمبيعات فقط (حجوزات، مبيعات، عرابين، عمولات المسوقين، صافي الدخل). لتحليل الملاك والمستثمرين والأرباح المحققة والمخالصات → <Link href="/dashboard/owners-investors/analytics" className="text-amber-700 font-medium hover:underline">تحليلات الملاك والمستثمرين</Link>.
-            </div>
-
             {/* Executive summary */}
             <section className="mb-8">
               <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -801,7 +827,7 @@ export default function MarketingReportsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {stats.byBuilding.map((b) => (
+                      {paginatedByBuilding.map((b) => (
                         <tr key={b.buildingId} className="border-b border-slate-100 hover:bg-slate-50/50">
                           <td className="py-2 px-3 font-medium text-slate-800">{b.buildingName}</td>
                           <td className="py-2 px-3 text-center">{formatNum(b.reservations)}</td>
@@ -811,6 +837,29 @@ export default function MarketingReportsPage() {
                       ))}
                     </tbody>
                   </table>
+                  {stats.byBuilding.length > 0 && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                        <span>عرض</span>
+                        <select
+                          value={byBuildingPageSize}
+                          onChange={(e) => { setByBuildingPageSize(Number(e.target.value)); setByBuildingPage(1); }}
+                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-0 transition-all duration-200"
+                        >
+                          {TABLE_PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                        <span className="font-mono">
+                          {((byBuildingPage - 1) * byBuildingPageSize + 1).toLocaleString("en")}–
+                          {Math.min(byBuildingPage * byBuildingPageSize, stats.byBuilding.length).toLocaleString("en")} من {stats.byBuilding.length.toLocaleString("en")}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => setByBuildingPage((p) => Math.max(1, p - 1))} disabled={byBuildingPage <= 1} className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-0">السابق</button>
+                        <span className="px-2 py-1.5 text-sm text-slate-600 font-mono">{byBuildingPage.toLocaleString("en")} / {byBuildingTotalPages.toLocaleString("en")}</span>
+                        <button type="button" onClick={() => setByBuildingPage((p) => Math.min(byBuildingTotalPages, p + 1))} disabled={byBuildingPage >= byBuildingTotalPages} className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-0">التالي</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </section>
             )}
@@ -1068,48 +1117,53 @@ export default function MarketingReportsPage() {
                   </div>
                 ) : (
                   <div className="border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => setRemainingTableExpanded(!remainingTableExpanded)}
-                      className="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-slate-600 hover:bg-slate-50 transition print:hidden"
-                    >
-                      <span>تفاصيل صفقات المبالغ المتبقية — {formatNum(salesWithRemaining.length)} صفقة</span>
-                      <span className="text-amber-600">{remainingTableExpanded ? "إخفاء التفاصيل" : "عرض التفاصيل"}</span>
-                    </button>
-                    {(remainingTableExpanded || salesWithRemaining.length <= 6) && (
-                      <div className="overflow-x-auto max-h-[18rem] overflow-y-auto">
-                        <table className="w-full text-sm border-collapse">
-                          <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 z-10">
-                            <tr>
-                              <th className="text-right py-2 px-3 font-semibold text-slate-600">تاريخ البيع</th>
-                              <th className="text-right py-2 px-3 font-semibold text-slate-600">العمارة / الوحدة</th>
-                              <th className="text-right py-2 px-3 font-semibold text-slate-600">سعر البيع</th>
-                              <th className="text-right py-2 px-3 font-semibold text-slate-600">المتبقي</th>
-                              <th className="text-right py-2 px-3 font-semibold text-slate-600">استحقاق المتبقي</th>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm border-collapse">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                          <tr>
+                            <th className="text-right py-2 px-3 font-semibold text-slate-600">تاريخ البيع</th>
+                            <th className="text-right py-2 px-3 font-semibold text-slate-600">العمارة / الوحدة</th>
+                            <th className="text-right py-2 px-3 font-semibold text-slate-600">سعر البيع</th>
+                            <th className="text-right py-2 px-3 font-semibold text-slate-600">المتبقي</th>
+                            <th className="text-right py-2 px-3 font-semibold text-slate-600">استحقاق المتبقي</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paginatedRemaining.map((s) => (
+                            <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                              <td className="py-2 px-3 text-slate-700">{formatDate(s.sale_date)}</td>
+                              <td className="py-2 px-3">
+                                {buildingsMap[s.building_id] ?? "—"} / {s.unit_id && unitsMap[s.unit_id] ? `${unitsMap[s.unit_id].unit_number} (د${unitsMap[s.unit_id].floor})` : "—"}
+                              </td>
+                              <td className="py-2 px-3 dir-ltr font-medium">{formatNum(s.sale_price)} {RIYAL}</td>
+                              <td className="py-2 px-3 dir-ltr text-amber-700 font-medium">{formatNum(s.remaining_payment ?? 0)} {RIYAL}</td>
+                              <td className="py-2 px-3 text-slate-600">{s.remaining_payment_due_date ? formatDate(s.remaining_payment_due_date) : "—"}</td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {salesWithRemaining.slice(0, remainingTableExpanded ? 100 : 8).map((s) => (
-                              <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                                <td className="py-2 px-3 text-slate-700">{formatDate(s.sale_date)}</td>
-                                <td className="py-2 px-3">
-                                  {buildingsMap[s.building_id] ?? "—"} / {s.unit_id && unitsMap[s.unit_id] ? `${unitsMap[s.unit_id].unit_number} (د${unitsMap[s.unit_id].floor})` : "—"}
-                                </td>
-                                <td className="py-2 px-3 dir-ltr font-medium">{formatNum(s.sale_price)} {RIYAL}</td>
-                                <td className="py-2 px-3 dir-ltr text-amber-700 font-medium">{formatNum(s.remaining_payment ?? 0)} {RIYAL}</td>
-                                <td className="py-2 px-3 text-slate-600">{s.remaining_payment_due_date ? formatDate(s.remaining_payment_due_date) : "—"}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                        <span>عرض</span>
+                        <select
+                          value={remainingPageSize}
+                          onChange={(e) => { setRemainingPageSize(Number(e.target.value)); setRemainingPage(1); }}
+                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-0 transition-all duration-200"
+                        >
+                          {TABLE_PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                        <span className="font-mono">
+                          {((remainingPage - 1) * remainingPageSize + 1).toLocaleString("en")}–
+                          {Math.min(remainingPage * remainingPageSize, salesWithRemaining.length).toLocaleString("en")} من {salesWithRemaining.length.toLocaleString("en")}
+                        </span>
                       </div>
-                    )}
-                    {!remainingTableExpanded && salesWithRemaining.length > 6 && (
-                      <p className="text-xs text-slate-500 px-4 py-2 border-t border-slate-100">عرض 8 من {formatNum(salesWithRemaining.length)} — انقر «عرض التفاصيل» للمزيد</p>
-                    )}
-                    {remainingTableExpanded && salesWithRemaining.length > 100 && (
-                      <p className="text-xs text-slate-500 px-4 py-2 border-t border-slate-100">عرض أول 100 صفقة من أصل {formatNum(salesWithRemaining.length)}</p>
-                    )}
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => setRemainingPage((p) => Math.max(1, p - 1))} disabled={remainingPage <= 1} className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-0">السابق</button>
+                        <span className="px-2 py-1.5 text-sm text-slate-600 font-mono">{remainingPage.toLocaleString("en")} / {remainingTotalPages.toLocaleString("en")}</span>
+                        <button type="button" onClick={() => setRemainingPage((p) => Math.min(remainingTotalPages, p + 1))} disabled={remainingPage >= remainingTotalPages} className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-0">التالي</button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1243,36 +1297,60 @@ export default function MarketingReportsPage() {
                 {stats.topMarketersBySales.length === 0 ? (
                   <div className="px-5 py-8 text-center text-slate-500 text-sm">لا يوجد مسوقون لديهم مبيعات في الفترة</div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[400px]">
-                      <thead>
-                        <tr className="text-right text-xs font-semibold text-slate-500 border-b border-slate-100">
-                          <th className="py-2.5 px-3">المسوق</th>
-                          <th className="py-2.5 px-3">عدد الحجوزات</th>
-                          <th className="py-2.5 px-3">مبيعات مكتملة</th>
-                          <th className="py-2.5 px-3">العمولة</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {stats.topMarketersBySales.map((m, i) => {
-                          const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
-                          return (
-                            <tr key={m.id} className={`${i < 3 ? "bg-amber-50/30" : ""} hover:bg-slate-50/50 transition`}>
-                              <td className="py-3 px-3">
-                                <span className="inline-flex items-center gap-2">
-                                  {medal ? <span className="text-base">{medal}</span> : <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-500 text-xs font-bold flex items-center justify-center">{i + 1}</span>}
-                                  <span className="font-medium text-slate-800">{m.name}</span>
-                                </span>
-                              </td>
-                              <td className="py-3 px-3 text-slate-600 dir-ltr">{formatNum(m.reservations ?? 0)}</td>
-                              <td className="py-3 px-3 text-slate-600 dir-ltr">{formatNum(m.completed)}</td>
-                              <td className="py-3 px-3 dir-ltr text-sm font-bold text-amber-700">{formatNum(m.commission ?? 0)} {RIYAL}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[400px]">
+                        <thead>
+                          <tr className="text-right text-xs font-semibold text-slate-500 border-b border-slate-100">
+                            <th className="py-2.5 px-3">المسوق</th>
+                            <th className="py-2.5 px-3">عدد الحجوزات</th>
+                            <th className="py-2.5 px-3">مبيعات مكتملة</th>
+                            <th className="py-2.5 px-3">العمولة</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {paginatedMarketers.map((m, i) => {
+                            const globalIndex = (marketersPage - 1) * marketersPageSize + i;
+                            const medal = globalIndex === 0 ? "🥇" : globalIndex === 1 ? "🥈" : globalIndex === 2 ? "🥉" : null;
+                            return (
+                              <tr key={m.id} className={`${globalIndex < 3 ? "bg-amber-50/30" : ""} hover:bg-slate-50/50 transition`}>
+                                <td className="py-3 px-3">
+                                  <span className="inline-flex items-center gap-2">
+                                    {medal ? <span className="text-base">{medal}</span> : <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-500 text-xs font-bold flex items-center justify-center">{globalIndex + 1}</span>}
+                                    <span className="font-medium text-slate-800">{m.name}</span>
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 text-slate-600 dir-ltr">{formatNum(m.reservations ?? 0)}</td>
+                                <td className="py-3 px-3 text-slate-600 dir-ltr">{formatNum(m.completed)}</td>
+                                <td className="py-3 px-3 dir-ltr text-sm font-bold text-amber-700">{formatNum(m.commission ?? 0)} {RIYAL}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                        <span>عرض</span>
+                        <select
+                          value={marketersPageSize}
+                          onChange={(e) => { setMarketersPageSize(Number(e.target.value)); setMarketersPage(1); }}
+                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-0 transition-all duration-200"
+                        >
+                          {TABLE_PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                        <span className="font-mono">
+                          {((marketersPage - 1) * marketersPageSize + 1).toLocaleString("en")}–
+                          {Math.min(marketersPage * marketersPageSize, stats.topMarketersBySales.length).toLocaleString("en")} من {stats.topMarketersBySales.length.toLocaleString("en")}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => setMarketersPage((p) => Math.max(1, p - 1))} disabled={marketersPage <= 1} className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-0">السابق</button>
+                        <span className="px-2 py-1.5 text-sm text-slate-600 font-mono">{marketersPage.toLocaleString("en")} / {marketersTotalPages.toLocaleString("en")}</span>
+                        <button type="button" onClick={() => setMarketersPage((p) => Math.min(marketersTotalPages, p + 1))} disabled={marketersPage >= marketersTotalPages} className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-0">التالي</button>
+                      </div>
+                    </div>
+                  </>
                 )}
                 <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/50 print:hidden">
                   <Link href="/dashboard/marketing/marketers" className="text-sm text-amber-600 hover:underline font-medium">

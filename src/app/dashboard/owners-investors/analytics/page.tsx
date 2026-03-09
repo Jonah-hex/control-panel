@@ -213,6 +213,11 @@ export default function InvestmentAnalyticsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<InvestmentTypeFilter>("all");
   const [kpiDetailCard, setKpiDetailCard] = useState<"capital" | "profit" | "closed" | "avgPct" | "settlement" | null>(null);
+  const TABLE_PAGE_SIZES = [10, 25, 50, 100] as const;
+  const [unitsPage, setUnitsPage] = useState(1);
+  const [unitsPageSize, setUnitsPageSize] = useState(10);
+  const [buildingPage, setBuildingPage] = useState(1);
+  const [buildingPageSize, setBuildingPageSize] = useState(10);
 
   const applyDateRangePreset = (preset: DateRangePreset) => {
     setDateRangePreset(preset);
@@ -344,6 +349,24 @@ export default function InvestmentAnalyticsPage() {
     if (statusFilter === "under_construction") list = list.filter((r) => !r.closed);
     return list;
   }, [enrichedBuilding, filterBuilding, searchQuery, dateFrom, dateTo, statusFilter]);
+
+  const unitsTotalPages = Math.max(1, Math.ceil(filteredUnits.length / unitsPageSize));
+  const paginatedUnits = useMemo(
+    () => filteredUnits.slice((unitsPage - 1) * unitsPageSize, unitsPage * unitsPageSize),
+    [filteredUnits, unitsPage, unitsPageSize]
+  );
+  const buildingTotalPages = Math.max(1, Math.ceil(filteredBuilding.length / buildingPageSize));
+  const paginatedBuilding = useMemo(
+    () => filteredBuilding.slice((buildingPage - 1) * buildingPageSize, buildingPage * buildingPageSize),
+    [filteredBuilding, buildingPage, buildingPageSize]
+  );
+
+  useEffect(() => {
+    if (unitsPage > unitsTotalPages && unitsTotalPages >= 1) setUnitsPage(1);
+  }, [unitsPage, unitsTotalPages]);
+  useEffect(() => {
+    if (buildingPage > buildingTotalPages && buildingTotalPages >= 1) setBuildingPage(1);
+  }, [buildingPage, buildingTotalPages]);
 
   const summaryUnits = useMemo(() => {
     const totalInvested = filteredUnits.reduce((s, r) => s + (Number(r.purchase_price) || 0), 0);
@@ -588,11 +611,6 @@ export default function InvestmentAnalyticsPage() {
           </div>
         ) : (
           <>
-            {/* نطاق التقرير — تحليل الملاك والمستثمرين فقط */}
-            <div className="mb-6 rounded-xl border border-teal-200/80 bg-teal-50/50 px-4 py-3 text-sm text-slate-700">
-              <span className="font-medium text-teal-800">نطاق التحليل:</span> هذا التحليل خاص بالملاك والمستثمرين فقط (استثمارات الوحدات والعمارة، أرباح محققة، مخالصات، صافي المنشأة). لتقارير الحجوزات والمبيعات وأداء المسوقين → <Link href="/dashboard/marketing/reports" className="text-teal-700 font-medium hover:underline">تقارير التسويق والمبيعات</Link>.
-            </div>
-
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-6">
               <div className="flex items-center gap-2 mb-3">
                 <Filter className="w-4 h-4 text-slate-500" />
@@ -963,7 +981,7 @@ export default function InvestmentAnalyticsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredUnits.slice(0, 50).map((r) => {
+                      {paginatedUnits.map((r) => {
                         const capital = Number(r.purchase_price) || 0;
                         const profitVal = r.profit ?? 0;
                         const profitPct = capital > 0 && r.status === "resold" ? (profitVal / capital) * 100 : null;
@@ -988,7 +1006,50 @@ export default function InvestmentAnalyticsPage() {
                     </tbody>
                   </table>
                 </div>
-                {filteredUnits.length > 50 && <p className="text-xs text-slate-500 p-3 border-t border-slate-100">عرض 50 من {filteredUnits.length}</p>}
+                {filteredUnits.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                      <span>عرض</span>
+                      <select
+                        value={unitsPageSize}
+                        onChange={(e) => {
+                          setUnitsPageSize(Number(e.target.value));
+                          setUnitsPage(1);
+                        }}
+                        className="rounded-2xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-0 transition-all duration-200"
+                      >
+                        {TABLE_PAGE_SIZES.map((n) => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                      <span className="font-mono">
+                        {((unitsPage - 1) * unitsPageSize + 1).toLocaleString("en")}–
+                        {Math.min(unitsPage * unitsPageSize, filteredUnits.length).toLocaleString("en")} من {filteredUnits.length.toLocaleString("en")}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setUnitsPage((p) => Math.max(1, p - 1))}
+                        disabled={unitsPage <= 1}
+                        className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm focus:outline-none focus:ring-0"
+                      >
+                        السابق
+                      </button>
+                      <span className="px-2 py-1.5 text-sm text-slate-600 font-mono">
+                        {unitsPage.toLocaleString("en")} / {unitsTotalPages.toLocaleString("en")}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setUnitsPage((p) => Math.min(unitsTotalPages, p + 1))}
+                        disabled={unitsPage >= unitsTotalPages}
+                        className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm focus:outline-none focus:ring-0"
+                      >
+                        التالي
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1013,7 +1074,7 @@ export default function InvestmentAnalyticsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredBuilding.slice(0, 50).map((r) => (
+                      {paginatedBuilding.map((r) => (
                         <tr key={r.id} className="hover:bg-slate-50/50">
                           <td className="p-3 font-medium text-slate-800">{r.investor_name || "—"}</td>
                           <td className="p-3 text-slate-600">{r.buildingName}</td>
@@ -1037,7 +1098,50 @@ export default function InvestmentAnalyticsPage() {
                     </tbody>
                   </table>
                 </div>
-                {filteredBuilding.length > 50 && <p className="text-xs text-slate-500 p-3 border-t border-slate-100">عرض 50 من {filteredBuilding.length}</p>}
+                {filteredBuilding.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                      <span>عرض</span>
+                      <select
+                        value={buildingPageSize}
+                        onChange={(e) => {
+                          setBuildingPageSize(Number(e.target.value));
+                          setBuildingPage(1);
+                        }}
+                        className="rounded-2xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-0 transition-all duration-200"
+                      >
+                        {TABLE_PAGE_SIZES.map((n) => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                      <span className="font-mono">
+                        {((buildingPage - 1) * buildingPageSize + 1).toLocaleString("en")}–
+                        {Math.min(buildingPage * buildingPageSize, filteredBuilding.length).toLocaleString("en")} من {filteredBuilding.length.toLocaleString("en")}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setBuildingPage((p) => Math.max(1, p - 1))}
+                        disabled={buildingPage <= 1}
+                        className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm focus:outline-none focus:ring-0"
+                      >
+                        السابق
+                      </button>
+                      <span className="px-2 py-1.5 text-sm text-slate-600 font-mono">
+                        {buildingPage.toLocaleString("en")} / {buildingTotalPages.toLocaleString("en")}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setBuildingPage((p) => Math.min(buildingTotalPages, p + 1))}
+                        disabled={buildingPage >= buildingTotalPages}
+                        className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm focus:outline-none focus:ring-0"
+                      >
+                        التالي
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

@@ -668,9 +668,11 @@ export default function DashboardPage() {
     const d = new Date(isoDate)
     const now = new Date()
     const diffMs = now.getTime() - d.getTime()
+    const opts: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined }
+    const formatMiladi = () => d.toLocaleDateString('en-GB', opts)
     if (diffMs < 0) {
       // تاريخ مستقبلي (مثلاً انتهاء اتحاد الملاك)
-      return d.toLocaleDateString('ar-SA', { day: 'numeric', month: 'short', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined })
+      return formatMiladi()
     }
     const diffMins = Math.floor(diffMs / 60000)
     const diffHours = Math.floor(diffMs / 3600000)
@@ -680,7 +682,7 @@ export default function DashboardPage() {
     if (diffHours < 24) return `منذ ${diffHours} س`
     if (diffDays === 1) return 'أمس'
     if (diffDays < 7) return `منذ ${diffDays} أيام`
-    return d.toLocaleDateString('ar-SA', { day: 'numeric', month: 'short', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined })
+    return formatMiladi()
   }
 
   /** قائمة موحدة لجميع التنبيهات مرتبة من الأحدث إلى الأقدم */
@@ -756,11 +758,16 @@ export default function DashboardPage() {
 
   // اشتقاق آخر النشاطات من البيانات الفعلية (بيع، حجز، إضافة عمارة، تنبيهات اتحاد الملاك)
   const activities = useMemo(() => {
+    // اسم صاحب الحساب من الحساب فقط (استبعاد العمارة): الاسم من الحساب ثم صاحب الحساب
+    const ownerDisplayName =
+      (user && effectiveOwnerId === user.id ? (user.user_metadata?.full_name || user.email) : null) ||
+      'صاحب الحساب'
+
     const fromUnits: Activity[] = []
     for (const u of units) {
       const bName = buildings.find(b => b.id === u.building_id)?.name || '—'
       if (u.status === 'sold') {
-        // تم البيع: مسوق → "بواسطة المسوق: الاسم" | موظف (من حسابه) → "بواسطة: اسم الموظف" من created_by_name | وإلا "بواسطة: الإدارة"
+        // تم البيع: مسوق → "بواسطة المسوق: الاسم" | موظف → "بواسطة: اسم الموظف" | وإلا "بواسطة: اسم صاحب الحساب"
         const completedRes = reservations.find(r => r.unit_id === u.id && (r.status === 'completed' || r.sale_id != null || r.completed_at != null))
         const marketerName = completedRes?.marketer_name && String(completedRes.marketer_name).trim()
         const createdByName = completedRes?.created_by_name && String(completedRes.created_by_name).trim()
@@ -796,7 +803,7 @@ export default function DashboardPage() {
             type: 'sold',
             building_name: bName,
             building_id: u.building_id,
-            user_name: 'الإدارة',
+            user_name: ownerDisplayName,
             user_role_label: 'بواسطة',
             timestamp: u.updated_at || u.created_at,
             details: `تم بيع الوحدة ${u.unit_number} (الدور ${u.floor})`
@@ -933,7 +940,7 @@ export default function DashboardPage() {
     return [...fromUnits, ...fromReservations, ...fromExpiredReservations, ...fromBuildings, ...fromAssoc, ...fromMeterAdded, ...fromOwnershipTransferred, ...fromRemainingPaymentCollected, ...fromRemainingPaymentCollectedLate]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 7)
-  }, [units, buildings, reservations, employeesList, associationEndReminders, meterAddedLogs, ownershipTransferredLogs, remainingPaymentCollectedLogs, remainingPaymentCollectedLateLogs])
+  }, [units, buildings, reservations, employeesList, associationEndReminders, meterAddedLogs, ownershipTransferredLogs, remainingPaymentCollectedLogs, remainingPaymentCollectedLateLogs, user, effectiveOwnerId])
 
   // عرض النشاطات حسب الصلاحيات (خاص بلوحة الموظف)
   const filteredActivities = useMemo(() => {
@@ -1053,9 +1060,10 @@ export default function DashboardPage() {
     { icon: Eye, label: 'إدارة العماير', href: '/dashboard/buildings', color: 'green', gradient: 'from-emerald-500 to-green-500', permission: 'buildings' as const, noPermissionMessage: 'ليس لديك صلاحية إدارة العماير.' },
     { icon: Plus, label: 'إضافة عمارة', href: '/dashboard/buildings/new', color: 'blue', gradient: 'from-blue-500 to-cyan-500', permission: 'buildings_create' as const, noPermissionMessage: 'ليس لديك صلاحية إضافة عمارة جديدة. تواصل مع المالك لتفعيل الصلاحية.' },
     { icon: Home, label: 'الوحدات', href: '/dashboard/units', color: 'purple', gradient: 'from-purple-500 to-pink-500', permission: 'units' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول للوحدات.' },
-    { icon: BarChart3, label: 'الإحصائيات', href: '/dashboard/statistics', color: 'indigo', gradient: 'from-indigo-500 to-purple-500', permission: 'statistics' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول للإحصائيات.' },
     { icon: User2, label: 'إدارة التسويق والمبيعات', href: '/dashboard/marketing', color: 'amber', gradient: 'from-amber-500 to-orange-600', permission: 'marketing_view' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول لإدارة التسويق والمبيعات.' },
-    { icon: Users, label: 'إدارة الملاك والمستثمرين', href: '/dashboard/owners-investors', color: 'teal', gradient: 'from-teal-500 to-cyan-600', permission: 'owners_view' as const, permissionAlt: 'investors_view' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول لإدارة الملاك أو المستثمرين.' }
+    { icon: Users, label: 'إدارة الملاك والمستثمرين', href: '/dashboard/owners-investors', color: 'teal', gradient: 'from-teal-500 to-cyan-600', permission: 'owners_view' as const, permissionAlt: 'investors_view' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول لإدارة الملاك أو المستثمرين.' },
+    { icon: CheckSquare, label: 'المهام والملاحظات', href: '/dashboard/tasks', color: 'amber', gradient: 'from-amber-500 to-orange-600', permission: 'marketing_view' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول للمهام والملاحظات.' },
+    { icon: BarChart3, label: 'الإحصائيات', href: '/dashboard/statistics', color: 'indigo', gradient: 'from-indigo-500 to-purple-500', permission: 'statistics' as const, noPermissionMessage: 'ليس لديك صلاحية الوصول للإحصائيات.' }
   ]
 
   const recentBuildings = buildings.slice(0, 3)
@@ -1384,16 +1392,8 @@ export default function DashboardPage() {
 {/* الوقت والتاريخ */}
               <div className="hidden md:block px-5 py-3 rounded-2xl border border-slate-200/60 bg-white/90 shadow-sm shadow-slate-200/30 min-w-[10rem] text-right">
                 <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5">{greeting}</div>
-                <div className="text-sm font-semibold text-slate-800 tabular-nums">
-                  {currentTime.toLocaleDateString('en-GB', {
-                    weekday: 'short',
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric'
-                  })}
-                </div>
-                <div className="text-xs text-slate-500 mt-0.5 font-medium" dir="rtl">
-                  {currentTime.toLocaleDateString('ar-SA', { calendar: 'islamic-umalqura', year: 'numeric', month: 'long', day: 'numeric' })}
+                <div className="text-sm font-semibold text-slate-800 tabular-nums" dir="ltr">
+                  {currentTime.toLocaleDateString('en-GB', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
                 </div>
               </div>
 

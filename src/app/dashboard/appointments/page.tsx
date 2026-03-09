@@ -17,7 +17,18 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
 
-type AppointmentType = "viewing" | "meeting" | "maintenance" | "marketing" | "other";
+type AppointmentType =
+  | "viewing"
+  | "meeting"
+  | "maintenance"
+  | "marketing"
+  | "unit_handover"
+  | "contract_signing"
+  | "complaint"
+  | "owner_meeting"
+  | "document_delivery"
+  | "unit_inspection"
+  | "other";
 type AppointmentStatus = "scheduled" | "completed" | "cancelled" | "no_show";
 
 interface Appointment {
@@ -38,6 +49,12 @@ const TYPE_LABELS: Record<AppointmentType, string> = {
   meeting: "اجتماع",
   maintenance: "صيانة",
   marketing: "تسويق",
+  unit_handover: "تسليم مفاتيح",
+  contract_signing: "توقيع عقد",
+  complaint: "شكوى",
+  owner_meeting: "اجتماع ملاك",
+  document_delivery: "تسليم مستندات",
+  unit_inspection: "معاينة وحدة",
   other: "أخرى",
 };
 

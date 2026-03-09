@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Plus, Building2, LayoutDashboard, Home, Search, Trash2, Eye, Crown } from 'lucide-react'
@@ -10,10 +10,14 @@ import { useBuildings } from '@/hooks/useBuildings'
 import { PageLoadingSkeleton } from '@/components/dashboard/PageLoadingSkeleton'
 import type { Building } from '@/types/database'
 
+const TABLE_PAGE_SIZES = [10, 25, 50, 100] as const
+
 export default function BuildingsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [buildingToDelete, setBuildingToDelete] = useState<Building | null>(null)
+  const [buildingsPage, setBuildingsPage] = useState(1)
+  const [buildingsPageSize, setBuildingsPageSize] = useState(10)
   const supabase = createClient()
   const { effectiveOwnerId, can, ready } = useDashboardAuth()
   const { planName, canAddBuilding, buildingsLimitLabel, loading: subscriptionLoading } = useSubscription()
@@ -76,9 +80,21 @@ export default function BuildingsPage() {
   })
 
   // Sort by newest first (last added)
-  const displayedBuildings = [...filteredBuildings].sort((a, b) =>
-    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  const displayedBuildings = useMemo(
+    () => [...filteredBuildings].sort((a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    ),
+    [filteredBuildings]
   )
+
+  const buildingsTotalPages = Math.max(1, Math.ceil(displayedBuildings.length / buildingsPageSize))
+  const paginatedBuildings = useMemo(
+    () => displayedBuildings.slice((buildingsPage - 1) * buildingsPageSize, buildingsPage * buildingsPageSize),
+    [displayedBuildings, buildingsPage, buildingsPageSize]
+  )
+  useEffect(() => {
+    if (buildingsPage > buildingsTotalPages && buildingsTotalPages >= 1) setBuildingsPage(1)
+  }, [buildingsPage, buildingsTotalPages])
 
   const totalAvailableUnits = Object.values(unitStatsByBuilding).reduce((sum, s) => sum + s.available, 0)
   const totalReservedUnits = Object.values(unitStatsByBuilding).reduce((sum, s) => sum + s.reserved, 0)
@@ -228,7 +244,7 @@ export default function BuildingsPage() {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {displayedBuildings.map((b) => (
+                  {paginatedBuildings.map((b) => (
                     <tr key={b.id} className="hover:bg-sky-50/40 transition-colors duration-150">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -312,6 +328,44 @@ export default function BuildingsPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                <span>عرض</span>
+                <select
+                  value={buildingsPageSize}
+                  onChange={(e) => { setBuildingsPageSize(Number(e.target.value)); setBuildingsPage(1); }}
+                  className="rounded-2xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-0 transition-all duration-200"
+                  aria-label="عدد الصفوف في الصفحة"
+                >
+                  {TABLE_PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+                <span className="font-mono">
+                  {((buildingsPage - 1) * buildingsPageSize + 1).toLocaleString('en')}–
+                  {Math.min(buildingsPage * buildingsPageSize, displayedBuildings.length).toLocaleString('en')} من {displayedBuildings.length.toLocaleString('en')}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setBuildingsPage((p) => Math.max(1, p - 1))}
+                  disabled={buildingsPage <= 1}
+                  className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-0"
+                >
+                  السابق
+                </button>
+                <span className="px-2 py-1.5 text-sm text-slate-600 font-mono">
+                  {buildingsPage.toLocaleString('en')} / {buildingsTotalPages.toLocaleString('en')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setBuildingsPage((p) => Math.min(buildingsTotalPages, p + 1))}
+                  disabled={buildingsPage >= buildingsTotalPages}
+                  className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-0"
+                >
+                  التالي
+                </button>
+              </div>
             </div>
           </div>
         )}

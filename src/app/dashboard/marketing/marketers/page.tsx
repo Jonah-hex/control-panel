@@ -59,6 +59,9 @@ export default function MarketersPage() {
   });
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const TABLE_PAGE_SIZES = [10, 25, 50, 100] as const;
+  const [marketersPage, setMarketersPage] = useState(1);
+  const [marketersPageSize, setMarketersPageSize] = useState(10);
 
   const supabase = createClient();
 
@@ -79,8 +82,17 @@ export default function MarketersPage() {
         company.includes(q) ||
         notes.includes(q)
       );
-    });
+    }    );
   }, [marketers, searchQuery]);
+
+  const marketersTotalPages = Math.max(1, Math.ceil(filteredMarketers.length / marketersPageSize));
+  const paginatedMarketers = useMemo(
+    () => filteredMarketers.slice((marketersPage - 1) * marketersPageSize, marketersPage * marketersPageSize),
+    [filteredMarketers, marketersPage, marketersPageSize]
+  );
+  useEffect(() => {
+    if (marketersPage > marketersTotalPages && marketersTotalPages >= 1) setMarketersPage(1);
+  }, [marketersPage, marketersTotalPages]);
 
   const fetchMarketers = useCallback(async () => {
     if (!effectiveOwnerId) return;
@@ -326,7 +338,8 @@ export default function MarketersPage() {
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto max-h-[28rem] overflow-y-auto">
+            <>
+            <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 shadow-[0_1px_0_0_rgba(0,0,0,0.06)]">
                   <tr>
@@ -338,7 +351,7 @@ export default function MarketersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredMarketers.map((m) => (
+                  {paginatedMarketers.map((m) => (
                     <tr key={m.id} className="border-b border-slate-100 hover:bg-amber-50/40 transition">
                       <td className="py-2 px-3 align-top">
                         <p className="font-semibold text-gray-800 truncate max-w-[10rem]" title={m.name}>{m.name}</p>
@@ -409,6 +422,47 @@ export default function MarketersPage() {
                 </tbody>
               </table>
             </div>
+            {filteredMarketers.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                  <span>عرض</span>
+                  <select
+                    value={marketersPageSize}
+                    onChange={(e) => { setMarketersPageSize(Number(e.target.value)); setMarketersPage(1); }}
+                    className="rounded-2xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-0 transition-all duration-200"
+                    aria-label="عدد الصفوف في الصفحة"
+                  >
+                    {TABLE_PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                  <span className="font-mono">
+                    {((marketersPage - 1) * marketersPageSize + 1).toLocaleString("en")}–
+                    {Math.min(marketersPage * marketersPageSize, filteredMarketers.length).toLocaleString("en")} من {filteredMarketers.length.toLocaleString("en")}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setMarketersPage((p) => Math.max(1, p - 1))}
+                    disabled={marketersPage <= 1}
+                    className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-0"
+                  >
+                    السابق
+                  </button>
+                  <span className="px-2 py-1.5 text-sm text-slate-600 font-mono">
+                    {marketersPage.toLocaleString("en")} / {marketersTotalPages.toLocaleString("en")}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setMarketersPage((p) => Math.min(marketersTotalPages, p + 1))}
+                    disabled={marketersPage >= marketersTotalPages}
+                    className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-0"
+                  >
+                    التالي
+                  </button>
+                </div>
+              </div>
+            )}
+            </>
           )}
         </section>
       </div>
