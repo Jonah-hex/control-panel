@@ -161,6 +161,7 @@ interface BuildingInvestorRow {
   settlement_type?: string | null;
   transferred_amount?: number | null;
   transferred_from_building_investor_id?: string | null;
+  transferred_from_unit_investment_id?: string | null;
   payment_method?: string | null;
   payment_bank_name?: string | null;
   payment_check_number?: string | null;
@@ -180,11 +181,17 @@ interface UnitInvestmentRow {
   purchase_date: string | null;
   resale_sale_id: string | null;
   status: string;
+  settlement_type?: string | null;
+  settlement_method?: string | null;
+  settlement_account_iban?: string | null;
+  settlement_bank_name?: string | null;
   notes: string | null;
   created_at: string;
   unit?: { unit_number: string; floor: number } | null;
   building?: Building | null;
+  transferred_amount?: number | null;
   transferred_from_building_investor_id?: string | null;
+  transferred_from_unit_investment_id?: string | null;
   payment_method?: string | null;
   payment_bank_name?: string | null;
   payment_check_number?: string | null;
@@ -193,10 +200,18 @@ interface UnitInvestmentRow {
   id_image_path?: string | null;
 }
 
-/** رأس المال القائم القابل للنقل (لمخالصة «أرباح فقط» فقط) */
+/** رأس المال القائم القابل للنقل — عمارة (لمخالصة «أرباح فقط» فقط) */
 function capitalStillAvailable(row: BuildingInvestorRow): number {
   if (row.settlement_type !== "profit_only" || !row.closed_at) return 0;
   const total = Number(row.total_invested_amount) || 0;
+  const transferred = Number(row.transferred_amount) || 0;
+  return Math.max(0, total - transferred);
+}
+
+/** رأس المال القائم القابل للنقل — وحدة (مُعادة بيع + مخالصة «أرباح فقط» فقط) */
+function capitalStillAvailableUnit(row: UnitInvestmentRow): number {
+  if (row.status !== "resold" || row.settlement_type !== "profit_only") return 0;
+  const total = Number(row.purchase_price) || 0;
   const transferred = Number(row.transferred_amount) || 0;
   return Math.max(0, total - transferred);
 }
@@ -231,6 +246,7 @@ export default function InvestorsPage() {
   const [viewingCheckImageUrl, setViewingCheckImageUrl] = useState<string | null>(null);
   const [closingUnitInvestment, setClosingUnitInvestment] = useState<(UnitInvestmentRow & { resalePrice?: number | null; profit?: number | null; buildingName?: string }) | null>(null);
   const [closingUnitSaleId, setClosingUnitSaleId] = useState("");
+  const [closingUnitSettlementType, setClosingUnitSettlementType] = useState<"" | "with_capital" | "profit_only">("");
   const [closingBuildingInvestor, setClosingBuildingInvestor] = useState<BuildingInvestorRow | null>(null);
   const [closingBuildingPercentage, setClosingBuildingPercentage] = useState("");
   const [closingSettlementMethod, setClosingSettlementMethod] = useState<string>("");
@@ -270,7 +286,12 @@ export default function InvestorsPage() {
     }, 100);
     return () => clearTimeout(t);
   }, [modalOpen, triggerFileInput]);
-  const [transferSource, setTransferSource] = useState<BuildingInvestorRow | null>(null);
+  type TransferSourceRow = BuildingInvestorRow | UnitInvestmentRow;
+  const [transferSource, setTransferSource] = useState<TransferSourceRow | null>(null);
+  const isTransferSourceBuilding = (r: TransferSourceRow): r is BuildingInvestorRow => "total_invested_amount" in r;
+  const getTransferSourceAvailable = (r: TransferSourceRow | null): number =>
+    r == null ? 0 : isTransferSourceBuilding(r) ? capitalStillAvailable(r) : capitalStillAvailableUnit(r);
+  const getTransferSourceInvestorName = (r: TransferSourceRow | null): string => (r ? (r as { investor_name?: string }).investor_name ?? "—" : "—");
   const [transferTargetType, setTransferTargetType] = useState<"building" | "unit">("building");
   const [transferAmount, setTransferAmount] = useState("");
   const [transferBuildingId, setTransferBuildingId] = useState("");
@@ -324,7 +345,7 @@ export default function InvestorsPage() {
   const unitContractFileInputRef = useRef<HTMLInputElement>(null);
   const unitIdFileInputRef = useRef<HTMLInputElement>(null);
 
-  const [formUnitResale, setFormUnitResale] = useState({ resale_sale_id: "" });
+  const [formUnitResale, setFormUnitResale] = useState<{ resale_sale_id: string; settlement_type: "" | "with_capital" | "profit_only" }>({ resale_sale_id: "", settlement_type: "" });
 
   useEffect(() => {
     if (!ready) return;
@@ -449,11 +470,15 @@ export default function InvestorsPage() {
       showToast("اختر عملية البيع لإغلاق الصفقة.", "error");
       return;
     }
+    if (!closingUnitSettlementType) {
+      showToast("اختر نوع المخالصة: مع رأس المال أو أرباح فقط.", "error");
+      return;
+    }
     setSaving(true);
     try {
       const { error } = await supabase
         .from("unit_investments")
-        .update({ resale_sale_id: closingUnitSaleId, status: "resold" })
+        .update({ resale_sale_id: closingUnitSaleId, status: "resold", settlement_type: closingUnitSettlementType })
         .eq("id", closingUnitInvestment.id);
       if (error) throw error;
       showToast("تم إغلاق الصفقة وتوثيق الربط.");
@@ -470,6 +495,7 @@ export default function InvestorsPage() {
       }
       setClosingUnitInvestment(null);
       setClosingUnitSaleId("");
+      setClosingUnitSettlementType("");
     } catch (e: unknown) {
       showToast((e as { message?: string })?.message || "فشل إغلاق الصفقة", "error");
     } finally {
@@ -604,15 +630,37 @@ export default function InvestorsPage() {
     setViewingBuildingInvestor(null);
   };
 
+  const openTransferModalFromUnit = (row: UnitInvestmentRow) => {
+    const available = capitalStillAvailableUnit(row);
+    setTransferSource(row);
+    setTransferTargetType("building");
+    setTransferAmount(available > 0 ? String(available) : "");
+    setTransferBuildingId(buildings[0]?.id ?? "");
+    setTransferUnitId("");
+    setTransferProfitPct("15");
+    setTransferProfitPctTo("");
+    setTransferStartDate(new Date().toISOString().slice(0, 10));
+    setTransferDueDate("");
+    setTransferNotes("");
+    setViewingUnitInvestment(null);
+  };
+
   const submitTransferCapital = async () => {
     if (!transferSource || !effectiveOwnerId) return;
     const amountRaw = transferAmount.replace(/\D/g, "");
     const amount = amountRaw ? parseFloat(amountRaw) : 0;
-    const available = capitalStillAvailable(transferSource);
+    const available = getTransferSourceAvailable(transferSource);
     if (amount <= 0 || amount > available) {
       showToast(`المبلغ يجب أن يكون بين 1 و ${formatNum(available)} ر.س (رأس المال القائم المتاح)`, "error");
       return;
     }
+    const fromBuilding = isTransferSourceBuilding(transferSource);
+    const investorPayload = {
+      investor_name: transferSource.investor_name,
+      investor_phone: transferSource.investor_phone ?? null,
+      investor_email: transferSource.investor_email ?? null,
+      investor_id_number: transferSource.investor_id_number ?? null,
+    };
     if (transferTargetType === "building") {
       if (!transferBuildingId) {
         showToast("اختر العمارة المستهدفة", "error");
@@ -629,10 +677,7 @@ export default function InvestorsPage() {
         const payload = {
           building_id: transferBuildingId,
           owner_id: effectiveOwnerId,
-          investor_name: transferSource.investor_name,
-          investor_phone: transferSource.investor_phone ?? null,
-          investor_email: transferSource.investor_email ?? null,
-          investor_id_number: transferSource.investor_id_number ?? null,
+          ...investorPayload,
           profit_percentage: pctFrom,
           profit_percentage_to: pctTo != null && pctTo !== pctFrom ? pctTo : null,
           agreement_type: "agreed_percentage",
@@ -640,19 +685,37 @@ export default function InvestorsPage() {
           investment_start_date: transferStartDate || null,
           investment_due_date: transferDueDate || null,
           notes: transferNotes.trim() || null,
-          transferred_from_building_investor_id: transferSource.id,
+          ...(fromBuilding
+            ? { transferred_from_building_investor_id: transferSource.id }
+            : { transferred_from_unit_investment_id: transferSource.id }),
         };
         const { error: insertErr } = await supabase.from("building_investors").insert(payload);
         if (insertErr) throw insertErr;
         const newTransferred = (Number(transferSource.transferred_amount) || 0) + amount;
-        const { error: updateErr } = await supabase.from("building_investors").update({ transferred_amount: newTransferred }).eq("id", transferSource.id);
-        if (updateErr) throw updateErr;
+        if (fromBuilding) {
+          const { error: updateErr } = await supabase.from("building_investors").update({ transferred_amount: newTransferred }).eq("id", transferSource.id);
+          if (updateErr) throw updateErr;
+        } else {
+          const { error: updateErr } = await supabase.from("unit_investments").update({ transferred_amount: newTransferred }).eq("id", transferSource.id);
+          if (updateErr) throw updateErr;
+        }
         showToast("تم نقل رأس المال إلى العمارة الجديدة");
         setTransferSource(null);
         const { data } = await supabase.from("building_investors").select("*").eq("owner_id", effectiveOwnerId).order("created_at", { ascending: false });
         if (data) {
           const withBuildings = (data as BuildingInvestorRow[]).map((row) => ({ ...row, building: buildings.find((b) => b.id === row.building_id) ?? null }));
           setBuildingInvestors(withBuildings);
+        }
+        if (!fromBuilding) {
+          const { data: uiData } = await supabase.from("unit_investments").select("*").eq("owner_id", effectiveOwnerId).order("created_at", { ascending: false });
+          if (uiData && Array.isArray(uiData)) {
+            const enriched = (uiData as UnitInvestmentRow[]).map((r) => {
+              const b = buildings.find((x) => x.id === r.building_id) ?? null;
+              const u = units.find((x) => x.id === r.unit_id) ?? null;
+              return { ...r, building: b, unit: u ? { unit_number: String(u.unit_number), floor: u.floor } : null };
+            });
+            setUnitInvestments(enriched);
+          }
         }
       } catch (e: unknown) {
         showToast((e as { message?: string })?.message || "فشل نقل رأس المال", "error");
@@ -670,21 +733,25 @@ export default function InvestorsPage() {
           unit_id: transferUnitId,
           building_id: transferBuildingId,
           owner_id: effectiveOwnerId,
-          investor_name: transferSource.investor_name,
-          investor_phone: transferSource.investor_phone ?? null,
-          investor_email: transferSource.investor_email ?? null,
-          investor_id_number: transferSource.investor_id_number ?? null,
+          ...investorPayload,
           purchase_price: amount,
           purchase_date: transferStartDate || new Date().toISOString().slice(0, 10),
           status: "under_construction",
           notes: transferNotes.trim() || null,
-          transferred_from_building_investor_id: transferSource.id,
+          ...(fromBuilding
+            ? { transferred_from_building_investor_id: transferSource.id }
+            : { transferred_from_unit_investment_id: transferSource.id }),
         };
         const { error: insertErr } = await supabase.from("unit_investments").insert(payload);
         if (insertErr) throw insertErr;
         const newTransferred = (Number(transferSource.transferred_amount) || 0) + amount;
-        const { error: updateErr } = await supabase.from("building_investors").update({ transferred_amount: newTransferred }).eq("id", transferSource.id);
-        if (updateErr) throw updateErr;
+        if (fromBuilding) {
+          const { error: updateErr } = await supabase.from("building_investors").update({ transferred_amount: newTransferred }).eq("id", transferSource.id);
+          if (updateErr) throw updateErr;
+        } else {
+          const { error: updateErr } = await supabase.from("unit_investments").update({ transferred_amount: newTransferred }).eq("id", transferSource.id);
+          if (updateErr) throw updateErr;
+        }
         showToast("تم نقل رأس المال إلى الوحدة الجديدة");
         setTransferSource(null);
         const { data: biData } = await supabase.from("building_investors").select("*").eq("owner_id", effectiveOwnerId).order("created_at", { ascending: false });
@@ -905,7 +972,7 @@ export default function InvestorsPage() {
     setUnitCheckImageFile(null);
     setUnitContractFile(null);
     setUnitIdFile(null);
-    setFormUnitResale({ resale_sale_id: "" });
+    setFormUnitResale({ resale_sale_id: "", settlement_type: "" });
     setModalOpen("unit");
   };
 
@@ -931,7 +998,10 @@ export default function InvestorsPage() {
     setUnitCheckImageFile(null);
     setUnitContractFile(null);
     setUnitIdFile(null);
-    setFormUnitResale({ resale_sale_id: row.resale_sale_id || "" });
+    setFormUnitResale({
+      resale_sale_id: row.resale_sale_id || "",
+      settlement_type: row.settlement_type === "profit_only" ? "profit_only" : row.settlement_type === "with_capital" ? "with_capital" : "",
+    });
     setModalOpen("unit");
   };
 
@@ -999,7 +1069,10 @@ export default function InvestorsPage() {
           if (formUnitResale.resale_sale_id) {
             updatePayload.resale_sale_id = formUnitResale.resale_sale_id;
             updatePayload.status = "resold";
+            updatePayload.settlement_type = formUnitResale.settlement_type || "with_capital";
           }
+        } else if (editingUnit.status === "resold" && formUnitResale.settlement_type) {
+          updatePayload.settlement_type = formUnitResale.settlement_type;
         }
         const { error } = await supabase.from("unit_investments").update(updatePayload).eq("id", editingUnit.id);
         if (error) throw error;
@@ -1499,7 +1572,7 @@ export default function InvestorsPage() {
                   </div>
                   <div className="flex-1 overflow-y-auto p-4 space-y-4">
                     <p className="text-sm text-slate-600">
-                      المستثمر: <strong>{transferSource.investor_name}</strong> — رأس المال المتاح للنقل: <span className="dir-ltr font-semibold text-amber-700">{formatNum(capitalStillAvailable(transferSource))} ر.س</span>
+                      المستثمر: <strong>{getTransferSourceInvestorName(transferSource)}</strong> — رأس المال المتاح للنقل: <span className="dir-ltr font-semibold text-amber-700">{formatNum(getTransferSourceAvailable(transferSource))} ر.س</span>
                     </p>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">الوجهة</label>
@@ -1521,12 +1594,12 @@ export default function InvestorsPage() {
                         onChange={(e) => {
                           const raw = e.target.value.replace(/\D/g, "");
                           const num = raw ? parseInt(raw, 10) : 0;
-                          const max = capitalStillAvailable(transferSource);
+                          const max = getTransferSourceAvailable(transferSource);
                           if (max <= 0) setTransferAmount("");
                           else setTransferAmount(String(Math.min(num, max)));
                         }}
                         className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm dir-ltr focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
-                        placeholder={String(capitalStillAvailable(transferSource))}
+                        placeholder={String(getTransferSourceAvailable(transferSource))}
                       />
                     </div>
                     {transferTargetType === "building" && (
@@ -1670,7 +1743,7 @@ export default function InvestorsPage() {
                                     <Pencil className="w-4 h-4" />
                                   </button>
                                 )}
-                                <button type="button" onClick={() => { setClosingUnitInvestment({ ...row, buildingName: row.building?.name }); setClosingUnitSaleId(row.resale_sale_id || ""); }} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg" title="إغلاق الصفقة">
+                                <button type="button" onClick={() => { setClosingUnitInvestment({ ...row, buildingName: row.building?.name }); setClosingUnitSaleId(row.resale_sale_id || ""); setClosingUnitSettlementType((row as UnitInvestmentRow).settlement_type === "profit_only" ? "profit_only" : (row as UnitInvestmentRow).settlement_type === "with_capital" ? "with_capital" : ""); }} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg" title="إغلاق الصفقة">
                                   <CheckCircle2 className="w-4 h-4" />
                                 </button>
                                 {canEdit && (
@@ -1751,6 +1824,20 @@ export default function InvestorsPage() {
                 </div>
                 <Row label="سعر إعادة البيع" value={viewingUnitInvestment.resalePrice != null ? `${formatNum(Number(viewingUnitInvestment.resalePrice))} ر.س` : "—"} dirLtr />
                 <Row label="الربح" value={viewingUnitInvestment.profit != null ? `+${formatNum(Number(viewingUnitInvestment.profit))} ر.س` : "—"} dirLtr />
+                {viewingUnitInvestment.status === "resold" && viewingUnitInvestment.settlement_type === "profit_only" && capitalStillAvailableUnit(viewingUnitInvestment) > 0 && (
+                  <div className="rounded-xl border border-amber-200/80 bg-amber-50/30 p-4 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-600 text-sm">رأس المال القائم في الوحدة</span>
+                      <span className="font-semibold dir-ltr text-amber-700">{formatNum(capitalStillAvailableUnit(viewingUnitInvestment))} ر.س</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      <button type="button" onClick={() => openTransferModalFromUnit(viewingUnitInvestment)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-amber-400 bg-white text-amber-700 text-sm font-medium hover:bg-amber-100 transition-colors">
+                        <TrendingUp className="w-4 h-4 shrink-0" />
+                        نقل رأس المال إلى عمارة أو وحدة
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {viewingUnitInvestment.notes && <Row label="ملاحظات" value={viewingUnitInvestment.notes} />}
                 <div className="space-y-3 pt-2 border-t border-slate-100">
                   <p className="text-sm font-medium text-slate-700 text-center">المرفقات</p>
@@ -1818,14 +1905,14 @@ export default function InvestorsPage() {
 
       {/* نافذة إغلاق صفقة استثمار الوحدة */}
       {closingUnitInvestment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => { setClosingUnitInvestment(null); setClosingUnitSaleId(""); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => { setClosingUnitInvestment(null); setClosingUnitSaleId(""); setClosingUnitSettlementType(""); }}>
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} dir="rtl">
             <div className="bg-gradient-to-br from-emerald-600 to-teal-700 px-5 py-4 flex items-center justify-between shrink-0">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5" />
                 إغلاق صفقة الاستثمار
               </h3>
-              <button type="button" onClick={() => { setClosingUnitInvestment(null); setClosingUnitSaleId(""); }} className="p-2 rounded-xl bg-white/20 hover:bg-white/30 text-white transition-colors">
+              <button type="button" onClick={() => { setClosingUnitInvestment(null); setClosingUnitSaleId(""); setClosingUnitSettlementType(""); }} className="p-2 rounded-xl bg-white/20 hover:bg-white/30 text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1839,16 +1926,29 @@ export default function InvestorsPage() {
                 </div>
               </div>
               {closingUnitInvestment.status === "resold" ? (
-                <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 space-y-2 text-sm">
-                  <p className="font-semibold text-emerald-800">الصفقة مُغلقة (مُخالصة)</p>
-                  <div className="grid grid-cols-1 gap-2">
-                    <div className="flex justify-between"><span className="text-slate-600">سعر إعادة البيع</span><span className="font-semibold dir-ltr text-emerald-700">{closingUnitInvestment.resalePrice != null ? `${formatNum(Number(closingUnitInvestment.resalePrice))} ر.س` : "—"}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-600">الربح المحقق</span><span className="font-semibold dir-ltr text-emerald-700">+{closingUnitInvestment.profit != null ? formatNum(Number(closingUnitInvestment.profit)) : "—"} ر.س</span></div>
-                    {closingUnitInvestment.purchase_price > 0 && closingUnitInvestment.profit != null && (
-                      <div className="flex justify-between"><span className="text-slate-600">نسبة الربح</span><span className="font-semibold dir-ltr text-teal-700">{((Number(closingUnitInvestment.profit) / Number(closingUnitInvestment.purchase_price)) * 100).toFixed(1)}%</span></div>
-                    )}
+                <>
+                  <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 space-y-2 text-sm">
+                    <p className="font-semibold text-emerald-800">الصفقة مُغلقة (مُخالصة)</p>
+                    <div className="grid grid-cols-1 gap-2">
+                      <div className="flex justify-between"><span className="text-slate-600">سعر إعادة البيع</span><span className="font-semibold dir-ltr text-emerald-700">{closingUnitInvestment.resalePrice != null ? `${formatNum(Number(closingUnitInvestment.resalePrice))} ر.س` : "—"}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-600">الربح المحقق</span><span className="font-semibold dir-ltr text-emerald-700">+{closingUnitInvestment.profit != null ? formatNum(Number(closingUnitInvestment.profit)) : "—"} ر.س</span></div>
+                      {closingUnitInvestment.purchase_price > 0 && closingUnitInvestment.profit != null && (
+                        <div className="flex justify-between"><span className="text-slate-600">نسبة الربح</span><span className="font-semibold dir-ltr text-teal-700">{((Number(closingUnitInvestment.profit) / Number(closingUnitInvestment.purchase_price)) * 100).toFixed(1)}%</span></div>
+                      )}
+                      {(closingUnitInvestment as UnitInvestmentRow).settlement_type && (
+                        <>
+                          <div className="flex justify-between"><span className="text-slate-600">نوع المخالصة</span><span className="font-medium">{(closingUnitInvestment as UnitInvestmentRow).settlement_type === "with_capital" ? "مع رأس المال" : "أرباح فقط"}</span></div>
+                          <div className="flex justify-between"><span className="text-slate-600">مبلغ المخالصة</span><span className="font-semibold dir-ltr text-emerald-700">{(closingUnitInvestment as UnitInvestmentRow).settlement_type === "with_capital" ? formatNum(Number(closingUnitInvestment.purchase_price) + (closingUnitInvestment.profit ?? 0)) : formatNum(closingUnitInvestment.profit ?? 0)} ر.س</span></div>
+                          {(closingUnitInvestment as UnitInvestmentRow).settlement_type === "profit_only" && (
+                            <p className="text-xs text-amber-700 mt-2 pt-2 border-t border-emerald-100">
+                              يجب نقل رأس المال المتبقي إلى عمارة أو وحدة جديدة أو مخالصة رأس المال لضبط الحسابات الصحيحة.
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
+                </>
               ) : (
                 <>
                   <div className="space-y-2">
@@ -1874,7 +1974,26 @@ export default function InvestorsPage() {
                       );
                     })()}
                   </div>
-                  <button type="button" onClick={confirmCloseUnitDeal} disabled={saving || !closingUnitSaleId} className="w-full py-2.5 rounded-xl bg-emerald-600 text-white font-medium text-sm hover:bg-emerald-700 disabled:opacity-50 transition">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-slate-700">نوع المخالصة (مطلوب)</label>
+                    <div className="flex gap-2 flex-wrap">
+                      <button type="button" onClick={() => setClosingUnitSettlementType("profit_only")} className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${closingUnitSettlementType === "profit_only" ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
+                        أرباح فقط
+                      </button>
+                      <button type="button" onClick={() => setClosingUnitSettlementType("with_capital")} className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${closingUnitSettlementType === "with_capital" ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
+                        مع رأس المال
+                      </button>
+                    </div>
+                    {closingUnitSaleId && closingUnitSettlementType && (() => {
+                      const sale = sales.find((s) => s.id === closingUnitSaleId);
+                      const resalePrice = sale?.sale_price ?? 0;
+                      const capital = Number(closingUnitInvestment.purchase_price);
+                      const profit = resalePrice - capital;
+                      const amount = closingUnitSettlementType === "with_capital" ? capital + profit : profit;
+                      return <p className="text-xs text-slate-500">مبلغ المخالصة: {formatNum(amount)} ر.س</p>;
+                    })()}
+                  </div>
+                  <button type="button" onClick={confirmCloseUnitDeal} disabled={saving || !closingUnitSaleId || !closingUnitSettlementType} className="w-full py-2.5 rounded-xl bg-emerald-600 text-white font-medium text-sm hover:bg-emerald-700 disabled:opacity-50 transition">
                     {saving ? "جاري الإغلاق..." : "تأكيد إغلاق الصفقة"}
                   </button>
                 </>
@@ -2205,15 +2324,15 @@ export default function InvestorsPage() {
                       onChange={(e) => setFormBuilding((p) => ({ ...p, total_invested_amount: e.target.value.replace(/\D/g, "") }))}
                       className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm dir-ltr focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
                     />
-                    {(expectedFrom != null && expectedFrom > 0) && (
-                      <p className="mt-2 text-sm font-semibold text-teal-700 bg-teal-50 rounded-xl px-3 py-2 dir-ltr">
-                        {expectedTo != null
-                          ? `الربح المتوقع: ${formatNum(Math.round(expectedFrom))} – ${formatNum(Math.round(expectedTo))} ر.س`
-                          : `الربح المتوقع: ${formatNum(Math.round(expectedFrom))} ر.س`}
-                      </p>
-                    )}
                   </div>
                 </div>
+                {(expectedFrom != null && expectedFrom > 0) && (
+                  <p className="w-full text-sm font-semibold text-teal-700 bg-teal-50 rounded-xl px-4 py-2.5 dir-ltr text-center">
+                    {expectedTo != null
+                      ? `الربح المتوقع: ${formatNum(Math.round(expectedFrom))} – ${formatNum(Math.round(expectedTo))} ر.س`
+                      : `الربح المتوقع: ${formatNum(Math.round(expectedFrom))} ر.س`}
+                  </p>
+                )}
                 <div className="space-y-3">
                   <p className="text-sm font-semibold text-slate-700">طريقة الدفع</p>
                   <div className="flex flex-wrap gap-2">
@@ -2599,28 +2718,48 @@ className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 roun
                 </div>
               </div>
               {editingUnit && (
-                <div>
+                <div className="space-y-3">
                   {editingUnit.status === "resold" && editingUnit.resale_sale_id ? (
                     <>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">ربط إعادة البيع</label>
-                      <p className="text-sm text-slate-600 py-2">تمت المخالصة — البيع مُربوط ولا يُعاد ربطه</p>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">ربط إعادة البيع</label>
+                        <p className="text-sm text-slate-600 py-2">تمت المخالصة — البيع مُربوط ولا يُعاد ربطه</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">نوع المخالصة</label>
+                        <div className="flex gap-2 flex-wrap">
+                          <button type="button" onClick={() => setFormUnitResale((p) => ({ ...p, settlement_type: "profit_only" }))} className={`px-4 py-2 rounded-full text-sm font-medium border ${formUnitResale.settlement_type === "profit_only" ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600"}`}>أرباح فقط</button>
+                          <button type="button" onClick={() => setFormUnitResale((p) => ({ ...p, settlement_type: "with_capital" }))} className={`px-4 py-2 rounded-full text-sm font-medium border ${formUnitResale.settlement_type === "with_capital" ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600"}`}>مع رأس المال</button>
+                        </div>
+                      </div>
                     </>
                   ) : (
                     <>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">ربط بعملية إعادة البيع (اختياري)</label>
-                      <select
-                        value={formUnitResale.resale_sale_id}
-                        onChange={(e) => setFormUnitResale((p) => ({ ...p, resale_sale_id: e.target.value }))}
-                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
-                      >
-                        <option value="">— بدون ربط —</option>
-                        {sales.filter((s) => s.unit_id === editingUnit.unit_id).map((s) => (
-                          <option key={s.id} value={s.id}>
-                            بيع بـ {formatNum(Number(s.sale_price))} ر.س
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-slate-500 mt-1">عند الربط يُحسب الربح تلقائياً (سعر البيع − سعر الشراء)</p>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">ربط بعملية إعادة البيع (اختياري)</label>
+                        <select
+                          value={formUnitResale.resale_sale_id}
+                          onChange={(e) => setFormUnitResale((p) => ({ ...p, resale_sale_id: e.target.value }))}
+                          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
+                        >
+                          <option value="">— بدون ربط —</option>
+                          {sales.filter((s) => s.unit_id === editingUnit.unit_id).map((s) => (
+                            <option key={s.id} value={s.id}>
+                              بيع بـ {formatNum(Number(s.sale_price))} ر.س
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-slate-500 mt-1">عند الربط يُحسب الربح تلقائياً (سعر البيع − سعر الشراء)</p>
+                      </div>
+                      {formUnitResale.resale_sale_id && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">نوع المخالصة (عند الإغلاق)</label>
+                          <div className="flex gap-2 flex-wrap">
+                            <button type="button" onClick={() => setFormUnitResale((p) => ({ ...p, settlement_type: "profit_only" }))} className={`px-4 py-2 rounded-full text-sm font-medium border ${formUnitResale.settlement_type === "profit_only" ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600"}`}>أرباح فقط</button>
+                            <button type="button" onClick={() => setFormUnitResale((p) => ({ ...p, settlement_type: "with_capital" }))} className={`px-4 py-2 rounded-full text-sm font-medium border ${formUnitResale.settlement_type === "with_capital" ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600"}`}>مع رأس المال</button>
+                          </div>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
