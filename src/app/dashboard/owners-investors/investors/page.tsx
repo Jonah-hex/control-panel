@@ -19,6 +19,7 @@ import {
   CreditCard,
   CheckCircle2,
   CheckCheck,
+  ArrowRightLeft,
 } from "lucide-react";
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -63,13 +64,49 @@ function getDuration(start: string, end: string): { years: number; months: numbe
   return { years, months, days };
 }
 
-/** المتبقي من اليوم حتى تاريخ الاستحقاق */
-function getRemaining(due: string): { years: number; months: number; days: number } | null {
+/** الأيام الفعلية بين تاريخين (للاتساق بين مدة العقد والمتبقي) */
+function getCalendarDaysBetween(start: string, end: string): number {
+  const a = new Date(start + "T12:00:00");
+  const b = new Date(end + "T12:00:00");
+  return Math.round((b.getTime() - a.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+/** مدة العقد والمنقضي والمتبقي بالأيام الفعلية؛ للعرض: شهر = ٣٠ يوم (المنقضي + المتبقي = مدة العقد) */
+function getDurationAndRemaining(start: string, due: string): { totalDays: number; elapsedDays: number; remainingDays: number; durationYMD: { y: number; m: number; d: number }; elapsedYMD: { y: number; m: number; d: number }; remainingYMD: { y: number; m: number; d: number } } | null {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const end = new Date(due + "T12:00:00");
   end.setHours(0, 0, 0, 0);
   if (end.getTime() < today.getTime()) return null;
+  const startStr = start.slice(0, 10);
+  const todayStr = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
+  const totalDays = getCalendarDaysBetween(startStr, due);
+  const elapsedDays = getCalendarDaysBetween(startStr, todayStr);
+  const remainingDays = Math.max(0, totalDays - elapsedDays);
+  const toYMD = (days: number) => ({ y: 0, m: Math.floor(days / 30), d: days % 30 });
+  return {
+    totalDays,
+    elapsedDays,
+    remainingDays,
+    durationYMD: toYMD(totalDays),
+    elapsedYMD: toYMD(elapsedDays),
+    remainingYMD: toYMD(remainingDays),
+  };
+}
+
+/** المتبقي من اليوم حتى تاريخ الاستحقاق (عند عدم وجود تاريخ بدء نستخدم getDuration من اليوم) */
+function getRemaining(due: string, start?: string | null): { years: number; months: number; days: number } | null {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(due + "T12:00:00");
+  end.setHours(0, 0, 0, 0);
+  if (end.getTime() < today.getTime()) return null;
+  if (start) {
+    const data = getDurationAndRemaining(start, due);
+    if (!data) return null;
+    const { m, d } = data.remainingYMD;
+    return { years: 0, months: m, days: d };
+  }
   const startStr = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
   return getDuration(startStr, due);
 }
@@ -93,7 +130,7 @@ function formatDuration(y: number, m: number, d: number): string {
   const parts: string[] = [];
   if (y > 0) parts.push(`${y} سنة`);
   if (m > 0) parts.push(`${m} شهر`);
-  if (d > 0) parts.push(`${d} يوم`);
+  if (d > 0 || (y > 0 || m > 0)) parts.push(`${d} يوم`);
   return parts.length ? parts.join(" و ") : "0 يوم";
 }
 
@@ -185,6 +222,9 @@ interface UnitInvestmentRow {
   settlement_method?: string | null;
   settlement_account_iban?: string | null;
   settlement_bank_name?: string | null;
+  resale_commission?: number | null;
+  admin_fees?: number | null;
+  purchase_commission?: number | null;
   notes: string | null;
   created_at: string;
   unit?: { unit_number: string; floor: number } | null;
@@ -208,7 +248,14 @@ function capitalStillAvailable(row: BuildingInvestorRow): number {
   return Math.max(0, total - transferred);
 }
 
-/** رأس المال القائم القابل للنقل — وحدة (مُعادة بيع + مخالصة «أرباح فقط» فقط) */
+/** السعر الفعلي للشراء = سعر الشراء − عمولة البيع — للعرض وتحليلات المالك فقط (مخالصة المستثمر تُحسب من سعر الشراء الكامل) */
+function getEffectivePurchasePrice(row: { purchase_price: number; purchase_commission?: number | null }): number {
+  const price = Number(row.purchase_price) || 0;
+  const commission = Number(row.purchase_commission) || 0;
+  return Math.max(0, price - commission);
+}
+
+/** رأس المال القائم القابل للنقل — وحدة (مُعادة بيع + مخالصة «أرباح فقط» فقط) — يُحسب من سعر الشراء الكامل */
 function capitalStillAvailableUnit(row: UnitInvestmentRow): number {
   if (row.status !== "resold" || row.settlement_type !== "profit_only") return 0;
   const total = Number(row.purchase_price) || 0;
@@ -225,7 +272,7 @@ export default function InvestorsPage() {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [buildingInvestors, setBuildingInvestors] = useState<BuildingInvestorRow[]>([]);
   const [unitInvestments, setUnitInvestments] = useState<UnitInvestmentRow[]>([]);
-  const [units, setUnits] = useState<{ id: string; unit_number: string; floor: number; building_id: string }[]>([]);
+  const [units, setUnits] = useState<{ id: string; unit_number: string; floor: number; building_id: string; status?: string }[]>([]);
   const [sales, setSales] = useState<{ id: string; unit_id: string; sale_price: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState<"building" | "unit" | null>(null);
@@ -247,6 +294,12 @@ export default function InvestorsPage() {
   const [closingUnitInvestment, setClosingUnitInvestment] = useState<(UnitInvestmentRow & { resalePrice?: number | null; profit?: number | null; buildingName?: string }) | null>(null);
   const [closingUnitSaleId, setClosingUnitSaleId] = useState("");
   const [closingUnitSettlementType, setClosingUnitSettlementType] = useState<"" | "with_capital" | "profit_only">("");
+  const [closingUnitCommission, setClosingUnitCommission] = useState("");
+  const [closingUnitAdminFees, setClosingUnitAdminFees] = useState("");
+  const [closingUnitStep, setClosingUnitStep] = useState<1 | 2 | 3>(1);
+  const [closingUnitSettlementMethod, setClosingUnitSettlementMethod] = useState("");
+  const [closingUnitSettlementAccountIban, setClosingUnitSettlementAccountIban] = useState("");
+  const [closingUnitSettlementBankName, setClosingUnitSettlementBankName] = useState("");
   const [closingBuildingInvestor, setClosingBuildingInvestor] = useState<BuildingInvestorRow | null>(null);
   const [closingBuildingPercentage, setClosingBuildingPercentage] = useState("");
   const [closingSettlementMethod, setClosingSettlementMethod] = useState<string>("");
@@ -329,6 +382,7 @@ export default function InvestorsPage() {
     investor_phone: "",
     investor_id_number: "",
     purchase_price: "",
+    purchase_commission: "",
     purchase_date: "",
     payment_method: "",
     payment_bank_name: "",
@@ -396,9 +450,9 @@ export default function InvestorsPage() {
           setBuildingInvestors(withBuildings);
         }
 
-        let unitsList: { id: string; unit_number: number; floor: number; building_id: string }[] = [];
+        let unitsList: { id: string; unit_number: number; floor: number; building_id: string; status?: string }[] = [];
         if (buildingIds.length) {
-          const { data: uData } = await supabase.from("units").select("id, unit_number, floor, building_id").in("building_id", buildingIds);
+          const { data: uData } = await supabase.from("units").select("id, unit_number, floor, building_id, status").in("building_id", buildingIds);
           if (uData) {
             unitsList = uData as typeof unitsList;
             setUnits(uData as typeof units);
@@ -451,7 +505,7 @@ export default function InvestorsPage() {
           const b = buildings.find((x) => x.id === r.building_id) ?? null;
           const u = units.find((x) => x.id === r.unit_id) ?? null;
           const resalePrice = r.resale_sale_id ? sales.find((s) => s.id === r.resale_sale_id)?.sale_price ?? null : null;
-          const profit = resalePrice != null ? resalePrice - r.purchase_price : null;
+          const profit = resalePrice != null ? resalePrice - Number(r.purchase_price) : null;
           return { ...r, building: b, unit: u ? { unit_number: String(u.unit_number), floor: u.floor } : null, resalePrice, profit };
         });
         setUnitInvestments(enriched);
@@ -474,11 +528,28 @@ export default function InvestorsPage() {
       showToast("اختر نوع المخالصة: مع رأس المال أو أرباح فقط.", "error");
       return;
     }
+    if (!closingUnitSettlementMethod) {
+      showToast("اختر طريقة المخالصة: كاش أو تحويل أو شيك مصدق.", "error");
+      return;
+    }
+    const toNum = (s: string) => { const d = (s || "").replace(/\D/g, ""); return d.length > 0 ? Number(d) : 0; };
+    const commission = toNum(closingUnitCommission);
+    const adminFees = toNum(closingUnitAdminFees);
+    const methodValue = closingUnitSettlementMethod === "حوالة" ? "transfer" : closingUnitSettlementMethod === "شيك" ? "check" : closingUnitSettlementMethod === "كاش" ? "cash" : null;
     setSaving(true);
     try {
       const { error } = await supabase
         .from("unit_investments")
-        .update({ resale_sale_id: closingUnitSaleId, status: "resold", settlement_type: closingUnitSettlementType })
+        .update({
+          resale_sale_id: closingUnitSaleId,
+          status: "resold",
+          settlement_type: closingUnitSettlementType,
+          resale_commission: commission,
+          admin_fees: adminFees,
+          settlement_method: methodValue,
+          settlement_account_iban: closingUnitSettlementAccountIban.trim() || null,
+          settlement_bank_name: closingUnitSettlementBankName.trim() || null,
+        })
         .eq("id", closingUnitInvestment.id);
       if (error) throw error;
       showToast("تم إغلاق الصفقة وتوثيق الربط.");
@@ -488,7 +559,7 @@ export default function InvestorsPage() {
           const b = buildings.find((x) => x.id === r.building_id) ?? null;
           const u = units.find((x) => x.id === r.unit_id) ?? null;
           const resalePrice = r.resale_sale_id ? sales.find((s) => s.id === r.resale_sale_id)?.sale_price ?? null : null;
-          const profit = resalePrice != null ? resalePrice - r.purchase_price : null;
+          const profit = resalePrice != null ? resalePrice - Number(r.purchase_price) : null;
           return { ...r, building: b, unit: u ? { unit_number: String(u.unit_number), floor: u.floor } : null, resalePrice, profit };
         });
         setUnitInvestments(enriched);
@@ -496,6 +567,12 @@ export default function InvestorsPage() {
       setClosingUnitInvestment(null);
       setClosingUnitSaleId("");
       setClosingUnitSettlementType("");
+      setClosingUnitCommission("");
+      setClosingUnitAdminFees("");
+      setClosingUnitStep(1);
+      setClosingUnitSettlementMethod("");
+      setClosingUnitSettlementAccountIban("");
+      setClosingUnitSettlementBankName("");
     } catch (e: unknown) {
       showToast((e as { message?: string })?.message || "فشل إغلاق الصفقة", "error");
     } finally {
@@ -960,6 +1037,7 @@ export default function InvestorsPage() {
       investor_phone: "",
       investor_id_number: "",
       purchase_price: "",
+      purchase_commission: "",
       purchase_date: new Date().toISOString().slice(0, 10),
       payment_method: "",
       payment_bank_name: "",
@@ -986,6 +1064,7 @@ export default function InvestorsPage() {
       investor_phone: row.investor_phone || "",
       investor_id_number: row.investor_id_number || "",
       purchase_price: String(row.purchase_price),
+      purchase_commission: row.purchase_commission != null ? String(row.purchase_commission) : "",
       purchase_date: row.purchase_date || "",
       payment_method: row.payment_method || "",
       payment_bank_name: row.payment_bank_name || "",
@@ -1016,6 +1095,12 @@ export default function InvestorsPage() {
     const price = priceRaw ? parseFloat(priceRaw) : NaN;
     if (isNaN(price) || price < 0) {
       showToast("أدخل سعر شراء صحيحاً", "error");
+      return;
+    }
+    const commissionRaw = formUnit.purchase_commission.replace(/\D/g, "");
+    const purchaseCommission = commissionRaw ? parseFloat(commissionRaw) : 0;
+    if (purchaseCommission > price) {
+      showToast("عمولة البيع لا يمكن أن تتجاوز سعر الشراء", "error");
       return;
     }
     const buildingId = units.find((u) => u.id === formUnit.unit_id)?.building_id;
@@ -1054,6 +1139,7 @@ export default function InvestorsPage() {
         investor_phone: phoneVal || null,
         investor_id_number: formUnit.investor_id_number.trim() || null,
         purchase_price: price,
+        purchase_commission: purchaseCommission,
         purchase_date: formUnit.purchase_date || null,
         payment_method: formUnit.payment_method?.trim() || null,
         payment_bank_name: formUnit.payment_method === "transfer" ? (formUnit.payment_bank_name?.trim() || null) : null,
@@ -1150,11 +1236,11 @@ export default function InvestorsPage() {
     else deleteUnitInvestment(deleteConfirm.id);
   };
 
-  // الربح = سعر إعادة البيع (من عملية البيع المربوطة) − سعر شراء المستثمر
+  // الربح = سعر إعادة البيع − السعر الفعلي (سعر الشراء − عمولة البيع)
   const unitInvestmentsWithProfit = useMemo(() => {
     return unitInvestments.map((r) => {
       const resalePrice = r.resale_sale_id ? sales.find((s) => s.id === r.resale_sale_id)?.sale_price ?? null : null;
-      const profit = resalePrice != null ? resalePrice - r.purchase_price : null;
+      const profit = resalePrice != null ? resalePrice - Number(r.purchase_price) : null;
       return { ...r, resalePrice, profit };
     });
   }, [unitInvestments, sales]);
@@ -1255,7 +1341,7 @@ export default function InvestorsPage() {
                         <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">نسبة الربح</th>
                         <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">نوع العقد</th>
                         <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">مبلغ الاستثمار</th>
-                        <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">الربح المتوقع</th>
+                        <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50">الربح</th>
                         <th className="p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50 w-28">إجراء</th>
                       </tr>
                     </thead>
@@ -1267,8 +1353,10 @@ export default function InvestorsPage() {
                           </td>
                         </tr>
                       ) : (
-                        buildingInvestorsPaginated.map((row) => (
-                          <tr key={row.id} className="border-b border-slate-100 hover:bg-teal-50/30 transition">
+                        buildingInvestorsPaginated.map((row) => {
+                          const needsTransfer = capitalStillAvailable(row) > 0;
+                          return (
+                          <tr key={row.id} className={`border-b border-slate-100 hover:bg-teal-50/30 transition ${needsTransfer ? "border-r-2 border-r-amber-300 bg-amber-50/20" : ""}`}>
                             <td className="p-3 text-center font-medium text-slate-800">{row.building?.name ?? "—"}</td>
                             <td className="p-3 text-center">
                               <div className="font-medium text-slate-800">{row.investor_name}</div>
@@ -1291,7 +1379,15 @@ export default function InvestorsPage() {
                               {row.agreement_type === "from_building_sales" ? "من مبيعات العمارة" : "نسبة متفق عليها"}
                             </td>
                             <td className="p-3 text-center text-slate-700 dir-ltr">
-                              {row.total_invested_amount != null ? `${formatNum(Number(row.total_invested_amount))} ر.س` : "—"}
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span>{row.total_invested_amount != null ? `${formatNum(Number(row.total_invested_amount))} ر.س` : "—"}</span>
+                                {needsTransfer && (
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); setViewingBuildingInvestor(null); openTransferModal(row); }} className="inline-flex items-center gap-1 mt-0.5 text-[10px] text-amber-700/90 font-medium tracking-tight hover:text-amber-800 hover:underline focus:outline-none" title="نقل رأس المال القائم">
+                                    <ArrowRightLeft className="w-2.5 h-2.5 shrink-0 text-amber-600/80" strokeWidth={2.2} />
+                                    نقل رأس مال
+                                  </button>
+                                )}
+                              </div>
                             </td>
                             <td className="p-3 text-center text-slate-700 dir-ltr">
                               {row.closed_at != null && row.realized_profit != null ? (
@@ -1336,7 +1432,8 @@ export default function InvestorsPage() {
                               </div>
                             </td>
                           </tr>
-                        ))
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -1412,18 +1509,57 @@ export default function InvestorsPage() {
             {viewingBuildingInvestor && (() => {
               const start = viewingBuildingInvestor.investment_start_date;
               const due = viewingBuildingInvestor.investment_due_date;
-              const duration = start && due ? getDuration(start, due) : null;
-              const remaining = due ? getRemaining(due) : null;
+              const data = start && due ? getDurationAndRemaining(start, due) : null;
+              const duration = data
+                ? { years: data.durationYMD.y, months: data.durationYMD.m, days: data.durationYMD.d }
+                : (start && due ? getDuration(start, due) : null);
+              const remaining = data
+                ? { years: data.remainingYMD.y, months: data.remainingYMD.m, days: data.remainingYMD.d }
+                : (due ? getRemaining(due, start) : null);
               return (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setViewingBuildingInvestor(null)}>
                 <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} dir="rtl">
-                  <div className="bg-gradient-to-br from-teal-500 to-cyan-600 px-5 py-4 flex items-center justify-between shrink-0">
-                    <h3 className="text-lg font-bold text-white">بيانات المستثمر</h3>
+                  <div className={`px-5 py-4 flex items-center justify-between shrink-0 ${viewingBuildingInvestor.closed_at ? "bg-gradient-to-br from-emerald-600 to-teal-700" : "bg-gradient-to-br from-teal-500 to-cyan-600"}`}>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      {viewingBuildingInvestor.closed_at && <CheckCircle2 className="w-5 h-5 text-emerald-200" />}
+                      {viewingBuildingInvestor.closed_at ? "صفقة مُخالصة" : "بيانات المستثمر"}
+                    </h3>
                     <button type="button" onClick={() => setViewingBuildingInvestor(null)} className="p-2 rounded-xl bg-white/20 hover:bg-white/30 text-white transition-colors">
                       <X className="w-5 h-5" />
                     </button>
                   </div>
                   <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                    {viewingBuildingInvestor.closed_at ? (
+                      <>
+                        <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 space-y-3">
+                          <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">ملخص المخالصة</p>
+                          <div className="grid grid-cols-1 gap-2 text-sm">
+                            <div className="flex justify-between"><span className="text-slate-600">تاريخ الإغلاق</span><span className="font-semibold text-slate-800">{formatDateEn(viewingBuildingInvestor.closed_at)}</span></div>
+                            {viewingBuildingInvestor.closing_percentage != null && (
+                              <div className="flex justify-between"><span className="text-slate-600">نسبة الإغلاق</span><span className="font-semibold text-emerald-700 dir-ltr">{Number(viewingBuildingInvestor.closing_percentage)}%</span></div>
+                            )}
+                            {viewingBuildingInvestor.realized_profit != null && (
+                              <div className="flex justify-between"><span className="text-slate-600">الربح المحقق</span><span className="font-bold text-emerald-700 dir-ltr">+{formatNum(Number(viewingBuildingInvestor.realized_profit))} ر.س</span></div>
+                            )}
+                            {viewingBuildingInvestor.settlement_type && (
+                              <>
+                                <div className="flex justify-between"><span className="text-slate-600">نوع المخالصة</span><span className="font-medium">{viewingBuildingInvestor.settlement_type === "with_capital" ? "مع رأس المال" : "أرباح فقط"}</span></div>
+                                <div className="flex justify-between"><span className="text-slate-600">مبلغ المخالصة</span><span className="font-bold text-emerald-800 dir-ltr">{viewingBuildingInvestor.settlement_type === "with_capital" && viewingBuildingInvestor.total_invested_amount != null ? formatNum(Number(viewingBuildingInvestor.total_invested_amount) + Number(viewingBuildingInvestor.realized_profit || 0)) : formatNum(Number(viewingBuildingInvestor.realized_profit || 0))} ر.س</span></div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 space-y-2">
+                          <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">بيانات العقد والمستثمر</p>
+                          <Row label="العمارة" value={viewingBuildingInvestor.building?.name ?? "—"} />
+                          <Row label="المستثمر" value={viewingBuildingInvestor.investor_name} />
+                          {viewingBuildingInvestor.investor_phone && <Row label="الجوال" value={viewingBuildingInvestor.investor_phone} dirLtr />}
+                          <Row label="مبلغ الاستثمار" value={viewingBuildingInvestor.total_invested_amount != null ? `${formatNum(Number(viewingBuildingInvestor.total_invested_amount))} ر.س` : "—"} dirLtr />
+                          <Row label="نوع العقد" value={viewingBuildingInvestor.agreement_type === "from_building_sales" ? "من مبيعات العمارة" : "نسبة متفق عليها"} />
+                          {viewingBuildingInvestor.notes && <Row label="ملاحظات" value={viewingBuildingInvestor.notes} />}
+                        </div>
+                      </>
+                    ) : (
                     <div className="grid grid-cols-1 gap-3 text-sm">
                       <Row label="العمارة" value={viewingBuildingInvestor.building?.name ?? "—"} />
                       <Row label="اسم المستثمر" value={viewingBuildingInvestor.investor_name} />
@@ -1436,14 +1572,7 @@ export default function InvestorsPage() {
                             ? `${Number(viewingBuildingInvestor.profit_percentage)}%–${Number(viewingBuildingInvestor.profit_percentage_to)}%`
                             : `${Number(viewingBuildingInvestor.profit_percentage)}%`
                         }
-                        muted={!!viewingBuildingInvestor.closed_at}
                       />
-                      {viewingBuildingInvestor.closed_at != null && (viewingBuildingInvestor.closing_percentage != null || viewingBuildingInvestor.realized_profit != null) && (
-                        <div className="flex justify-between items-start gap-3 py-2 border-b border-slate-100">
-                          <span className="text-slate-600 font-medium shrink-0">نسبة الربح النهائي</span>
-                          <span className="dir-ltr font-bold text-emerald-600">{viewingBuildingInvestor.closing_percentage != null ? `${Number(viewingBuildingInvestor.closing_percentage)}%` : "—"}</span>
-                        </div>
-                      )}
                       <Row label="نوع العقد" value={viewingBuildingInvestor.agreement_type === "from_building_sales" ? "من مبيعات العمارة" : "نسبة متفق عليها"} />
                       <Row label="مبلغ الاستثمار" value={viewingBuildingInvestor.total_invested_amount != null ? `${formatNum(Number(viewingBuildingInvestor.total_invested_amount))} ر.س` : "—"} dirLtr />
                       <Row label="طريقة الدفع" value={settlementMethodLabel(viewingBuildingInvestor.payment_method)} />
@@ -1467,11 +1596,10 @@ export default function InvestorsPage() {
                           })()
                         }
                         dirLtr
-                        muted={!!viewingBuildingInvestor.closed_at}
                       />
                       <Row label="بدء الاستثمار" value={formatDateEn(viewingBuildingInvestor.investment_start_date)} dirLtr />
                       <Row label="استحقاق المبلغ" value={formatDateEn(viewingBuildingInvestor.investment_due_date)} dirLtr />
-                      {(duration || remaining != null) && (
+                      {(duration || remaining != null || (due && new Date(due + "T12:00:00").getTime() < Date.now())) && (
                         <div className="flex flex-wrap gap-2 pt-2 mt-2 border-t border-slate-100">
                           {duration && (
                             <div className="rounded-full border border-slate-200/70 bg-slate-50 px-3 py-1.5 flex items-center gap-2 shadow-sm min-w-0">
@@ -1494,7 +1622,8 @@ export default function InvestorsPage() {
                       )}
                       {viewingBuildingInvestor.notes && <Row label="ملاحظات" value={viewingBuildingInvestor.notes} />}
                     </div>
-                    <div className="space-y-3 pt-2 border-t border-slate-100">
+                    )}
+                    <div className="space-y-3 pt-4">
                       <p className="text-sm font-medium text-slate-700 text-center">المرفقات</p>
                       <div className="flex flex-wrap gap-2 justify-center">
                         {viewingBuildingInvestor.contract_image_path ? (
@@ -1648,9 +1777,15 @@ export default function InvestorsPage() {
                           <label className="block text-sm font-medium text-slate-700 mb-1">الوحدة</label>
                           <select value={transferUnitId} onChange={(e) => setTransferUnitId(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500">
                             <option value="">— اختر الوحدة —</option>
-                            {units.filter((u) => u.building_id === transferBuildingId).map((u) => (
-                              <option key={u.id} value={u.id}>وحدة {u.unit_number} — د{u.floor}</option>
-                            ))}
+                            {units
+                              .filter((u) => u.building_id === transferBuildingId && u.status !== "sold")
+                              .sort((a, b) => {
+                                const byFloor = Number(a.floor) - Number(b.floor);
+                                return byFloor !== 0 ? byFloor : Number(a.unit_number) - Number(b.unit_number);
+                              })
+                              .map((u) => (
+                                <option key={u.id} value={u.id}>وحدة {u.unit_number} — د{u.floor}</option>
+                              ))}
                           </select>
                         </div>
                         <div>
@@ -1706,8 +1841,10 @@ export default function InvestorsPage() {
                           </td>
                         </tr>
                       ) : (
-                        unitInvestmentsWithProfit.map((row) => (
-                          <tr key={row.id} className="hover:bg-slate-50/50">
+                        unitInvestmentsWithProfit.map((row) => {
+                          const needsTransferUnit = capitalStillAvailableUnit(row) > 0;
+                          return (
+                          <tr key={row.id} className={`hover:bg-slate-50/50 transition ${needsTransferUnit ? "border-r-2 border-r-amber-300 bg-amber-50/20" : ""}`}>
                             <td className="p-3 text-center">
                               <div className="font-medium text-slate-800">وحدة {row.unit?.unit_number ?? "—"} — د{row.unit?.floor ?? "—"}</div>
                               <div className="text-xs text-slate-500">{row.building?.name ?? "—"}</div>
@@ -1716,7 +1853,17 @@ export default function InvestorsPage() {
                               <div className="font-medium text-slate-800">{row.investor_name}</div>
                               {row.investor_phone && <div className="text-xs text-slate-500 dir-ltr">{row.investor_phone}</div>}
                             </td>
-                            <td className="p-3 text-center font-medium text-slate-700 dir-ltr">{formatNum(Number(row.purchase_price))} ر.س</td>
+                            <td className="p-3 text-center font-medium text-slate-700 dir-ltr">
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span>{formatNum(Number(row.purchase_price))} ر.س</span>
+                                {needsTransferUnit && (
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); setViewingUnitInvestment(null); openTransferModalFromUnit(row); }} className="inline-flex items-center gap-1 mt-0.5 text-[10px] text-amber-700/90 font-medium tracking-tight hover:text-amber-800 hover:underline focus:outline-none" title="نقل رأس المال القائم">
+                                    <ArrowRightLeft className="w-2.5 h-2.5 shrink-0 text-amber-600/80" strokeWidth={2.2} />
+                                    نقل رأس مال
+                                  </button>
+                                )}
+                              </div>
+                            </td>
                             <td className="p-3 text-center dir-ltr">
                               {row.resalePrice != null ? `${formatNum(Number(row.resalePrice))} ر.س` : "—"}
                             </td>
@@ -1743,7 +1890,17 @@ export default function InvestorsPage() {
                                     <Pencil className="w-4 h-4" />
                                   </button>
                                 )}
-                                <button type="button" onClick={() => { setClosingUnitInvestment({ ...row, buildingName: row.building?.name }); setClosingUnitSaleId(row.resale_sale_id || ""); setClosingUnitSettlementType((row as UnitInvestmentRow).settlement_type === "profit_only" ? "profit_only" : (row as UnitInvestmentRow).settlement_type === "with_capital" ? "with_capital" : ""); }} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg" title="إغلاق الصفقة">
+                                <button type="button" onClick={() => {
+                                  setClosingUnitInvestment({ ...row, buildingName: row.building?.name });
+                                  setClosingUnitSaleId(row.resale_sale_id || "");
+                                  setClosingUnitSettlementType((row as UnitInvestmentRow).settlement_type === "profit_only" ? "profit_only" : (row as UnitInvestmentRow).settlement_type === "with_capital" ? "with_capital" : "");
+                                  setClosingUnitCommission((row as UnitInvestmentRow).resale_commission != null ? Number((row as UnitInvestmentRow).resale_commission).toLocaleString("en") : "");
+                                  setClosingUnitAdminFees((row as UnitInvestmentRow).admin_fees != null ? Number((row as UnitInvestmentRow).admin_fees).toLocaleString("en") : "");
+                                  setClosingUnitStep(1);
+                                  setClosingUnitSettlementMethod("");
+                                  setClosingUnitSettlementAccountIban("");
+                                  setClosingUnitSettlementBankName("");
+                                }} className={row.status === "resold" ? "p-2 text-slate-500 hover:bg-slate-100 rounded-lg" : "p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg"} title={row.status === "resold" ? "عرض المخالصة" : "إغلاق الصفقة"}>
                                   <CheckCircle2 className="w-4 h-4" />
                                 </button>
                                 {canEdit && (
@@ -1754,7 +1911,8 @@ export default function InvestorsPage() {
                               </div>
                             </td>
                           </tr>
-                        ))
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -1776,72 +1934,42 @@ export default function InvestorsPage() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
-              <div className="grid grid-cols-1 gap-3 text-sm">
-                <Row label="الوحدة / العمارة" value={`وحدة ${viewingUnitInvestment.unit?.unit_number ?? "—"} — د${viewingUnitInvestment.unit?.floor ?? "—"} — ${viewingUnitInvestment.building?.name ?? "—"}`} />
-                <Row label="المستثمر" value={viewingUnitInvestment.investor_name} />
-                <Row label="الجوال" value={viewingUnitInvestment.investor_phone ?? "—"} dirLtr />
-                <Row label="رقم الهوية" value={viewingUnitInvestment.investor_id_number ?? "—"} dirLtr />
-                <Row label="سعر الشراء" value={`${formatNum(Number(viewingUnitInvestment.purchase_price))} ر.س`} dirLtr />
-                <Row label="طريقة الدفع" value={viewingUnitInvestment.payment_method ? settlementMethodLabel(viewingUnitInvestment.payment_method) : "—"} />
-                {viewingUnitInvestment.payment_method === "transfer" && viewingUnitInvestment.payment_bank_name && (
-                  <Row label="على بنك" value={viewingUnitInvestment.payment_bank_name} />
-                )}
-                {viewingUnitInvestment.payment_method === "check" && viewingUnitInvestment.payment_check_number && (
-                  <Row label="رقم الشيك" value={viewingUnitInvestment.payment_check_number} dirLtr />
-                )}
-                <Row label="تاريخ الشراء" value={viewingUnitInvestment.purchase_date ? formatDateEn(viewingUnitInvestment.purchase_date) : "—"} dirLtr />
-                <Row label="حالة مشروع الاستثمار" value={viewingUnitInvestment.status === "resold" ? "تم إعادة البيع" : viewingUnitInvestment.status === "cancelled" ? "ملغي" : "تحت الإنشاء"} />
-                <div className="pt-2 border-t border-slate-100 space-y-2">
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">ربط إعادة البيع</p>
-                  {canEdit && viewingUnitInvestment.status !== "cancelled" && viewingUnitInvestment.status !== "resold" ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <select
-                        value={cardResaleId}
-                        onChange={(e) => setCardResaleId(e.target.value)}
-                        className="flex-1 min-w-[140px] border border-slate-200 rounded-xl px-3 py-2 text-sm"
-                      >
-                        <option value="">— بدون ربط —</option>
-                        {sales.filter((s) => s.unit_id === viewingUnitInvestment.unit_id).map((s) => (
-                          <option key={s.id} value={s.id}>بيع بـ {formatNum(Number(s.sale_price))} ر.س</option>
-                        ))}
-                      </select>
-                      <button type="button" onClick={saveUnitResaleLink} disabled={saving} className="px-4 py-2 rounded-xl bg-teal-500 text-white text-sm font-medium hover:bg-teal-600 disabled:opacity-50">
-                        {saving ? "جاري..." : "حفظ الربط"}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="text-slate-800 dir-ltr">
-                      <p>
-                        {viewingUnitInvestment.resale_sale_id
-                          ? `تم إعادة البيع بــ ${viewingUnitInvestment.resalePrice != null ? formatNum(Number(viewingUnitInvestment.resalePrice)) + " ر.س" : "—"}`
-                          : "— بدون ربط —"}
-                      </p>
-                      {viewingUnitInvestment.status === "resold" && viewingUnitInvestment.resale_sale_id && (
-                        <p className="text-slate-500 text-xs mt-1">تمت المخالصة</p>
-                      )}
-                    </div>
-                  )}
+              {/* 1. بيانات المستثمر */}
+              <section className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-2">
+                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider pb-2 border-b border-slate-200/80">بيانات المستثمر</h4>
+                <div className="grid grid-cols-1 gap-2 text-sm">
+                  <Row label="المستثمر" value={viewingUnitInvestment.investor_name} />
+                  <Row label="الجوال" value={viewingUnitInvestment.investor_phone ?? "—"} dirLtr />
+                  <Row label="رقم الهوية" value={viewingUnitInvestment.investor_id_number ?? "—"} dirLtr />
                 </div>
-                <Row label="سعر إعادة البيع" value={viewingUnitInvestment.resalePrice != null ? `${formatNum(Number(viewingUnitInvestment.resalePrice))} ر.س` : "—"} dirLtr />
-                <Row label="الربح" value={viewingUnitInvestment.profit != null ? `+${formatNum(Number(viewingUnitInvestment.profit))} ر.س` : "—"} dirLtr />
-                {viewingUnitInvestment.status === "resold" && viewingUnitInvestment.settlement_type === "profit_only" && capitalStillAvailableUnit(viewingUnitInvestment) > 0 && (
-                  <div className="rounded-xl border border-amber-200/80 bg-amber-50/30 p-4 space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-600 text-sm">رأس المال القائم في الوحدة</span>
-                      <span className="font-semibold dir-ltr text-amber-700">{formatNum(capitalStillAvailableUnit(viewingUnitInvestment))} ر.س</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      <button type="button" onClick={() => openTransferModalFromUnit(viewingUnitInvestment)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-amber-400 bg-white text-amber-700 text-sm font-medium hover:bg-amber-100 transition-colors">
-                        <TrendingUp className="w-4 h-4 shrink-0" />
-                        نقل رأس المال إلى عمارة أو وحدة
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {viewingUnitInvestment.notes && <Row label="ملاحظات" value={viewingUnitInvestment.notes} />}
-                <div className="space-y-3 pt-2 border-t border-slate-100">
-                  <p className="text-sm font-medium text-slate-700 text-center">المرفقات</p>
-                  <div className="flex flex-wrap gap-2 justify-center">
+              </section>
+
+              {/* 2. عملية الاستثمار */}
+              <section className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-2">
+                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider pb-2 border-b border-slate-200/80">عملية الاستثمار</h4>
+                <div className="grid grid-cols-1 gap-2 text-sm">
+                  <Row label="الوحدة / العمارة" value={`وحدة ${viewingUnitInvestment.unit?.unit_number ?? "—"} — د${viewingUnitInvestment.unit?.floor ?? "—"} — ${viewingUnitInvestment.building?.name ?? "—"}`} />
+                  <Row label="سعر الشراء" value={`${formatNum(Number(viewingUnitInvestment.purchase_price))} ر.س`} dirLtr />
+                  {(viewingUnitInvestment as UnitInvestmentRow).purchase_commission != null && Number((viewingUnitInvestment as UnitInvestmentRow).purchase_commission) > 0 && (
+                    <>
+                      <Row label="عمولة البيع" value={`-${formatNum(Number((viewingUnitInvestment as UnitInvestmentRow).purchase_commission))} ر.س`} dirLtr />
+                      <Row label="السعر الفعلي" value={`${formatNum(getEffectivePurchasePrice(viewingUnitInvestment))} ر.س`} dirLtr />
+                    </>
+                  )}
+                  <Row label="طريقة الدفع" value={viewingUnitInvestment.payment_method ? settlementMethodLabel(viewingUnitInvestment.payment_method) : "—"} />
+                  {viewingUnitInvestment.payment_method === "transfer" && viewingUnitInvestment.payment_bank_name && (
+                    <Row label="على بنك" value={viewingUnitInvestment.payment_bank_name} />
+                  )}
+                  {viewingUnitInvestment.payment_method === "check" && viewingUnitInvestment.payment_check_number && (
+                    <Row label="رقم الشيك" value={viewingUnitInvestment.payment_check_number} dirLtr />
+                  )}
+                  <Row label="تاريخ الشراء" value={viewingUnitInvestment.purchase_date ? formatDateEn(viewingUnitInvestment.purchase_date) : "—"} dirLtr />
+                  <Row label="حالة مشروع الاستثمار" value={viewingUnitInvestment.status === "resold" ? "تم إعادة البيع" : viewingUnitInvestment.status === "cancelled" ? "ملغي" : "تحت الإنشاء"} />
+                  {viewingUnitInvestment.notes && <Row label="ملاحظات" value={viewingUnitInvestment.notes} />}
+                </div>
+                <div className="pt-3 mt-2 border-t border-slate-200/80">
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">المرفقات</p>
+                  <div className="flex flex-wrap gap-1.5">
                     {viewingUnitInvestment.contract_image_path ? (
                       <a
                         href="#"
@@ -1850,13 +1978,15 @@ export default function InvestorsPage() {
                           const { data } = await supabase.storage.from(INVESTOR_DOCS_BUCKET).createSignedUrl(viewingUnitInvestment.contract_image_path!, 3600);
                           if (data?.signedUrl) window.open(data.signedUrl, "_blank");
                         }}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-teal-200/80 bg-teal-50/60 text-teal-800 text-xs font-medium hover:bg-teal-100/80 transition-colors"
+                        title="عرض صورة العقد"
                       >
-                        عرض صورة العقد
+                        <Eye className="w-3.5 h-3.5 shrink-0 opacity-80" />
+                        عقد
                       </a>
                     ) : (
-                      <span className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-100 bg-slate-50 text-slate-500 text-sm font-medium">
-                        لم يُرفق عقد
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-dashed border-slate-200 bg-slate-50/50 text-slate-400 text-xs">
+                        عقد —
                       </span>
                     )}
                     {viewingUnitInvestment.id_image_path ? (
@@ -1867,13 +1997,15 @@ export default function InvestorsPage() {
                           const { data } = await supabase.storage.from(INVESTOR_DOCS_BUCKET).createSignedUrl(viewingUnitInvestment.id_image_path!, 3600);
                           if (data?.signedUrl) window.open(data.signedUrl, "_blank");
                         }}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-teal-200/80 bg-teal-50/60 text-teal-800 text-xs font-medium hover:bg-teal-100/80 transition-colors"
+                        title="عرض صورة الهوية"
                       >
-                        عرض صورة الهوية
+                        <Eye className="w-3.5 h-3.5 shrink-0 opacity-80" />
+                        هوية
                       </a>
                     ) : (
-                      <span className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-100 bg-slate-50 text-slate-500 text-sm font-medium">
-                        لم تُرفق هوية
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-dashed border-slate-200 bg-slate-50/50 text-slate-400 text-xs">
+                        هوية —
                       </span>
                     )}
                     {viewingUnitInvestment.payment_method === "check" && (
@@ -1885,19 +2017,53 @@ export default function InvestorsPage() {
                             const { data } = await supabase.storage.from(INVESTOR_DOCS_BUCKET).createSignedUrl(viewingUnitInvestment.payment_check_image_path!, 3600);
                             if (data?.signedUrl) window.open(data.signedUrl, "_blank");
                           }}
-                          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-teal-200/80 bg-teal-50/60 text-teal-800 text-xs font-medium hover:bg-teal-100/80 transition-colors"
+                          title="عرض صورة الشيك"
                         >
-                          عرض صورة الشيك
+                          <Eye className="w-3.5 h-3.5 shrink-0 opacity-80" />
+                          شيك
                         </a>
                       ) : (
-                        <span className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-100 bg-slate-50 text-slate-500 text-sm font-medium">
-                          لم تُرفق صورة الشيك
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-dashed border-slate-200 bg-slate-50/50 text-slate-400 text-xs">
+                          شيك —
                         </span>
                       )
                     )}
                   </div>
                 </div>
-              </div>
+              </section>
+
+              {/* 3. عملية إعادة البيع */}
+              <section className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-2">
+                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider pb-2 border-b border-slate-200/80">عملية إعادة البيع</h4>
+                <div className="grid grid-cols-1 gap-2 text-sm">
+                  <Row label="سعر إعادة البيع" value={viewingUnitInvestment.resalePrice != null ? `${formatNum(Number(viewingUnitInvestment.resalePrice))} ر.س` : "—"} dirLtr />
+                  <Row label="الربح" value={viewingUnitInvestment.profit != null ? `+${formatNum(Number(viewingUnitInvestment.profit))} ر.س` : "—"} dirLtr />
+                  {viewingUnitInvestment.status === "resold" && (viewingUnitInvestment as UnitInvestmentRow).settlement_type && (
+                    <Row label="نوع المخالصة" value={(viewingUnitInvestment as UnitInvestmentRow).settlement_type === "with_capital" ? "مع رأس المال" : "أرباح فقط"} />
+                  )}
+                  {viewingUnitInvestment.status === "resold" && (viewingUnitInvestment as UnitInvestmentRow).settlement_method && (
+                    <Row label="طريقة المخالصة" value={settlementMethodLabel((viewingUnitInvestment as UnitInvestmentRow).settlement_method!)} />
+                  )}
+                </div>
+                {viewingUnitInvestment.status === "resold" && viewingUnitInvestment.settlement_type === "profit_only" && capitalStillAvailableUnit(viewingUnitInvestment) > 0 && (
+                  <div className="rounded-lg border border-amber-200/80 bg-amber-50/30 p-3 mt-3 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-600 text-sm">رأس المال القائم في الوحدة</span>
+                      <span className="font-semibold dir-ltr text-amber-700">{formatNum(capitalStillAvailableUnit(viewingUnitInvestment))} ر.س</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 justify-center pt-1">
+                      <button type="button" onClick={() => openTransferModalFromUnit(viewingUnitInvestment)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-amber-400 bg-white text-amber-700 text-sm font-medium hover:bg-amber-100 transition-colors">
+                        <TrendingUp className="w-4 h-4 shrink-0" />
+                        نقل رأس المال إلى عمارة أو وحدة
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {viewingUnitInvestment.status !== "resold" && (
+                  <p className="text-xs text-slate-400 pt-1">لم تُنفّذ إعادة البيع بعد</p>
+                )}
+              </section>
             </div>
           </div>
         </div>
@@ -1905,14 +2071,14 @@ export default function InvestorsPage() {
 
       {/* نافذة إغلاق صفقة استثمار الوحدة */}
       {closingUnitInvestment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => { setClosingUnitInvestment(null); setClosingUnitSaleId(""); setClosingUnitSettlementType(""); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => { setClosingUnitInvestment(null); setClosingUnitSaleId(""); setClosingUnitSettlementType(""); setClosingUnitCommission(""); setClosingUnitAdminFees(""); setClosingUnitStep(1); setClosingUnitSettlementMethod(""); setClosingUnitSettlementAccountIban(""); setClosingUnitSettlementBankName(""); }}>
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} dir="rtl">
             <div className="bg-gradient-to-br from-emerald-600 to-teal-700 px-5 py-4 flex items-center justify-between shrink-0">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5" />
                 إغلاق صفقة الاستثمار
               </h3>
-              <button type="button" onClick={() => { setClosingUnitInvestment(null); setClosingUnitSaleId(""); setClosingUnitSettlementType(""); }} className="p-2 rounded-xl bg-white/20 hover:bg-white/30 text-white transition-colors">
+              <button type="button" onClick={() => { setClosingUnitInvestment(null); setClosingUnitSaleId(""); setClosingUnitSettlementType(""); setClosingUnitCommission(""); setClosingUnitAdminFees(""); setClosingUnitStep(1); setClosingUnitSettlementMethod(""); setClosingUnitSettlementAccountIban(""); setClosingUnitSettlementBankName(""); }} className="p-2 rounded-xl bg-white/20 hover:bg-white/30 text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1931,14 +2097,26 @@ export default function InvestorsPage() {
                     <p className="font-semibold text-emerald-800">الصفقة مُغلقة (مُخالصة)</p>
                     <div className="grid grid-cols-1 gap-2">
                       <div className="flex justify-between"><span className="text-slate-600">سعر إعادة البيع</span><span className="font-semibold dir-ltr text-emerald-700">{closingUnitInvestment.resalePrice != null ? `${formatNum(Number(closingUnitInvestment.resalePrice))} ر.س` : "—"}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-600">الربح المحقق</span><span className="font-semibold dir-ltr text-emerald-700">+{closingUnitInvestment.profit != null ? formatNum(Number(closingUnitInvestment.profit)) : "—"} ر.س</span></div>
-                      {closingUnitInvestment.purchase_price > 0 && closingUnitInvestment.profit != null && (
+                      <div className="flex justify-between"><span className="text-slate-600">الربح الإجمالي</span><span className="font-semibold dir-ltr text-emerald-700">+{closingUnitInvestment.profit != null ? formatNum(Number(closingUnitInvestment.profit)) : "—"} ر.س</span></div>
+                      {((closingUnitInvestment as UnitInvestmentRow).resale_commission != null && Number((closingUnitInvestment as UnitInvestmentRow).resale_commission) > 0) || ((closingUnitInvestment as UnitInvestmentRow).admin_fees != null && Number((closingUnitInvestment as UnitInvestmentRow).admin_fees) > 0) ? (
+                        <>
+                          {(closingUnitInvestment as UnitInvestmentRow).resale_commission != null && Number((closingUnitInvestment as UnitInvestmentRow).resale_commission) > 0 && <div className="flex justify-between"><span className="text-slate-600">عمولة البيع</span><span className="font-medium dir-ltr text-slate-700">-{formatNum(Number((closingUnitInvestment as UnitInvestmentRow).resale_commission))} ر.س</span></div>}
+                          {(closingUnitInvestment as UnitInvestmentRow).admin_fees != null && Number((closingUnitInvestment as UnitInvestmentRow).admin_fees) > 0 && <div className="flex justify-between"><span className="text-slate-600">رسوم إدارية</span><span className="font-medium dir-ltr text-slate-700">-{formatNum(Number((closingUnitInvestment as UnitInvestmentRow).admin_fees))} ر.س</span></div>}
+                          <div className="flex justify-between"><span className="text-slate-600">صافي الربح</span><span className="font-semibold dir-ltr text-emerald-700">+{formatNum(Math.max(0, (closingUnitInvestment.profit ?? 0) - Number((closingUnitInvestment as UnitInvestmentRow).resale_commission || 0) - Number((closingUnitInvestment as UnitInvestmentRow).admin_fees || 0)))} ر.س</span></div>
+                        </>
+                      ) : null}
+                      {Number(closingUnitInvestment.purchase_price) > 0 && closingUnitInvestment.profit != null && (
                         <div className="flex justify-between"><span className="text-slate-600">نسبة الربح</span><span className="font-semibold dir-ltr text-teal-700">{((Number(closingUnitInvestment.profit) / Number(closingUnitInvestment.purchase_price)) * 100).toFixed(1)}%</span></div>
+                      )}
+                      {(closingUnitInvestment as UnitInvestmentRow).settlement_method && (
+                        <p className="text-emerald-800 font-semibold pb-2 border-b border-emerald-100/80">تم المخالصة بـ {settlementMethodLabel((closingUnitInvestment as UnitInvestmentRow).settlement_method)}</p>
                       )}
                       {(closingUnitInvestment as UnitInvestmentRow).settlement_type && (
                         <>
                           <div className="flex justify-between"><span className="text-slate-600">نوع المخالصة</span><span className="font-medium">{(closingUnitInvestment as UnitInvestmentRow).settlement_type === "with_capital" ? "مع رأس المال" : "أرباح فقط"}</span></div>
-                          <div className="flex justify-between"><span className="text-slate-600">مبلغ المخالصة</span><span className="font-semibold dir-ltr text-emerald-700">{(closingUnitInvestment as UnitInvestmentRow).settlement_type === "with_capital" ? formatNum(Number(closingUnitInvestment.purchase_price) + (closingUnitInvestment.profit ?? 0)) : formatNum(closingUnitInvestment.profit ?? 0)} ر.س</span></div>
+                          <div className="flex justify-between"><span className="text-slate-600">مبلغ المخالصة</span><span className="font-semibold dir-ltr text-emerald-700">{(() => { const gross = closingUnitInvestment.profit ?? 0; const comm = Number((closingUnitInvestment as UnitInvestmentRow).resale_commission || 0); const adm = Number((closingUnitInvestment as UnitInvestmentRow).admin_fees || 0); const net = Math.max(0, gross - comm - adm); const capital = Number(closingUnitInvestment.purchase_price); return (closingUnitInvestment as UnitInvestmentRow).settlement_type === "with_capital" ? formatNum(capital + net) : formatNum(net); })()} ر.س</span></div>
+                          {(closingUnitInvestment as UnitInvestmentRow).settlement_account_iban && <div className="flex justify-between"><span className="text-slate-600">رقم الحساب / الآيبان</span><span className="font-medium dir-ltr">{(closingUnitInvestment as UnitInvestmentRow).settlement_account_iban}</span></div>}
+                          {(closingUnitInvestment as UnitInvestmentRow).settlement_bank_name && <div className="flex justify-between"><span className="text-slate-600">اسم البنك</span><span className="font-medium">{(closingUnitInvestment as UnitInvestmentRow).settlement_bank_name}</span></div>}
                           {(closingUnitInvestment as UnitInvestmentRow).settlement_type === "profit_only" && (
                             <p className="text-xs text-amber-700 mt-2 pt-2 border-t border-emerald-100">
                               يجب نقل رأس المال المتبقي إلى عمارة أو وحدة جديدة أو مخالصة رأس المال لضبط الحسابات الصحيحة.
@@ -1948,54 +2126,204 @@ export default function InvestorsPage() {
                       )}
                     </div>
                   </div>
+                  {(closingUnitInvestment as UnitInvestmentRow).settlement_type === "profit_only" && capitalStillAvailableUnit(closingUnitInvestment as UnitInvestmentRow) > 0 && (
+                    <button type="button" onClick={() => { setClosingUnitInvestment(null); setClosingUnitSaleId(""); setClosingUnitSettlementType(""); setClosingUnitCommission(""); setClosingUnitAdminFees(""); setClosingUnitStep(1); setClosingUnitSettlementMethod(""); setClosingUnitSettlementAccountIban(""); setClosingUnitSettlementBankName(""); openTransferModalFromUnit(closingUnitInvestment as UnitInvestmentRow); }} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-amber-300 bg-amber-50/50 text-amber-800 text-sm font-medium hover:bg-amber-100 transition-colors">
+                      <ArrowRightLeft className="w-4 h-4 shrink-0" />
+                      نقل رأس المال
+                    </button>
+                  )}
                 </>
               ) : (
                 <>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-700">ربط عملية البيع (مطلوب للإغلاق)</label>
-                    <select
-                      value={closingUnitSaleId}
-                      onChange={(e) => setClosingUnitSaleId(e.target.value)}
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
-                    >
-                      <option value="">— اختر عملية البيع —</option>
-                      {sales.filter((s) => s.unit_id === closingUnitInvestment.unit_id).map((s) => (
-                        <option key={s.id} value={s.id}>بيع بـ {formatNum(Number(s.sale_price))} ر.س</option>
-                      ))}
-                    </select>
-                    {closingUnitSaleId && (() => {
-                      const sale = sales.find((s) => s.id === closingUnitSaleId);
-                      const resalePrice = sale?.sale_price ?? 0;
-                      const capital = Number(closingUnitInvestment.purchase_price);
-                      const profit = resalePrice - capital;
-                      const pct = capital > 0 ? ((profit / capital) * 100).toFixed(1) : "—";
-                      return (
-                        <p className="text-xs text-slate-500">الربح المحقق: +{formatNum(profit)} ر.س ({pct}%)</p>
-                      );
-                    })()}
+                  {/* مؤشر الخطوات */}
+                  <div className="flex items-center justify-center gap-1 sm:gap-2">
+                    {[1, 2, 3].map((s) => (
+                      <span key={s} className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-colors ${closingUnitStep === s ? "bg-emerald-600 text-white" : closingUnitStep > s ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-400"}`}>{s}</span>
+                    ))}
                   </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-700">نوع المخالصة (مطلوب)</label>
-                    <div className="flex gap-2 flex-wrap">
-                      <button type="button" onClick={() => setClosingUnitSettlementType("profit_only")} className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${closingUnitSettlementType === "profit_only" ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
-                        أرباح فقط
-                      </button>
-                      <button type="button" onClick={() => setClosingUnitSettlementType("with_capital")} className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${closingUnitSettlementType === "with_capital" ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
-                        مع رأس المال
-                      </button>
-                    </div>
-                    {closingUnitSaleId && closingUnitSettlementType && (() => {
-                      const sale = sales.find((s) => s.id === closingUnitSaleId);
-                      const resalePrice = sale?.sale_price ?? 0;
-                      const capital = Number(closingUnitInvestment.purchase_price);
-                      const profit = resalePrice - capital;
-                      const amount = closingUnitSettlementType === "with_capital" ? capital + profit : profit;
-                      return <p className="text-xs text-slate-500">مبلغ المخالصة: {formatNum(amount)} ر.س</p>;
-                    })()}
-                  </div>
-                  <button type="button" onClick={confirmCloseUnitDeal} disabled={saving || !closingUnitSaleId || !closingUnitSettlementType} className="w-full py-2.5 rounded-xl bg-emerald-600 text-white font-medium text-sm hover:bg-emerald-700 disabled:opacity-50 transition">
-                    {saving ? "جاري الإغلاق..." : "تأكيد إغلاق الصفقة"}
-                  </button>
+
+                  {/* الخطوة 1: ربط البيع + عمولة + رسوم + نوع المخالصة */}
+                  {closingUnitStep === 1 && (
+                    <>
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-slate-700">ربط عملية البيع (مطلوب للإغلاق)</label>
+                        <select
+                          value={closingUnitSaleId}
+                          onChange={(e) => setClosingUnitSaleId(e.target.value)}
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                        >
+                          <option value="">— اختر عملية البيع —</option>
+                          {sales.filter((s) => s.unit_id === closingUnitInvestment.unit_id).map((s) => (
+                            <option key={s.id} value={s.id}>بيع بـ {formatNum(Number(s.sale_price))} ر.س</option>
+                          ))}
+                        </select>
+                        {closingUnitSaleId && (() => {
+                          const sale = sales.find((s) => s.id === closingUnitSaleId);
+                          const resalePrice = sale?.sale_price ?? 0;
+                          const capital = Number(closingUnitInvestment.purchase_price);
+                          const profit = resalePrice - capital;
+                          const pct = capital > 0 ? ((profit / capital) * 100).toFixed(1) : "—";
+                          return (
+                            <p className="text-xs text-slate-500">الربح الإجمالي: +{formatNum(profit)} ر.س ({pct}%)</p>
+                          );
+                        })()}
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="block text-sm font-medium text-slate-700">عمولة البيع (ر.س)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={closingUnitCommission}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/\D/g, "");
+                              setClosingUnitCommission(raw === "" ? "" : Number(raw).toLocaleString("en"));
+                            }}
+                            placeholder="0"
+                            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 dir-ltr"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="block text-sm font-medium text-slate-700">رسوم إدارية (ر.س)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={closingUnitAdminFees}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/\D/g, "");
+                              setClosingUnitAdminFees(raw === "" ? "" : Number(raw).toLocaleString("en"));
+                            }}
+                            placeholder="0"
+                            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 dir-ltr"
+                          />
+                        </div>
+                      </div>
+                      {closingUnitSaleId && (() => {
+                        const sale = sales.find((s) => s.id === closingUnitSaleId);
+                        const resalePrice = sale?.sale_price ?? 0;
+                        const capital = Number(closingUnitInvestment.purchase_price);
+                        const grossProfit = resalePrice - capital;
+                        const toNum = (s: string) => { const d = (s || "").replace(/\D/g, ""); return d.length > 0 ? Number(d) : 0; };
+                        const commission = toNum(closingUnitCommission);
+                        const adminFees = toNum(closingUnitAdminFees);
+                        const netProfit = Math.max(0, grossProfit - commission - adminFees);
+                        return (
+                          <p className="text-xs text-slate-600 font-medium">صافي الربح بعد الخصم: <span className="dir-ltr text-emerald-700">+{formatNum(netProfit)} ر.س</span></p>
+                        );
+                      })()}
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-slate-700">نوع المخالصة (مطلوب)</label>
+                        <div className="flex gap-2 flex-wrap">
+                          <button type="button" onClick={() => setClosingUnitSettlementType("profit_only")} className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${closingUnitSettlementType === "profit_only" ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
+                            أرباح فقط
+                          </button>
+                          <button type="button" onClick={() => setClosingUnitSettlementType("with_capital")} className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${closingUnitSettlementType === "with_capital" ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
+                            مع رأس المال
+                          </button>
+                        </div>
+                        {closingUnitSaleId && closingUnitSettlementType && (() => {
+                          const sale = sales.find((s) => s.id === closingUnitSaleId);
+                          const resalePrice = sale?.sale_price ?? 0;
+                          const capital = Number(closingUnitInvestment.purchase_price);
+                          const grossProfit = resalePrice - capital;
+                          const toNum = (s: string) => { const d = (s || "").replace(/\D/g, ""); return d.length > 0 ? Number(d) : 0; };
+                          const netProfit = Math.max(0, grossProfit - toNum(closingUnitCommission) - toNum(closingUnitAdminFees));
+                          const amount = closingUnitSettlementType === "with_capital" ? capital + netProfit : netProfit;
+                          return <p className="text-xs text-slate-500">مبلغ المخالصة: {formatNum(amount)} ر.س</p>;
+                        })()}
+                      </div>
+                      <div className="flex justify-end pt-1">
+                        <button type="button" onClick={() => setClosingUnitStep(2)} disabled={!closingUnitSaleId || !closingUnitSettlementType} className="px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
+                          التالي
+                        </button>
+                      </div>
+                    </>
+                  )}
+
+                  {/* الخطوة 2: طريقة المخالصة (كاش / تحويل / شيك مصدق) + حقول */}
+                  {closingUnitStep === 2 && (() => {
+                    const sale = sales.find((s) => s.id === closingUnitSaleId);
+                    const resalePrice = sale?.sale_price ?? 0;
+                    const capital = Number(closingUnitInvestment.purchase_price);
+                    const grossProfit = resalePrice - capital;
+                    const toNum = (s: string) => { const d = (s || "").replace(/\D/g, ""); return d.length > 0 ? Number(d) : 0; };
+                    const netProfit = Math.max(0, grossProfit - toNum(closingUnitCommission) - toNum(closingUnitAdminFees));
+                    const settlementAmount = closingUnitSettlementType === "with_capital" ? capital + netProfit : netProfit;
+                    return (
+                      <div className="space-y-3">
+                        <p className="text-sm font-semibold text-slate-700">طريقة المخالصة</p>
+                        <div className="flex flex-wrap gap-2">
+                          {([{ value: "حوالة", label: "حوالة" }, { value: "شيك", label: "شيك مصدق" }, { value: "كاش", label: "كاش" }] as const).map(({ value, label }) => (
+                            <button key={value} type="button" onClick={() => setClosingUnitSettlementMethod(value)} className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${closingUnitSettlementMethod === value ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>{label}</button>
+                          ))}
+                        </div>
+                        {closingUnitSettlementMethod === "حوالة" && (
+                          <div className="flex flex-wrap items-end gap-2 pt-1">
+                            <div className="min-w-0 flex-1 max-w-[300px]">
+                              <label className="block text-xs font-medium text-slate-600 mb-0.5">رقم الحساب أو الآيبان</label>
+                              <input type="text" value={closingUnitSettlementAccountIban} onChange={(e) => setClosingUnitSettlementAccountIban(e.target.value)} placeholder="رقم الحساب / الآيبان" className="w-full border border-slate-200 rounded-full px-4 py-2 text-sm dir-ltr focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
+                            </div>
+                            <div className="min-w-0 flex-1 max-w-[180px]">
+                              <label className="block text-xs font-medium text-slate-600 mb-0.5">اسم البنك</label>
+                              <input type="text" value={closingUnitSettlementBankName} onChange={(e) => setClosingUnitSettlementBankName(e.target.value)} placeholder="اسم البنك" className="w-full border border-slate-200 rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
+                            </div>
+                          </div>
+                        )}
+                        {closingUnitSettlementMethod === "شيك" && (
+                          <div className="flex flex-wrap items-end gap-2 pt-1">
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-0.5">مبلغ الشيك (ر.س)</label>
+                              <div className="border border-slate-200 rounded-full px-4 py-2 text-sm font-bold text-emerald-700 dir-ltr bg-emerald-50/50 min-w-0">
+                                {formatNum(settlementAmount)} ر.س
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-[140px] max-w-[200px]">
+                              <label className="block text-xs font-medium text-slate-600 mb-0.5">من بنك</label>
+                              <input type="text" value={closingUnitSettlementBankName} onChange={(e) => setClosingUnitSettlementBankName(e.target.value)} placeholder="اسم البنك" className="w-full border border-slate-200 rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
+                            </div>
+                          </div>
+                        )}
+                        {closingUnitSettlementMethod === "كاش" && (
+                          <div className="pt-1">
+                            <p className="text-xs font-medium text-slate-600 mb-0.5">مبلغ الكاش (ر.س)</p>
+                            <p className="text-sm font-bold text-emerald-700 dir-ltr">{formatNum(settlementAmount)} ر.س</p>
+                          </div>
+                        )}
+                        <div className="flex justify-between pt-2">
+                          <button type="button" onClick={() => setClosingUnitStep(1)} className="px-4 py-2 rounded-full border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50">السابق</button>
+                          <button type="button" onClick={() => setClosingUnitStep(3)} disabled={!closingUnitSettlementMethod} className="px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
+                            التالي
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* الخطوة 3: تأكيد إغلاق الصفقة */}
+                  {closingUnitStep === 3 && (() => {
+                    const sale = sales.find((s) => s.id === closingUnitSaleId);
+                    const resalePrice = sale?.sale_price ?? 0;
+                    const capital = Number(closingUnitInvestment.purchase_price);
+                    const grossProfit = resalePrice - capital;
+                    const toNum = (s: string) => { const d = (s || "").replace(/\D/g, ""); return d.length > 0 ? Number(d) : 0; };
+                    const netProfit = Math.max(0, grossProfit - toNum(closingUnitCommission) - toNum(closingUnitAdminFees));
+                    const amount = closingUnitSettlementType === "with_capital" ? capital + netProfit : netProfit;
+                    return (
+                      <div className="space-y-3">
+                        <p className="text-sm font-semibold text-slate-700">تأكيد إغلاق الصفقة</p>
+                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-sm space-y-1">
+                          <p>نوع المخالصة: {closingUnitSettlementType === "with_capital" ? "مع رأس المال" : "أرباح فقط"} — مبلغ المخالصة: <span className="font-semibold dir-ltr text-emerald-700">{formatNum(amount)} ر.س</span></p>
+                          <p>طريقة المخالصة: {closingUnitSettlementMethod === "شيك" ? "شيك مصدق" : closingUnitSettlementMethod}</p>
+                        </div>
+                        <div className="flex justify-between pt-1">
+                          <button type="button" onClick={() => setClosingUnitStep(2)} className="px-4 py-2 rounded-full border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50">السابق</button>
+                          <button type="button" onClick={confirmCloseUnitDeal} disabled={saving} className="px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
+                            {saving ? "جاري الإغلاق..." : "تأكيد إغلاق الصفقة"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </>
               )}
             </div>
@@ -2279,6 +2607,29 @@ export default function InvestorsPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">نوع العقد</label>
+                    <select
+                      value={formBuilding.agreement_type}
+                      onChange={(e) => setFormBuilding((p) => ({ ...p, agreement_type: e.target.value as "agreed_percentage" | "from_building_sales" }))}
+                      className="w-full h-[42px] border border-slate-200 rounded-xl px-4 py-2 text-sm leading-normal focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                    >
+                      <option value="agreed_percentage">نسبة متفق عليها</option>
+                      <option value="from_building_sales">من مبيعات العمارة</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">مبلغ الاستثمار (ر.س)</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={formBuilding.total_invested_amount ? formatNum(parseInt(formBuilding.total_invested_amount.replace(/\D/g, ""), 10) || 0) : ""}
+                      onChange={(e) => setFormBuilding((p) => ({ ...p, total_invested_amount: e.target.value.replace(/\D/g, "") }))}
+                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm dir-ltr focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">نسبة الربح من %</label>
                     <input
                       type="number"
@@ -2300,29 +2651,6 @@ export default function InvestorsPage() {
                       value={formBuilding.profit_percentage_to}
                       onChange={(e) => setFormBuilding((p) => ({ ...p, profit_percentage_to: e.target.value }))}
                       className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">نوع العقد</label>
-                    <select
-                      value={formBuilding.agreement_type}
-                      onChange={(e) => setFormBuilding((p) => ({ ...p, agreement_type: e.target.value as "agreed_percentage" | "from_building_sales" }))}
-                      className="w-full h-[42px] border border-slate-200 rounded-xl px-4 py-2 text-sm leading-normal focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
-                    >
-                      <option value="agreed_percentage">نسبة متفق عليها</option>
-                      <option value="from_building_sales">من مبيعات العمارة</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">مبلغ الاستثمار (ر.س)</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={formBuilding.total_invested_amount ? formatNum(parseInt(formBuilding.total_invested_amount.replace(/\D/g, ""), 10) || 0) : ""}
-                      onChange={(e) => setFormBuilding((p) => ({ ...p, total_invested_amount: e.target.value.replace(/\D/g, "") }))}
-                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm dir-ltr focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
                     />
                   </div>
                 </div>
@@ -2534,11 +2862,17 @@ className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 roun
                       disabled={!formUnit.building_id}
                     >
                       <option value="">اختر الوحدة</option>
-                      {units.filter((u) => u.building_id === formUnit.building_id).map((u) => (
-                        <option key={u.id} value={u.id}>
-                          وحدة {u.unit_number} — د{u.floor}
-                        </option>
-                      ))}
+                      {units
+                        .filter((u) => u.building_id === formUnit.building_id && u.status !== "sold")
+                        .sort((a, b) => {
+                          const byFloor = Number(a.floor) - Number(b.floor);
+                          return byFloor !== 0 ? byFloor : Number(a.unit_number) - Number(b.unit_number);
+                        })
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>
+                            وحدة {u.unit_number} — د{u.floor}
+                          </option>
+                        ))}
                     </select>
                   </div>
                 </>
@@ -2584,16 +2918,36 @@ className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 roun
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">سعر الشراء (ر.س) — عند الشراء تحت الإنشاء</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={formUnit.purchase_price ? formatNum(parseInt(formUnit.purchase_price.replace(/\D/g, ""), 10) || 0) : ""}
-                  onChange={(e) => setFormUnit((p) => ({ ...p, purchase_price: e.target.value.replace(/\D/g, "") }))}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm dir-ltr"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">سعر الشراء (ر.س)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={formUnit.purchase_price ? formatNum(parseInt(formUnit.purchase_price.replace(/\D/g, ""), 10) || 0) : ""}
+                    onChange={(e) => setFormUnit((p) => ({ ...p, purchase_price: e.target.value.replace(/\D/g, "") }))}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm dir-ltr"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">عمولة البيع (ر.س)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={formUnit.purchase_commission ? formatNum(parseInt(formUnit.purchase_commission.replace(/\D/g, ""), 10) || 0) : ""}
+                    onChange={(e) => setFormUnit((p) => ({ ...p, purchase_commission: e.target.value.replace(/\D/g, "") }))}
+                    placeholder="0 — إن تُركت فارغة السعر الفعلي = سعر الشراء"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm dir-ltr placeholder:text-slate-400"
+                  />
+                </div>
               </div>
+              {formUnit.purchase_price && formUnit.purchase_commission && (() => {
+                const price = parseInt(formUnit.purchase_price.replace(/\D/g, ""), 10) || 0;
+                const comm = parseInt(formUnit.purchase_commission.replace(/\D/g, ""), 10) || 0;
+                const effective = Math.max(0, price - comm);
+                if (comm <= 0) return null;
+                return <p className="text-xs text-slate-600">السعر الفعلي بعد العمولة: <span className="font-semibold dir-ltr text-teal-700">{formatNum(effective)} ر.س</span></p>;
+              })()}
               <div className="space-y-3">
                 <p className="text-sm font-semibold text-slate-700">طريقة الدفع</p>
                 <div className="flex flex-wrap gap-2">

@@ -59,6 +59,7 @@ interface HandoverInfo {
 /** بيانات البيع من جدول sales */
 interface SaleInfo {
   id: string;
+  sale_date?: string | null;
   payment_status: "completed" | "partial";
   sale_price?: number | null;
   remaining_payment?: number | null;
@@ -165,9 +166,9 @@ export default function OwnersPage() {
           unitIds.length > 0
             ? supabase
                 .from("sales")
-                .select("id, unit_id, payment_status, sale_price, remaining_payment, remaining_payment_due_date, remaining_payment_collected_at")
+                .select("id, unit_id, sale_date, payment_status, sale_price, remaining_payment, remaining_payment_due_date, remaining_payment_collected_at")
                 .in("unit_id", unitIds)
-            : { data: [] as { id: string; unit_id: string; payment_status: string; sale_price?: number | null; remaining_payment?: number | null; remaining_payment_due_date?: string | null; remaining_payment_collected_at?: string | null }[] },
+            : { data: [] as { id: string; unit_id: string; sale_date?: string | null; payment_status: string; sale_price?: number | null; remaining_payment?: number | null; remaining_payment_due_date?: string | null; remaining_payment_collected_at?: string | null }[] },
         ]);
 
         const handoverByUnit = new Map((handoversRes.data || []).map((h) => [h.unit_id, h as HandoverInfo]));
@@ -382,7 +383,7 @@ export default function OwnersPage() {
               <User className="w-5 h-5" />
               قائمة الملاك ({filteredUnits.length})
             </h2>
-            <p className="text-sm text-slate-500 mt-1">عرض تفاصيل ملاك العمارة</p>
+            <p className="text-sm text-slate-500 mt-1">عرض تفاصيل الملاك</p>
           </div>
 
           {loading ? (
@@ -622,8 +623,8 @@ export default function OwnersPage() {
                 <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
                   <span className="text-slate-600 shrink-0">
                     {(viewOwnerUnit.sale?.sale_price != null || viewOwnerUnit.transfer_check_amount != null)
-                      ? `صورة الشيك (${Number(viewOwnerUnit.sale?.sale_price ?? viewOwnerUnit.transfer_check_amount).toLocaleString("en")} ر.س)`
-                      : "صورة الشيك"}
+                      ? `مبلغ الشيك (${Number(viewOwnerUnit.sale?.sale_price ?? viewOwnerUnit.transfer_check_amount).toLocaleString("en")} ر.س)`
+                      : "مبلغ الشيك"}
                   </span>
                   <a
                     href={viewOwnerUnit.transfer_check_image_url}
@@ -668,15 +669,18 @@ export default function OwnersPage() {
               <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
                 <span className="text-slate-600 shrink-0">تاريخ الإفراغ</span>
                 <span className="font-medium text-slate-800 text-left dir-ltr">
-                  {viewOwnerUnit.handover?.handover_date
-                    ? (() => {
-                        const d = new Date(viewOwnerUnit.handover!.handover_date);
-                        const day = String(d.getDate()).padStart(2, "0");
-                        const month = String(d.getMonth() + 1).padStart(2, "0");
-                        const year = d.getFullYear();
-                        return `${day}/${month}/${year}`;
-                      })()
-                    : "—"}
+                  {(() => {
+                    const transferDate = viewOwnerUnit.sale?.sale_date;
+                    const fallbackHandover = viewOwnerUnit.handover?.handover_date;
+                    const fallbackCollected = viewOwnerUnit.sale?.remaining_payment_collected_at;
+                    const dateToShow = transferDate || fallbackHandover || fallbackCollected;
+                    if (!dateToShow) return "—";
+                    const d = new Date(dateToShow);
+                    const day = String(d.getDate()).padStart(2, "0");
+                    const month = String(d.getMonth() + 1).padStart(2, "0");
+                    const year = d.getFullYear();
+                    return `${day}/${month}/${year}`;
+                  })()}
                 </span>
               </div>
               <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">

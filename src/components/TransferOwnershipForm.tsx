@@ -537,6 +537,10 @@ export default function TransferOwnershipForm({
           </div>
         )}
 
+        {form.payment_methods.includes("cash") && form.payment_methods.includes("transfer") && (
+          <div className="border-t border-slate-200/70 my-1" role="separator" />
+        )}
+
         {form.payment_methods.includes("transfer") && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
@@ -574,6 +578,10 @@ export default function TransferOwnershipForm({
               />
             </div>
           </div>
+        )}
+
+        {form.payment_methods.includes("transfer") && form.payment_methods.includes("certified_check") && (
+          <div className="border-t border-slate-200/70 my-1" role="separator" />
         )}
 
         {form.payment_methods.includes("certified_check") && (

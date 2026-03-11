@@ -888,7 +888,9 @@ export default function SalesPage() {
                   <p>لا توجد وحدات غير مباعة في هذه العمارة</p>
                 </div>
               ) : (
-                <div className="rounded-xl border border-slate-200 overflow-hidden">
+                <>
+                  <p className="text-sm font-medium text-slate-600 mb-2">الوحدات المتاحة</p>
+                  <div className="rounded-xl border border-slate-200 overflow-hidden">
                   <table className="w-full text-center border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200">
@@ -921,6 +923,7 @@ export default function SalesPage() {
             </tbody>
           </table>
                 </div>
+                </>
               )}
             </div>
           </section>
@@ -954,9 +957,9 @@ export default function SalesPage() {
                         setTimeout(() => { w.focus(); w.print(); w.close(); }, 300);
                       };
                     }}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 transition-colors"
                   >
-                    <Printer className="w-4 h-4" />
+                    <Printer className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
                     طباعة
                   </button>
                   <button type="button" onClick={() => setSelectedSale(null)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500" aria-label="إغلاق">
