@@ -110,6 +110,10 @@ export default function OwnersPage() {
   const [viewOwnerUnit, setViewOwnerUnit] = useState<OwnerUnit | null>(null);
   const [associationModalUnit, setAssociationModalUnit] = useState<OwnerUnit | null>(null);
   const [associationSaving, setAssociationSaving] = useState(false);
+  const [ownersPage, setOwnersPage] = useState(1);
+  const [ownersPageSize, setOwnersPageSize] = useState(10);
+
+  const OWNERS_PAGE_SIZES = [10, 15, 25, 50, 100] as const;
 
   useEffect(() => {
     if (!ready) return;
@@ -224,6 +228,16 @@ export default function OwnersPage() {
     return list;
   }, [ownerUnits, searchTerm, buildingFilter, handoverFilter, paymentFilter]);
 
+  const ownersTotalPages = Math.max(1, Math.ceil(filteredUnits.length / ownersPageSize));
+  const ownersPaginated = useMemo(
+    () => filteredUnits.slice((ownersPage - 1) * ownersPageSize, ownersPage * ownersPageSize),
+    [filteredUnits, ownersPage, ownersPageSize]
+  );
+
+  useEffect(() => {
+    if (ownersPage > ownersTotalPages && ownersTotalPages >= 1) setOwnersPage(1);
+  }, [ownersPage, ownersTotalPages]);
+
   const handleRegisterInAssociation = async () => {
     const unit = associationModalUnit;
     if (!unit?.building_id) return;
@@ -337,7 +351,7 @@ export default function OwnersPage() {
               <select
                 value={buildingFilter}
                 onChange={(e) => setBuildingFilter(e.target.value)}
-                className="w-full appearance-none pr-10 pl-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+                className="w-full appearance-none pr-10 pl-10 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
               >
                 <option value="all">جميع العماير</option>
                 {buildings.map((b) => (
@@ -352,12 +366,12 @@ export default function OwnersPage() {
               <select
                 value={handoverFilter}
                 onChange={(e) => setHandoverFilter(e.target.value as typeof handoverFilter)}
-                className="w-full appearance-none pr-10 pl-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+                className="w-full appearance-none pr-4 pl-10 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
               >
                 <option value="all">الاستلام: الكل</option>
                 <option value="completed">تم الاستلام</option>
-                <option value="draft">مسودة استلام</option>
-                <option value="none">لم يتم الاستلام</option>
+                <option value="draft">مسودة</option>
+                <option value="none">لم يُستلم</option>
               </select>
               <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
             </div>
@@ -365,7 +379,7 @@ export default function OwnersPage() {
               <select
                 value={paymentFilter}
                 onChange={(e) => setPaymentFilter(e.target.value as typeof paymentFilter)}
-                className="w-full appearance-none pr-10 pl-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+                className="w-full appearance-none pr-4 pl-10 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
               >
                 <option value="all">الدفع: الكل</option>
                 <option value="completed">دفعة مكتملة</option>
@@ -397,6 +411,7 @@ export default function OwnersPage() {
               <p className="text-sm mt-1">ستظهر هنا عند وجود وحدات بحالة «مباعة» مع بيانات المالك</p>
             </div>
           ) : (
+            <>
             <div className="overflow-x-auto">
               <table className="w-full text-center border-collapse">
                 <thead>
@@ -411,7 +426,7 @@ export default function OwnersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredUnits.map((unit) => (
+                  {ownersPaginated.map((unit) => (
                     <tr key={unit.id} className="border-b border-slate-100 hover:bg-teal-50/50 transition">
                       <td className="p-2 text-slate-800 font-medium align-middle text-sm">{unit.owner_name || unit.previous_owner_name || "—"}</td>
                       <td className="p-2 text-slate-700 align-middle dir-ltr font-mono text-sm font-medium">{unit.owner_phone || "—"}</td>
@@ -450,6 +465,50 @@ export default function OwnersPage() {
                 </tbody>
               </table>
             </div>
+            {filteredUnits.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                  <span>عرض</span>
+                  <select
+                    value={ownersPageSize}
+                    onChange={(e) => {
+                      setOwnersPageSize(Number(e.target.value));
+                      setOwnersPage(1);
+                    }}
+                    className="rounded-2xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-0 transition-all duration-200"
+                  >
+                    {OWNERS_PAGE_SIZES.map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                  <span className="font-mono">
+                    {((ownersPage - 1) * ownersPageSize + 1).toLocaleString("en")} - {Math.min(ownersPage * ownersPageSize, filteredUnits.length).toLocaleString("en")}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setOwnersPage((p) => Math.max(1, p - 1))}
+                    disabled={ownersPage <= 1}
+                    className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm focus:outline-none focus:ring-0"
+                  >
+                    السابق
+                  </button>
+                  <span className="px-2 py-1.5 text-sm text-slate-600 font-mono">
+                    {ownersPage.toLocaleString("en")} / {ownersTotalPages.toLocaleString("en")}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setOwnersPage((p) => Math.min(ownersTotalPages, p + 1))}
+                    disabled={ownersPage >= ownersTotalPages}
+                    className="min-w-[2.75rem] py-2 px-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm focus:outline-none focus:ring-0"
+                  >
+                    التالي
+                  </button>
+                </div>
+              </div>
+            )}
+            </>
           )}
         </section>
       </div>

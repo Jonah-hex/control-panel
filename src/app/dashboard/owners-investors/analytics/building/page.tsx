@@ -374,14 +374,14 @@ export default function BuildingAnalyticsPage() {
                 <span className="text-sm font-semibold text-slate-700">الفلاتر والبحث</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                <div className="relative">
+                <div className="relative lg:col-span-2">
                   <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
                     placeholder="بحث باسم المستثمر..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pr-10 pl-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                    className="w-full h-[46px] pr-10 pl-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
                   />
                 </div>
                 <select
@@ -403,11 +403,11 @@ export default function BuildingAnalyticsPage() {
                   <option value="resold">مُخالص</option>
                   <option value="under_construction">قائم</option>
                 </select>
-                <div className="lg:col-span-2 space-y-2">
+                <div className="space-y-2 min-w-0">
                   <select
                     value={dateRangePreset}
                     onChange={(e) => applyDateRangePreset(e.target.value as DateRangePreset)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-white"
+                    className="w-full min-w-0 px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-white"
                   >
                     <option value="all">كل المدة</option>
                     <option value="today">اليوم</option>

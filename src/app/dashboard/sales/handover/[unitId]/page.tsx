@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
 import { showToast } from "@/app/dashboard/buildings/details/toast";
+import { phoneDigitsOnly } from "@/lib/validation-utils";
 import {
   ArrowRight,
   Building2,
@@ -384,10 +385,12 @@ export default function UnitHandoverPage() {
                   <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1"><Phone className="w-3.5 h-3.5" /> جوال المستلم</label>
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
                     value={receivedByPhone}
-                    onChange={(e) => setReceivedByPhone(e.target.value)}
-                    placeholder="05xxxxxxxx"
+                    onChange={(e) => setReceivedByPhone(phoneDigitsOnly(e.target.value))}
                     className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 dir-ltr"
+                    placeholder="05xxxxxxxx"
                   />
                 </div>
               </div>

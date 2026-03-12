@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS dashboard_appointments (
   owner_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   scheduled_at TIMESTAMPTZ NOT NULL,
-  type TEXT NOT NULL DEFAULT 'other' CHECK (type IN ('viewing', 'meeting', 'maintenance', 'marketing', 'unit_handover', 'contract_signing', 'complaint', 'owner_meeting', 'document_delivery', 'unit_inspection', 'other')),
+  type TEXT NOT NULL DEFAULT 'other' CHECK (type IN ('handover_appointment', 'inspector_viewing', 'engineering_review', 'unit_delivery', 'viewing', 'maintenance', 'marketing', 'contract_signing', 'other')),
   related_task_id UUID REFERENCES public.dashboard_tasks(id) ON DELETE SET NULL,
   building_id UUID REFERENCES public.buildings(id) ON DELETE SET NULL,
   notes TEXT,

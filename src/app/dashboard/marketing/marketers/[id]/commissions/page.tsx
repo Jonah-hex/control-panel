@@ -5,8 +5,16 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
-import { ChevronLeft, LayoutDashboard } from "lucide-react";
+import { ChevronLeft, LayoutDashboard, User, Phone, Mail, Building2, FileText } from "lucide-react";
 import { RiyalIcon } from "@/components/icons/RiyalIcon";
+
+interface MarketerInfo {
+  name: string;
+  phone: string | null;
+  email: string | null;
+  company: string | null;
+  notes: string | null;
+}
 
 const RIYAL = "ر.س";
 
@@ -24,7 +32,7 @@ export default function MarketerCommissionsPage() {
   const router = useRouter();
   const marketerId = params?.id as string | undefined;
   const { can, ready, effectiveOwnerId } = useDashboardAuth();
-  const [marketerName, setMarketerName] = useState<string>("");
+  const [marketer, setMarketer] = useState<MarketerInfo | null>(null);
   const [rows, setRows] = useState<CommissionRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,11 +44,12 @@ export default function MarketerCommissionsPage() {
     try {
       const { data: marketerData } = await supabase
         .from("reservation_marketers")
-        .select("name")
+        .select("name, phone, email, company, notes")
         .eq("id", marketerId)
         .eq("owner_id", effectiveOwnerId)
         .maybeSingle();
-      setMarketerName((marketerData as { name?: string } | null)?.name ?? "—");
+      const m = marketerData as { name?: string; phone?: string | null; email?: string | null; company?: string | null; notes?: string | null } | null;
+      setMarketer(m ? { name: m.name ?? "—", phone: m.phone ?? null, email: m.email ?? null, company: m.company ?? null, notes: m.notes ?? null } : null);
 
       const { data: resData } = await supabase
         .from("reservations")
@@ -166,8 +175,7 @@ export default function MarketerCommissionsPage() {
                 <RiyalIcon className="w-6 h-6" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-slate-800">سجل عمولات المسوق</h1>
-                <p className="text-sm text-slate-500 mt-0.5">{marketerName}</p>
+                <h1 className="text-xl font-bold text-slate-800">سجل المسوق</h1>
               </div>
             </div>
           </div>
@@ -180,6 +188,73 @@ export default function MarketerCommissionsPage() {
           </Link>
         </header>
 
+        {/* بطاقة بيانات المسوق */}
+        {marketer && (
+          <section className="rounded-2xl border border-slate-200 bg-white shadow-md overflow-hidden mb-6">
+            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/70">
+              <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <User className="w-4 h-4 text-amber-600" />
+                بيانات المسوق
+              </p>
+            </div>
+            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                  <User className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">الاسم</p>
+                  <p className="text-sm font-medium text-slate-800">{marketer.name}</p>
+                </div>
+              </div>
+              {marketer.phone && (
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                    <Phone className="w-5 h-5 text-slate-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">الجوال</p>
+                    <p className="text-sm font-medium text-slate-800 dir-ltr">{marketer.phone}</p>
+                  </div>
+                </div>
+              )}
+              {marketer.email && (
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                    <Mail className="w-5 h-5 text-slate-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-500">الإيميل</p>
+                    <p className="text-sm font-medium text-slate-800 truncate dir-ltr" title={marketer.email}>{marketer.email}</p>
+                  </div>
+                </div>
+              )}
+              {marketer.company && (
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                    <Building2 className="w-5 h-5 text-slate-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">المؤسسة</p>
+                    <p className="text-sm font-medium text-slate-800">{marketer.company}</p>
+                  </div>
+                </div>
+              )}
+              {marketer.notes && (
+                <div className="flex items-start gap-3 sm:col-span-2 lg:col-span-4">
+                  <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                    <FileText className="w-5 h-5 text-slate-600" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-slate-500 mb-0.5">ملاحظات</p>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{marketer.notes}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         <section className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 shadow-lg overflow-hidden transition-all duration-300">
           <div className="px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-amber-50/80 to-white flex items-center justify-between flex-wrap gap-2">
             <p className="text-sm font-semibold text-slate-800">عمولات المبيعات المكتملة</p>
@@ -191,7 +266,7 @@ export default function MarketerCommissionsPage() {
           </div>
 
           {loading ? (
-            <div className="px-5 py-12 text-center text-slate-500">جاري تحميل سجل العمولات...</div>
+            <div className="px-5 py-12 text-center text-slate-500">جاري التحميل...</div>
           ) : rows.length === 0 ? (
             <div className="px-5 py-12 text-center text-slate-500">لا توجد عمولات مسجّلة لهذا المسوق.</div>
           ) : (

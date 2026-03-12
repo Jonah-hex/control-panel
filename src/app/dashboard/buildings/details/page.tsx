@@ -1327,7 +1327,7 @@ function DetailsContent() {
                       <div className="rounded-xl bg-white/90 border border-amber-100 px-4 py-2 shadow-sm">
                         <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-1">رقم الجوال</p>
                         {isEditingGuardCard ? (
-                          <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-amber-500 rounded-none" type="tel" inputMode="numeric" maxLength={10} value={guardEdit.guard_phone ?? ''} onChange={e => setGuardEdit({ ...guardEdit, guard_phone: phoneDigitsOnly(e.target.value) })} />
+                          <input className="w-full bg-transparent border-0 border-b border-dashed border-gray-300 text-gray-800 font-medium text-sm py-0.5 focus:outline-none focus:ring-0 focus:border-amber-500 rounded-none" type="tel" inputMode="numeric" maxLength={10} value={guardEdit.guard_phone ?? ''} onChange={e => setGuardEdit({ ...guardEdit, guard_phone: phoneDigitsOnly(e.target.value) })} placeholder="05xxxxxxxx" />
                         ) : (
                           <a href={building.guard_phone ? `tel:${building.guard_phone}` : '#'} className="text-gray-800 font-medium hover:text-amber-600 transition flex items-center gap-2">
                             {building.guard_phone || '—'}

@@ -13,21 +13,23 @@ import {
   Trash2,
   X,
   CheckCircle,
+  Eye,
+  FileText,
+  User,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
+import { showToast } from "@/app/dashboard/buildings/details/toast";
 
 type AppointmentType =
+  | "handover_appointment"
+  | "inspector_viewing"
+  | "engineering_review"
+  | "unit_delivery"
   | "viewing"
-  | "meeting"
   | "maintenance"
   | "marketing"
-  | "unit_handover"
   | "contract_signing"
-  | "complaint"
-  | "owner_meeting"
-  | "document_delivery"
-  | "unit_inspection"
   | "other";
 type AppointmentStatus = "scheduled" | "completed" | "cancelled" | "no_show";
 
@@ -41,20 +43,20 @@ interface Appointment {
   notes: string | null;
   status: AppointmentStatus;
   created_at: string;
+  created_by?: string | null;
+  created_by_name?: string | null;
   buildings?: { id: string; name: string }[] | null;
 }
 
 const TYPE_LABELS: Record<AppointmentType, string> = {
+  handover_appointment: "موعد افراغ",
+  inspector_viewing: "معاينة فاحص",
+  engineering_review: "مراجعه مكتب هندسي",
+  unit_delivery: "تسليم وحدة",
   viewing: "معاينة",
-  meeting: "اجتماع",
   maintenance: "صيانة",
   marketing: "تسويق",
-  unit_handover: "تسليم مفاتيح",
   contract_signing: "توقيع عقد",
-  complaint: "شكوى",
-  owner_meeting: "اجتماع ملاك",
-  document_delivery: "تسليم مستندات",
-  unit_inspection: "معاينة وحدة",
   other: "أخرى",
 };
 
@@ -68,7 +70,7 @@ const STATUS_LABELS: Record<AppointmentStatus, string> = {
 export default function AppointmentsPage() {
   const router = useRouter();
   const supabase = createClient();
-  const { can, ready, effectiveOwnerId } = useDashboardAuth();
+  const { can, ready, effectiveOwnerId, currentUserDisplayName } = useDashboardAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [buildings, setBuildings] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +86,7 @@ export default function AppointmentsPage() {
     notes: "",
   });
   const [saving, setSaving] = useState(false);
+  const [viewingAppointment, setViewingAppointment] = useState<Appointment | null>(null);
 
   const canEdit = can("marketing_edit");
 
@@ -93,7 +96,7 @@ export default function AppointmentsPage() {
     const { data, error } = await supabase
       .from("dashboard_appointments")
       .select(`
-        id, owner_id, title, scheduled_at, type, building_id, notes, status, created_at,
+        id, owner_id, title, scheduled_at, type, building_id, notes, status, created_at, created_by, created_by_name,
         buildings ( id, name )
       `)
       .eq("owner_id", effectiveOwnerId)
@@ -170,7 +173,10 @@ export default function AppointmentsPage() {
   };
 
   const saveAppointment = async () => {
-    if (!effectiveOwnerId || !form.title.trim()) return;
+    if (!effectiveOwnerId || !form.title.trim()) {
+      showToast("أدخل عنوان الموعد", "error");
+      return;
+    }
     const scheduledAt = `${form.scheduled_at}T${form.scheduled_time}:00`;
     setSaving(true);
     if (editingId) {
@@ -184,9 +190,15 @@ export default function AppointmentsPage() {
           notes: form.notes.trim() || null,
         })
         .eq("id", editingId);
-      if (!error) fetchAppointments();
       setSaving(false);
+      if (error) {
+        showToast(error.message || "فشل تحديث الموعد", "error");
+        return;
+      }
+      showToast("تم تحديث الموعد", "success");
+      fetchAppointments();
       setModalOpen(false);
+      setEditingId(null);
       return;
     }
     const { error } = await supabase.from("dashboard_appointments").insert({
@@ -198,12 +210,17 @@ export default function AppointmentsPage() {
       notes: form.notes.trim() || null,
       status: "scheduled",
       created_by: (await supabase.auth.getUser()).data.user?.id,
+      created_by_name: currentUserDisplayName?.trim() || null,
     });
     setSaving(false);
-    if (!error) {
-      fetchAppointments();
-      setModalOpen(false);
+    if (error) {
+      showToast(error.message || "فشل حفظ الموعد", "error");
+      return;
     }
+    showToast("تم حفظ الموعد", "success");
+    fetchAppointments();
+    setModalOpen(false);
+    setEditingId(null);
   };
 
   const setStatus = async (id: string, status: AppointmentStatus) => {
@@ -293,28 +310,32 @@ export default function AppointmentsPage() {
               {filtered.map((a) => (
                 <li
                   key={a.id}
-                  className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 hover:bg-gray-50/50 transition"
+                  className="group flex flex-col sm:flex-row sm:items-center gap-3 p-4 hover:bg-gray-50/50 transition"
                 >
-                  <div className="flex items-center gap-4 flex-1">
+                  <button
+                    type="button"
+                    onClick={() => setViewingAppointment(a)}
+                    className="flex items-center gap-4 flex-1 min-w-0 text-right rounded-xl hover:bg-blue-50/50 transition-colors -m-2 p-2 sm:-m-1 sm:p-1"
+                  >
                     <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 flex flex-col items-center justify-center text-white font-bold text-sm shrink-0">
                       <span>{new Date(a.scheduled_at).getDate()}</span>
                       <span className="text-xs opacity-90">
                         {new Date(a.scheduled_at).toLocaleDateString("en-GB", { month: "short" })}
                       </span>
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <h3 className="font-semibold text-gray-800">{a.title}</h3>
                       <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5">
-                        <Clock className="w-3 h-3" />
+                        <Clock className="w-3 h-3 shrink-0" />
                         {formatTime(a.scheduled_at)} · {formatDate(a.scheduled_at)}
                       </p>
                       <div className="flex flex-wrap gap-2 mt-2">
                         <span className="px-2 py-0.5 rounded-lg bg-blue-100 text-blue-800 text-xs font-medium">
-                          {TYPE_LABELS[a.type]}
+                          {TYPE_LABELS[a.type as AppointmentType] ?? "أخرى"}
                         </span>
                         {a.buildings?.[0]?.name && (
                           <span className="flex items-center gap-1 text-xs text-gray-500">
-                            <Building2 className="w-3 h-3" />
+                            <Building2 className="w-3 h-3 shrink-0" />
                             {a.buildings[0].name}
                           </span>
                         )}
@@ -323,9 +344,10 @@ export default function AppointmentsPage() {
                         </span>
                       </div>
                     </div>
-                  </div>
+                    <Eye className="w-5 h-5 text-slate-400 shrink-0 ms-auto opacity-60 group-hover:opacity-100 transition-opacity" aria-hidden />
+                  </button>
                   {canEdit && (
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                       {a.status === "scheduled" && (
                         <>
                           <button
@@ -370,6 +392,117 @@ export default function AppointmentsPage() {
           )}
         </div>
       </div>
+
+      {/* بطاقة عرض تفاصيل الموعد */}
+      {viewingAppointment && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => setViewingAppointment(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="appointment-detail-title"
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto overflow-x-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex items-center justify-between rounded-t-2xl z-10">
+              <h2 id="appointment-detail-title" className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-blue-600" />
+                تفاصيل الموعد
+              </h2>
+              <button
+                type="button"
+                onClick={() => setViewingAppointment(null)}
+                className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
+                aria-label="إغلاق"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-5">
+              <div className="flex items-start gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 flex flex-col items-center justify-center text-white font-bold text-sm shrink-0">
+                  <span className="text-xl leading-tight">{new Date(viewingAppointment.scheduled_at).getDate()}</span>
+                  <span className="text-xs opacity-90">
+                    {new Date(viewingAppointment.scheduled_at).toLocaleDateString("en-GB", { month: "short" })}
+                  </span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-bold text-gray-800 leading-snug">{viewingAppointment.title}</h3>
+                  <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-1">
+                    <Clock className="w-4 h-4 shrink-0" />
+                    {formatTime(viewingAppointment.scheduled_at)} · {formatDate(viewingAppointment.scheduled_at)}
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <span className="px-2.5 py-1 rounded-lg bg-blue-100 text-blue-800 text-xs font-medium">
+                      {TYPE_LABELS[viewingAppointment.type] ?? "أخرى"}
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-medium">
+                      {STATUS_LABELS[viewingAppointment.status]}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {viewingAppointment.buildings?.[0]?.name && (
+                <div className="flex items-center gap-3 py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <Building2 className="w-5 h-5 text-slate-500 shrink-0" />
+                  <span className="text-sm font-medium text-slate-800">{viewingAppointment.buildings[0].name}</span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-100">
+                <User className="w-5 h-5 text-slate-500 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs text-slate-500 mb-0.5">منشئ الموعد</p>
+                  <p className="text-sm font-medium text-slate-800">
+                    {viewingAppointment.created_by_name && viewingAppointment.created_by_name.trim()
+                      ? viewingAppointment.created_by_name.trim()
+                      : "—"}
+                  </p>
+                </div>
+              </div>
+
+              {viewingAppointment.notes && viewingAppointment.notes.trim() && (
+                <div className="rounded-xl border border-slate-100 bg-amber-50/50 p-4">
+                  <div className="flex items-center gap-2 text-amber-800 font-medium text-sm mb-2">
+                    <FileText className="w-4 h-4 shrink-0" />
+                    ملاحظات
+                  </div>
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{viewingAppointment.notes.trim()}</p>
+                </div>
+              )}
+
+              {(!viewingAppointment.notes || !viewingAppointment.notes.trim()) && (
+                <p className="text-xs text-slate-400 py-1">لا توجد ملاحظات</p>
+              )}
+            </div>
+            <div className="sticky bottom-0 bg-white border-t border-slate-100 px-5 py-4 flex gap-3 rounded-b-2xl">
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewingAppointment(null);
+                    openEdit(viewingAppointment);
+                  }}
+                  className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 font-medium text-sm hover:bg-blue-100 transition"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  تعديل الموعد
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setViewingAppointment(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 font-medium text-sm hover:bg-slate-100 transition"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">

@@ -575,34 +575,37 @@ export default function MarketingReportsPage() {
         <header className="relative rounded-2xl overflow-hidden mb-8 shadow-lg border border-gray-200/90 bg-gradient-to-br from-white to-gray-50 print:shadow-none print:border print:mb-4">
           <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-600 opacity-10 print:opacity-0" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_70%_0%,rgba(245,158,11,0.08),transparent)] print:opacity-0" />
-          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-4 sm:px-5 sm:py-4">
-            <div className="flex items-center gap-3 min-w-0">
+          <div className="relative flex flex-col gap-4 px-4 py-4 sm:px-5 sm:py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+            {/* العنوان والوصف — عرض ثابت على الشاشات المتوسطة فما فوق حتى لا يزاحم الأزرار */}
+            <div className="flex items-start sm:items-center gap-3 min-w-0 sm:max-w-[55%]">
               <div className="flex-shrink-0 w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/25 ring-1 ring-white/70 print:shadow-none">
                 <LineChart className="w-5 h-5 text-white" />
               </div>
               <div className="min-w-0">
                 <h1 className="text-lg sm:text-xl font-bold text-gray-800 tracking-tight leading-tight">تقارير التسويق والمبيعات</h1>
-                <p className="text-xs text-gray-500 mt-0.5">تحليل خاص بقسم التسويق والمبيعات فقط: حجوزات، مبيعات، عرابين، عمولات المسوقين، صافي الدخل — لا يشمل تحليل الملاك أو المستثمرين</p>
+                <p className="text-xs text-gray-500 mt-0.5">تقارير تسويق ومبيعات — حجوزات، مبيعات، عمولات</p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2 flex-shrink-0 print:hidden">
+            {/* الأزرار — تبقى في صف واحد أو تلف بشكل واضح */}
+            <div className="flex flex-wrap items-center justify-end gap-2 flex-shrink-0 print:hidden border-t border-slate-100 pt-3 sm:border-t-0 sm:pt-0">
               <Link
                 href="/dashboard/marketing"
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50"
+                className="inline-flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 whitespace-nowrap"
               >
-                <ChevronLeft className="w-4 h-4" />
-                إدارة التسويق والمبيعات
+                <ChevronLeft className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">إدارة التسويق والمبيعات</span>
+                <span className="sm:hidden">إدارة التسويق</span>
               </Link>
-              <Link href="/dashboard" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm hover:bg-slate-50">
-                <LayoutDashboard className="w-4 h-4" />
+              <Link href="/dashboard" className="inline-flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 whitespace-nowrap">
+                <LayoutDashboard className="w-4 h-4 shrink-0" />
                 لوحة التحكم
               </Link>
               <button
                 type="button"
                 onClick={handlePrint}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-medium hover:bg-amber-600"
+                className="inline-flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 whitespace-nowrap"
               >
-                <Printer className="w-4 h-4" />
+                <Printer className="w-4 h-4 shrink-0" />
                 طباعة
               </button>
             </div>
@@ -1229,7 +1232,7 @@ export default function MarketingReportsPage() {
                             <p className="text-xs text-slate-400 mt-1 dir-ltr">{pctCommission.toFixed(2)}% من إجمالي المبيعات</p>
                           </div>
                           <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50/60 p-4">
-                            <p className="text-xs font-medium text-emerald-700 mb-1">صافي الدخل الحالي</p>
+                            <p className="text-xs font-medium text-emerald-700 mb-1">صافي المبيعات الحالي</p>
                             <p className="text-xl font-bold text-emerald-800 dir-ltr">{formatMoney(netAfterCommission)} {RIYAL}</p>
                             <p className="text-xs text-slate-400 mt-1">صافي ما تم تحصيله فعليًا حتى الآن</p>
                           </div>

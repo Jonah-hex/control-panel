@@ -177,7 +177,11 @@ export default function MarketersPage() {
       return;
     }
     const phoneTrim = form.phone.trim();
-    if (phoneTrim && !isValidPhone10Digits(phoneTrim)) {
+    if (!phoneTrim) {
+      showToast("الرجاء إدخال جوال المسوق.", "error");
+      return;
+    }
+    if (!isValidPhone10Digits(phoneTrim)) {
       showToast("جوال المسوق يجب أن يكون 10 أرقام.", "error");
       return;
     }
@@ -185,7 +189,7 @@ export default function MarketersPage() {
     setSaving(true);
     const payload = {
       name: nameTrim,
-      phone: phoneTrim || null,
+      phone: phoneTrim,
       email: form.email?.trim() || null,
       company: form.company?.trim() || null,
       notes: form.notes?.trim() || null,
@@ -384,7 +388,7 @@ export default function MarketersPage() {
                           <Link
                             href={`/dashboard/marketing/marketers/${m.id}/commissions`}
                             className="p-1.5 rounded-md border border-amber-200 text-amber-600 hover:bg-amber-50 transition flex items-center justify-center"
-                            title="سجل العمولات"
+                            title="سجل المسوق"
                           >
                             <RiyalIcon className="w-4 h-4" />
                           </Link>
@@ -492,14 +496,16 @@ export default function MarketersPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">الجوال</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">الجوال *</label>
                 <input
                   type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  required
                   value={form.phone}
                   onChange={(e) => setForm((f) => ({ ...f, phone: phoneDigitsOnly(e.target.value) }))}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 dir-ltr"
                   placeholder="05xxxxxxxx"
-                  maxLength={10}
                 />
               </div>
               <div>
