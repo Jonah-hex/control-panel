@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { phoneDigitsOnly, isValidPhone10Digits } from "@/lib/validation-utils";
 import { showToast } from "@/app/dashboard/buildings/details/toast";
 import { formatReceiptNumberDisplay } from "@/lib/receipt-utils";
-import { ArrowRightLeft, Phone, FileText, X, Receipt } from "lucide-react";
+import { ArrowRightLeft, Phone, FileText, X, Receipt, FileUp } from "lucide-react";
 
 const DEEDS_BUCKET = "building-images";
 const TAX_EXEMPTION_PATH_PREFIX = "tax-exemption";
@@ -107,6 +107,14 @@ export default function TransferOwnershipForm({
   const [depositIncluded, setDepositIncluded] = useState<boolean | null>(null);
   const [depositRefundAccount, setDepositRefundAccount] = useState("");
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const checkImageInputRef = useRef<HTMLInputElement>(null);
+  const idImageInputRef = useRef<HTMLInputElement>(null);
+  const taxExemptionInputRef = useRef<HTMLInputElement>(null);
+
+  const attachmentFileBtn =
+    "w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200/80 bg-emerald-50/60 text-emerald-800 text-sm font-medium hover:bg-emerald-50/90 hover:border-emerald-300 transition-colors";
+  const attachmentFileBtnMuted =
+    "w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-100/80 text-slate-500 text-sm font-medium cursor-not-allowed";
 
   const fetchReservation = useCallback(async () => {
     const supabase = createClient();
@@ -184,7 +192,11 @@ export default function TransferOwnershipForm({
     if (!form.buyer_name.trim()) return;
     const phoneVal = (form.buyer_phone ?? "").trim();
     setPhoneError(null);
-    if (phoneVal && !isValidPhone10Digits(phoneVal)) {
+    if (!phoneVal) {
+      setPhoneError("رقم الجوال مطلوب (10 أرقام).");
+      return;
+    }
+    if (!isValidPhone10Digits(phoneVal)) {
       setPhoneError("رقم الجوال يجب أن يكون 10 أرقاماً.");
       return;
     }
@@ -426,9 +438,6 @@ export default function TransferOwnershipForm({
     }
   };
 
-  const fileInputClass =
-    "w-full border border-slate-200 rounded-xl px-4 py-2 text-sm file:mr-3 file:py-1.5 file:px-3 file:text-xs file:rounded-lg file:border file:border-slate-300/60 file:bg-white/40 file:backdrop-blur-sm file:text-slate-700 file:cursor-pointer hover:file:bg-white/60";
-
   return (
     <div className={compact ? "space-y-5" : "space-y-6"}>
       <div className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-l from-amber-50/80 to-slate-50/80 border border-amber-100/80">
@@ -451,19 +460,21 @@ export default function TransferOwnershipForm({
         <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">بيانات المشتري</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">اسم المشتري الجديد</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">اسم المشتري الجديد <span className="text-amber-600" aria-hidden>*</span></label>
           <input
             type="text"
             value={form.buyer_name}
             onChange={(e) => setForm((p) => ({ ...p, buyer_name: e.target.value }))}
             className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
             placeholder="اسم المشتري"
+            required
+            aria-required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
+          <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2 flex-wrap">
             <Phone className="w-4 h-4" />
-            رقم الجوال
+            رقم الجوال <span className="text-amber-600" aria-hidden>*</span>
           </label>
           <input
             type="tel"
@@ -474,8 +485,10 @@ export default function TransferOwnershipForm({
               setForm((p) => ({ ...p, buyer_phone: phoneDigitsOnly(e.target.value) }));
               setPhoneError(null);
             }}
-            className={`w-full border rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 ${phoneError ? "border-red-400 bg-red-50/50" : "border-slate-200"}`}
+            className={`w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 ${phoneError ? "!border-red-400 bg-red-50/50" : ""}`}
             placeholder="05xxxxxxxx"
+            required
+            aria-required
           />
           {phoneError && <p className="mt-1 text-sm text-red-600">{phoneError}</p>}
         </div>
@@ -494,8 +507,8 @@ export default function TransferOwnershipForm({
 
       <section>
         <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">طريقة الدفع</h4>
-      <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-4">
-        <label className="block text-sm font-semibold text-slate-800">طريقة الشراء</label>
+      <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
+        <label className="block text-sm font-semibold text-slate-900">طريقة الشراء <span className="text-amber-600" aria-hidden>*</span></label>
         <div className="flex flex-wrap gap-3">
           {(["cash", "transfer", "certified_check"] as const).map((method) => {
             const isChecked = form.payment_methods.includes(method);
@@ -507,6 +520,10 @@ export default function TransferOwnershipForm({
                   onChange={() => {
                     setForm((p) => {
                       const next = isChecked ? p.payment_methods.filter((m) => m !== method) : [...p.payment_methods, method];
+                      if (next.length === 0) {
+                        showToast("يجب الإبقاء على طريقة شراء واحدة على الأقل.", "error");
+                        return p;
+                      }
                       return { ...p, payment_methods: next };
                     });
                   }}
@@ -603,7 +620,32 @@ export default function TransferOwnershipForm({
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">إرفاق صورة الشيك</label>
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*" onChange={(e) => setCheckImageFile(e.target.files?.[0] || null)} className={fileInputClass} />
+                <input
+                  ref={checkImageInputRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) setCheckImageFile(f);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => checkImageInputRef.current?.click()}
+                  className={attachmentFileBtn}
+                >
+                  <FileUp className="w-4 h-4 shrink-0" aria-hidden />
+                  {checkImageFile
+                    ? checkImageFile.name
+                    : (unit as TransferUnit & { transfer_check_image_url?: string }).transfer_check_image_url
+                      ? "مرفق — تغيير"
+                      : "اختر ملف"}
+                </button>
+                {(checkImageFile || (unit as TransferUnit & { transfer_check_image_url?: string }).transfer_check_image_url) && (
+                  <p className="text-xs text-emerald-700 mt-1">{checkImageFile ? "سيتم رفع الملف عند الحفظ" : "مرفق محفوظ"}</p>
+                )}
               </div>
             </div>
             <div className="space-y-4">
@@ -773,11 +815,27 @@ export default function TransferOwnershipForm({
             <div className="space-y-3">
               <label className="block text-sm font-medium text-slate-700">صورة هوية العميل</label>
               <input
+                ref={idImageInputRef}
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
-                onChange={(e) => setIdImageFile(e.target.files?.[0] || null)}
-                className={`${fileInputClass} w-full max-w-full`}
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setIdImageFile(f);
+                  e.target.value = "";
+                }}
               />
+              <button type="button" onClick={() => idImageInputRef.current?.click()} className={attachmentFileBtn}>
+                <FileUp className="w-4 h-4 shrink-0" aria-hidden />
+                {idImageFile
+                  ? idImageFile.name
+                  : (unit as TransferUnit & { transfer_id_image_url?: string }).transfer_id_image_url
+                    ? "مرفق — تغيير"
+                    : "اختر ملف"}
+              </button>
+              {(idImageFile || (unit as TransferUnit & { transfer_id_image_url?: string }).transfer_id_image_url) && (
+                <p className="text-xs text-emerald-700 mt-1">{idImageFile ? "سيتم رفع الملف عند الحفظ" : "مرفق محفوظ"}</p>
+              )}
             </div>
             <div className="space-y-3">
               <label htmlFor="tax-exemption-cb" className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
@@ -791,14 +849,35 @@ export default function TransferOwnershipForm({
                 يوجد إعفاء ضريبي
               </label>
               {form.tax_exemption ? (
-                <input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
-                  onChange={(e) => setTaxExemptionFile(e.target.files?.[0] || null)}
-                  className={`${fileInputClass} w-full max-w-full`}
-                />
+                <>
+                  <input
+                    ref={taxExemptionInputRef}
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) setTaxExemptionFile(f);
+                      e.target.value = "";
+                    }}
+                  />
+                  <button type="button" onClick={() => taxExemptionInputRef.current?.click()} className={attachmentFileBtn}>
+                    <FileUp className="w-4 h-4 shrink-0" aria-hidden />
+                    {taxExemptionFile
+                      ? taxExemptionFile.name
+                      : unit.tax_exemption_file_url
+                        ? "مرفق — تغيير"
+                        : "اختر ملف"}
+                  </button>
+                  {(taxExemptionFile || unit.tax_exemption_file_url) && (
+                    <p className="text-xs text-emerald-700 mt-1">{taxExemptionFile ? "سيتم رفع الملف عند الحفظ" : "مرفق محفوظ"}</p>
+                  )}
+                </>
               ) : (
-                <div className="w-full rounded-xl border border-slate-200 px-4 py-2.5 flex items-center justify-center text-sm text-slate-500 bg-slate-50/50">لا يوجد إعفاء ضريبي</div>
+                <div className={attachmentFileBtnMuted} aria-disabled>
+                  <FileUp className="w-4 h-4 shrink-0 opacity-50" aria-hidden />
+                  لا يوجد إعفاء ضريبي
+                </div>
               )}
             </div>
           </div>
@@ -827,31 +906,50 @@ export default function TransferOwnershipForm({
       </div>
       </section>
 
-      <div className="flex flex-wrap gap-3 pt-2 border-t border-slate-100">
+      <div className="shrink-0 flex flex-wrap gap-3 -mx-6 px-6 py-4 mt-4 border-t border-amber-100/80 bg-amber-50/40 rounded-b-2xl">
         <button
           type="button"
-          onClick={() => form.buyer_name.trim() && !saving && setConfirmOpen(true)}
-          disabled={saving || !form.buyer_name.trim()}
-          className="px-5 py-2.5 bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-xl font-medium hover:from-amber-600 hover:to-amber-700 disabled:opacity-60 transition"
+          onClick={() =>
+            form.buyer_name.trim() &&
+            isValidPhone10Digits((form.buyer_phone ?? "").trim()) &&
+            !saving &&
+            setConfirmOpen(true)
+          }
+          disabled={
+            saving ||
+            !form.buyer_name.trim() ||
+            !isValidPhone10Digits((form.buyer_phone ?? "").trim())
+          }
+          className="flex-1 min-w-[10rem] py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-medium hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 shadow-sm"
         >
           {saving ? "جاري الحفظ..." : "حفظ — وتسجيل الوحدة مباعة"}
         </button>
-        <button type="button" onClick={onCancel} disabled={saving} className="px-5 py-2.5 bg-slate-200 text-slate-700 rounded-xl font-medium hover:bg-slate-300 disabled:opacity-60 transition">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+          className="px-4 py-2.5 border border-slate-200 bg-white rounded-xl font-medium hover:bg-slate-50 shadow-sm disabled:opacity-50"
+        >
           إلغاء
         </button>
       </div>
 
       {confirmOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-sm" onClick={() => setConfirmOpen(false)}>
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <p className="text-slate-700 text-center mb-6">
-              عملية نقل الملكية تعتبر نقل تام لمالك الوحدة، وتسجل حالة الوحدة <strong>مباعة بالنظام</strong>. هل تريد المتابعة؟
-            </p>
-            <div className="flex gap-3 justify-center">
-              <button onClick={() => { setConfirmOpen(false); handleSave(); }} disabled={saving} className="px-5 py-2.5 bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-xl font-medium hover:from-amber-600 hover:to-amber-700 disabled:opacity-60 transition">
+        <div className="dashboard-modal-overlay-z60 bg-slate-900/30" onClick={() => setConfirmOpen(false)}>
+          <div className="dashboard-modal-shell max-w-md w-full flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} dir="rtl">
+            <div className="shrink-0 px-6 pt-5 pb-3 border-b border-amber-100 bg-gradient-to-b from-amber-50/95 to-white rounded-t-2xl">
+              <h3 className="text-lg font-bold text-slate-800 text-center">تأكيد نقل الملكية</h3>
+            </div>
+            <div className="px-6 py-4 overflow-y-auto dashboard-modal-scroll dashboard-modal-scroll-gutter-auto max-h-[50vh]">
+              <p className="text-slate-700 text-center text-sm">
+                عملية نقل الملكية تعتبر نقل تام لمالك الوحدة، وتسجل حالة الوحدة <strong>مباعة بالنظام</strong>. هل تريد المتابعة؟
+              </p>
+            </div>
+            <div className="shrink-0 flex gap-3 justify-center px-6 py-4 border-t border-amber-100/80 bg-amber-50/30 rounded-b-2xl">
+              <button onClick={() => { setConfirmOpen(false); handleSave(); }} disabled={saving} className="flex-1 px-4 py-2.5 bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-xl font-medium hover:from-amber-600 hover:to-amber-700 disabled:opacity-60 shadow-sm">
                 تأكيد وإتمام النقل
               </button>
-              <button onClick={() => setConfirmOpen(false)} disabled={saving} className="px-5 py-2.5 bg-slate-200 text-slate-700 rounded-xl font-medium hover:bg-slate-300 disabled:opacity-60 transition">
+              <button onClick={() => setConfirmOpen(false)} disabled={saving} className="flex-1 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl font-medium hover:bg-slate-50 disabled:opacity-60 shadow-sm">
                 تراجع
               </button>
             </div>
@@ -860,30 +958,32 @@ export default function TransferOwnershipForm({
       )}
 
       {showReceiptModal && reservation && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" onClick={() => setShowReceiptModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-[420px] p-6" onClick={(e) => e.stopPropagation()} dir="rtl">
-            <div className="flex items-center justify-between mb-4">
+        <div className="dashboard-modal-overlay-z60" onClick={() => setShowReceiptModal(false)}>
+          <div className="dashboard-modal-shell max-w-[420px] w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} dir="rtl">
+            <div className="shrink-0 px-6 pt-5 pb-3 border-b border-slate-100 bg-gradient-to-b from-slate-50/95 to-white rounded-t-2xl flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                 <Receipt className="w-5 h-5" />
                 سند عربون حجز
               </h3>
-              <button type="button" onClick={() => setShowReceiptModal(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+              <button type="button" onClick={() => setShowReceiptModal(false)} className="p-2 rounded-xl hover:bg-slate-100">
                 <X className="w-5 h-5" />
               </button>
             </div>
+            <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll dashboard-modal-scroll-gutter-auto px-6 py-4">
             <div className="border-b-2 border-slate-700 pb-3 mb-4">
               <h1 className="text-xl font-bold text-slate-800">سند عربون حجز</h1>
             </div>
             <table className="w-full text-sm border-collapse">
               <tbody className="[&>tr]:border-b [&>tr]:border-slate-100">
                 <tr><td className="py-2 text-slate-500 w-32">رقم السند</td><td className="py-2 font-mono font-semibold">{formatReceiptNumberDisplay(reservation.receipt_number)}</td></tr>
-                <tr><td className="py-2 text-slate-500 w-32">تاريخ السند</td><td className="py-2">{reservation.receipt_date ? new Date(reservation.receipt_date + 'T12:00:00').toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}</td></tr>
+                <tr><td className="py-2 text-slate-500 w-32">تاريخ السند</td><td className="py-2 dir-ltr">{reservation.receipt_date ? new Date(reservation.receipt_date + 'T12:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}</td></tr>
                 <tr><td className="py-2 text-slate-500">الوحدة</td><td className="py-2">وحدة {unit.unit_number} — الدور {unit.floor}</td></tr>
                 <tr><td className="py-2 text-slate-500">العمارة</td><td className="py-2">{buildingName}</td></tr>
                 <tr><td className="py-2 text-slate-500">العميل</td><td className="py-2">{reservation.customer_name} — <span className="dir-ltr">{reservation.customer_phone}</span></td></tr>
                 <tr><td className="py-2 text-slate-500">مبلغ العربون</td><td className="py-2">{reservation.deposit_amount != null ? `${Number(reservation.deposit_amount).toLocaleString("en")} ر.س` : "—"}</td></tr>
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}

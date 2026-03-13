@@ -372,8 +372,8 @@ export default function BuildingsPage() {
       </div>
 
       {isDeleteModalOpen && buildingToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-gray-200">
+        <div className="dashboard-modal-overlay bg-black/40 backdrop-blur-[1px]">
+          <div className="dashboard-modal-shell w-full max-w-md">
             <div className="p-6">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center">

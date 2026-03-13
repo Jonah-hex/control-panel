@@ -47,6 +47,9 @@ A comprehensive full-stack property management system built with Next.js, React,
 - npm or yarn
 - Supabase project (with configured RLS policies)
 
+### Supabase — بيئة جديدة (ترحيل واحد)
+**لأي Supabase جديد:** بعد إنشاء الجداول الأساسية (`building_investors`, `unit_investments`, `dashboard_appointments` وغيرها حسب مشروعك)، نفّذ **مرة واحدة** الملف الموحّد: [`supabase_migrations/run_all_current_schema.sql`](supabase_migrations/run_all_current_schema.sql) في **SQL Editor** — لا حاجة لتشغيل باقي ملفات `supabase_migrations` واحداً واحداً إذا طبّقت هذا الملف كاملاً.
+
 ### Installation
 
 ```bash

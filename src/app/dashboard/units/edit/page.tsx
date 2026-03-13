@@ -259,7 +259,7 @@ function EditUnitPageContent() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {form.status === "sold" && (
             <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm font-medium">
-              الوحدة مباعة — العرض فقط، لا يمكن تعديل البيانات
+              الوحدة مباعة - للعرض فقط، لا يمكن تعديل البيانات
             </div>
           )}
           <div className="grid grid-cols-2 gap-4">

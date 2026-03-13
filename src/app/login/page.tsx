@@ -26,6 +26,15 @@ export default function LoginPage() {
   
   const router = useRouter()
   const supabase = createClient()
+  const [sessionExpired, setSessionExpired] = useState(false)
+
+  // انتهت الجلسة (refresh token غير صالح)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (new URLSearchParams(window.location.search).get('reason') === 'session_expired') {
+      setSessionExpired(true)
+    }
+  }, [])
 
   // تحقق من التخزين المؤقت عند التحميل (تذكرني)
   useEffect(() => {
@@ -228,6 +237,16 @@ export default function LoginPage() {
             <h1 className="text-3xl font-bold text-white mb-2">عماير Pro</h1>
             <p className="text-slate-400">أدخل إلى لوحة التحكم الخاصة بك</p>
           </div>
+
+          {/* انتهت الجلسة — سجّل دخول من جديد */}
+          {sessionExpired && (
+            <div className="mb-6 p-4 rounded-lg bg-amber-500/10 border border-amber-500/25 flex gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-amber-200 text-sm">
+                انتهت صلاحية الجلسة أو انقطعت. سجّل الدخول مرة أخرى (أحياناً يحدث بعد إغلاق المتصفح أو تسجيل الخروج من جهاز آخر).
+              </p>
+            </div>
+          )}
 
           {/* Error Alert */}
           {error && (

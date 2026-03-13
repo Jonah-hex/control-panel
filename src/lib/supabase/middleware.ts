@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { isInvalidSessionError } from '@/lib/supabase/auth-errors'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -29,7 +30,12 @@ export async function updateSession(request: NextRequest) {
 
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser()
+
+  if (authError && isInvalidSessionError(authError)) {
+    await supabase.auth.signOut()
+  }
 
   return supabaseResponse
 }

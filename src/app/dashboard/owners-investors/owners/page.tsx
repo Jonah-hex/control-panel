@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useDashboardAuth } from "@/hooks/useDashboardAuth";
 import { showToast } from "@/app/dashboard/buildings/details/toast";
+import { formatDateGregorian } from "@/lib/formatDateGregorian";
 
 /** عرض سعر البيع للمالك النهائي من sales عند التوفر (سياسة المسارين: docs/sales-and-investment-policy.md) */
 /** بيانات اتحاد الملاك في العمارة (مطابق لكارد تفاصيل العمارة) */
@@ -516,14 +517,14 @@ export default function OwnersPage() {
       {/* نافذة تفاصيل المالك */}
       {viewOwnerUnit && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+          className="dashboard-modal-overlay cursor-pointer"
           onClick={() => setViewOwnerUnit(null)}
           role="dialog"
           aria-modal="true"
           aria-labelledby="owner-modal-title"
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+            className="dashboard-modal-shell max-w-md w-full max-h-[90vh] overflow-y-auto overflow-x-hidden dashboard-modal-scroll cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between">
@@ -569,7 +570,7 @@ export default function OwnersPage() {
                   {viewOwnerUnit.sale?.remaining_payment_collected_at && (
                     <div className="flex justify-between items-center gap-3 py-1.5">
                       <span className="text-slate-600 shrink-0">تاريخ تحصيل المتبقي</span>
-                      <span className="font-medium text-slate-800 text-left">{new Date(viewOwnerUnit.sale.remaining_payment_collected_at).toLocaleDateString("ar-SA", { dateStyle: "medium" })}</span>
+                      <span className="font-medium text-slate-800 text-left dir-ltr">{formatDateGregorian(viewOwnerUnit.sale.remaining_payment_collected_at)}</span>
                     </div>
                   )}
                 </div>
@@ -650,7 +651,7 @@ export default function OwnersPage() {
                         <span className="text-slate-600 shrink-0">ضمان عقد المصاعد</span>
                         <span className="font-medium text-slate-800 text-left">
                           {months != null ? `${months} شهر` : "—"}
-                          {warrantyEndDate && ` · ينتهي ${new Date(warrantyEndDate).toLocaleDateString("ar-SA", { dateStyle: "short" })}`}
+                          {warrantyEndDate && ` · ينتهي ${formatDateGregorian(warrantyEndDate)}`}
                         </span>
                       </div>
                       {(warrantyExpired || warrantyExpiringSoon) && (
@@ -717,7 +718,7 @@ export default function OwnersPage() {
                     <span className="text-amber-700">
                       مبلغ متبقٍ: {(viewOwnerUnit.sale.remaining_payment ?? 0).toLocaleString("en")} ر.س
                       {viewOwnerUnit.sale?.remaining_payment_due_date && (
-                        <span className="block text-xs text-slate-500 mt-0.5">استحقاق: {new Date(viewOwnerUnit.sale.remaining_payment_due_date).toLocaleDateString("ar-SA")}</span>
+                        <span className="block text-xs text-slate-500 mt-0.5">استحقاق: <span className="dir-ltr inline-block">{formatDateGregorian(viewOwnerUnit.sale.remaining_payment_due_date)}</span></span>
                       )}
                     </span>
                   ) : (
@@ -833,59 +834,68 @@ export default function OwnersPage() {
         const currentCount = assoc.registeredUnitsCount ?? 0;
         return (
           <div
-            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+            className="dashboard-modal-overlay-z60 cursor-pointer"
             onClick={() => !associationSaving && setAssociationModalUnit(null)}
             role="dialog"
             aria-modal="true"
             aria-labelledby="association-modal-title"
           >
             <div
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6"
+              className="dashboard-modal-shell max-w-sm w-full max-h-[90vh] flex flex-col overflow-hidden cursor-default"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 id="association-modal-title" className="text-lg font-bold text-sky-800 flex items-center gap-2 mb-4">
-                <Users className="w-5 h-5" />
-                تسجيل في اتحاد الملاك
-              </h3>
+              <div className="shrink-0 px-6 pt-5 pb-3 border-b border-sky-100 bg-gradient-to-b from-sky-50/95 to-white rounded-t-2xl flex items-center justify-between gap-2">
+                <h3 id="association-modal-title" className="text-lg font-bold text-sky-800 flex items-center gap-2">
+                  <Users className="w-5 h-5 shrink-0" />
+                  تسجيل في اتحاد الملاك
+                </h3>
+                <button type="button" onClick={() => !associationSaving && setAssociationModalUnit(null)} className="p-2 rounded-xl hover:bg-sky-100 text-slate-600 shrink-0" aria-label="إغلاق">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll dashboard-modal-scroll-gutter-auto px-6 py-4">
               {!hasAssociation ? (
-                <>
-                  <p className="text-sm text-slate-600 mb-4">
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-600">
                     يجب تفعيل اتحاد الملاك للعمارة «{b?.name}» من تفاصيل العمارة أولاً، ثم تسجيل الوحدات.
                   </p>
                   <Link
                     href={`/dashboard/buildings/details?buildingId=${associationModalUnit.building_id}#card-association`}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 text-white text-sm font-medium hover:bg-sky-700"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 shadow-sm"
                   >
                     تفاصيل العمارة — اتحاد الملاك
                   </Link>
-                </>
+                </div>
               ) : (
-                <>
-                  <p className="text-sm text-slate-600 mb-2">
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-600">
                     تسجيل الوحدة <strong>{associationModalUnit.unit_number}</strong> (د{associationModalUnit.floor}) — {b?.name} في اتحاد الملاك.
                   </p>
-                  <p className="text-xs text-slate-500 mb-4">
+                  <p className="text-xs text-slate-500">
                     عدد الوحدات المسجلة حالياً: <strong>{currentCount}</strong> — سيصبح {currentCount + 1} بعد التسجيل.
                   </p>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={handleRegisterInAssociation}
-                      disabled={associationSaving}
-                      className="flex-1 px-4 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 disabled:opacity-60"
-                    >
-                      {associationSaving ? "جاري التسجيل..." : "تسجيل"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => !associationSaving && setAssociationModalUnit(null)}
-                      disabled={associationSaving}
-                      className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-60"
-                    >
-                      إلغاء
-                    </button>
-                  </div>
-                </>
+                </div>
+              )}
+              </div>
+              {hasAssociation && (
+              <div className="shrink-0 flex gap-2 px-6 py-4 border-t border-sky-100/80 bg-sky-50/30 rounded-b-2xl">
+                <button
+                  type="button"
+                  onClick={handleRegisterInAssociation}
+                  disabled={associationSaving}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 disabled:opacity-60 shadow-sm"
+                >
+                  {associationSaving ? "جاري التسجيل..." : "تسجيل"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => !associationSaving && setAssociationModalUnit(null)}
+                  disabled={associationSaving}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-60 shadow-sm"
+                >
+                  إلغاء
+                </button>
+              </div>
               )}
             </div>
           </div>

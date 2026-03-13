@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS dashboard_appointments (
   building_id UUID REFERENCES public.buildings(id) ON DELETE SET NULL,
   notes TEXT,
   status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'completed', 'cancelled', 'no_show')),
+  priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL

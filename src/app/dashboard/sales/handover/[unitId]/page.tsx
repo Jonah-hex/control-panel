@@ -9,6 +9,7 @@ import { showToast } from "@/app/dashboard/buildings/details/toast";
 import { phoneDigitsOnly } from "@/lib/validation-utils";
 import {
   ArrowRight,
+  Printer,
   Building2,
   ClipboardCheck,
   Home,
@@ -181,7 +182,7 @@ export default function UnitHandoverPage() {
           .eq("unit_id", unitId)
           .maybeSingle();
 
-        const today = new Date().toISOString().slice(0, 16);
+        const today = new Date().toISOString().slice(0, 10);
         setHandoverDate(today);
         setReceivedBy(resData?.customer_name || unitData.owner_name || "");
         setReceivedByPhone(resData?.customer_phone || unitData.owner_phone || "");
@@ -190,7 +191,7 @@ export default function UnitHandoverPage() {
           setExistingHandover({ id: handoverData.id, checklist: (handoverData.checklist as HandoverChecklist) || null });
           const c = (handoverData.checklist as HandoverChecklist) || {};
           setChecklist({ ...defaultChecklist(Number(unitData.rooms) || 1, Number(unitData.bathrooms) || 1), ...c });
-          if (handoverData.handover_date) setHandoverDate(new Date(handoverData.handover_date).toISOString().slice(0, 16));
+          if (handoverData.handover_date) setHandoverDate(new Date(handoverData.handover_date).toISOString().slice(0, 10));
           if (handoverData.received_by) setReceivedBy(String(handoverData.received_by));
           if (handoverData.received_by_phone) setReceivedByPhone(String(handoverData.received_by_phone));
           if (handoverData.notes) setNotes(String(handoverData.notes));
@@ -219,7 +220,9 @@ export default function UnitHandoverPage() {
         building_id: unit.building_id,
         sale_id: null,
         reservation_id: reservation?.id || null,
-        handover_date: handoverDate ? new Date(handoverDate).toISOString() : new Date().toISOString(),
+        handover_date: handoverDate
+          ? new Date(handoverDate + "T12:00:00.000Z").toISOString()
+          : new Date().toISOString(),
         delivered_by: "—",
         delivered_by_phone: null,
         received_by: receivedBy.trim() || "—",
@@ -311,34 +314,53 @@ export default function UnitHandoverPage() {
   const bathroomsCount = Math.max(1, Number(unit.bathrooms) || 1);
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-sky-50/40 p-4 sm:p-6 lg:p-8" dir="rtl">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+    <main
+      className="unit-handover-print-root min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-sky-50/40 p-4 sm:p-6 lg:p-8 print:p-0 print:bg-white"
+      dir="rtl"
+    >
+      <div className="unit-handover-print-inner max-w-4xl mx-auto print:max-w-none">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6 print:mb-4 print:hidden">
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard/sales"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 print:hidden"
+              title="العودة للمبيعات"
+              aria-label="العودة للمبيعات"
+              className="inline-flex items-center justify-center w-10 h-10 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 print:hidden shrink-0"
             >
-              <ArrowRight className="w-4 h-4" />
-              إدارة التسويق والمبيعات
+              <ArrowRight className="w-5 h-5" aria-hidden />
             </Link>
             <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-              <ClipboardCheck className="w-6 h-6 text-amber-600" />
+              <ClipboardCheck className="w-6 h-6 text-amber-600 print:hidden" />
               نموذج استلام الوحدة
             </h1>
           </div>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            title="طباعة النموذج"
+            aria-label="طباعة النموذج"
+            className="inline-flex items-center justify-center w-10 h-10 rounded-xl border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 print:hidden shadow-sm shrink-0"
+          >
+            <Printer className="w-5 h-5" aria-hidden />
+          </button>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-white">
-            <div className="flex flex-wrap items-center gap-4">
+        {/* عنوان طباعة فقط */}
+        <div className="unit-handover-print-title-print hidden print:block">
+          <p className="text-center text-base font-bold text-slate-900 tracking-tight print:pt-1 print:pb-2">نموذج استلام وحدة سكنية</p>
+          <p className="text-center text-[11px] text-slate-600 font-medium print:pb-3 print:border-b print:border-slate-300">هذا النموذج صادر رسميًا من النظام بموجب استلام الوحدة</p>
+        </div>
+
+        <div className="unit-handover-print-card bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden print:rounded-xl print:shadow-none print:border-slate-300">
+          <div className="unit-handover-print-banner p-6 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-white print:from-slate-100/80 print:to-white print:py-3 print:px-3 print:border-slate-200">
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm print:text-[11px]">
               <div className="flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-slate-500" />
+                <Building2 className="w-5 h-5 text-slate-500 print:hidden" />
                 <span className="font-semibold text-slate-800">{building?.name ?? "—"}</span>
               </div>
               <span className="text-slate-400">|</span>
               <div className="flex items-center gap-2">
-                <Home className="w-5 h-5 text-slate-500" />
+                <Home className="w-5 h-5 text-slate-500 print:hidden" />
                 <span className="font-semibold text-slate-800">الوحدة {unit.unit_number} — الدور {unit.floor}</span>
               </div>
               {unit.area > 0 && (
@@ -351,22 +373,27 @@ export default function UnitHandoverPage() {
           </div>
 
           <form
-            className="p-6 space-y-8"
-            onSubmit={(e) => { e.preventDefault(); handleSave(false); }}
+            className="unit-handover-print-form p-6 space-y-8 print:p-3 print:space-y-4 print:text-[10.5pt] print:leading-snug"
+            onSubmit={(e) => e.preventDefault()}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              const t = e.target as HTMLElement;
+              if (t.tagName === "TEXTAREA" || t.tagName === "BUTTON" || t.closest("button")) return;
+              e.preventDefault();
+            }}
           >
-            <section className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-4">
+            <section className="handover-print-keep-section rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-4 print:bg-white">
               <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
+                <Calendar className="w-4 h-4 print:hidden" />
                 تاريخ الإستلام
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">تاريخ الاستلام</label>
                   <input
-                    type="datetime-local"
+                    type="date"
                     value={handoverDate}
                     onChange={(e) => setHandoverDate(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                    className="handover-date-input w-[15.5rem] min-w-[14rem] max-w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                   />
                 </div>
               </div>
@@ -382,23 +409,26 @@ export default function UnitHandoverPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1"><Phone className="w-3.5 h-3.5" /> جوال المستلم</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
+                    <Phone className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                    جوال المستلم
+                  </label>
                   <input
                     type="tel"
                     inputMode="numeric"
                     maxLength={10}
                     value={receivedByPhone}
                     onChange={(e) => setReceivedByPhone(phoneDigitsOnly(e.target.value))}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 dir-ltr"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 dir-ltr text-right"
                     placeholder="05xxxxxxxx"
                   />
                 </div>
               </div>
             </section>
 
-            <section className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-4">
+            <section className="handover-print-keep-section rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-4 print:bg-white">
               <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                <Key className="w-4 h-4" />
+                <Key className="w-4 h-4 print:hidden" />
                 المفاتيح والعدادات
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -447,13 +477,13 @@ export default function UnitHandoverPage() {
               </div>
             </section>
 
-            <section className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-4">
-              <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                <DoorOpen className="w-4 h-4" />
+            <section className="handover-print-section-flow rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-4 print:bg-white">
+              <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2 print:border-b print:border-slate-300 print:pb-2 print:mb-2">
+                <DoorOpen className="w-4 h-4 print:hidden" />
                 حالة الغرف والمرافق
               </h2>
 
-              <div>
+              <div className="handover-print-subblock">
                 <label className="block text-sm font-medium text-slate-700 mb-2">الصالة</label>
                 <div className="flex flex-wrap gap-4 items-center">
                   <label className="inline-flex items-center gap-2">
@@ -475,7 +505,7 @@ export default function UnitHandoverPage() {
               </div>
 
               {Array.from({ length: roomsCount }, (_, i) => (
-                <div key={i}>
+                <div key={i} className="handover-print-subblock">
                   <label className="block text-sm font-medium text-slate-700 mb-2">غرفة النوم {roomsCount > 1 ? i + 1 : ""}</label>
                   <div className="flex flex-wrap gap-4 items-center">
                     <label className="inline-flex items-center gap-2">
@@ -497,7 +527,7 @@ export default function UnitHandoverPage() {
                 </div>
               ))}
 
-              <div>
+              <div className="handover-print-subblock">
                 <label className="block text-sm font-medium text-slate-700 mb-2">المطبخ</label>
                 <div className="flex flex-wrap gap-4 items-center">
                   <label className="inline-flex items-center gap-2">
@@ -519,7 +549,7 @@ export default function UnitHandoverPage() {
               </div>
 
               {Array.from({ length: bathroomsCount }, (_, i) => (
-                <div key={i}>
+                <div key={i} className="handover-print-subblock">
                   <label className="block text-sm font-medium text-slate-700 mb-2">دورة المياه {bathroomsCount > 1 ? i + 1 : ""}</label>
                   <div className="flex flex-wrap gap-4 items-center">
                     <label className="inline-flex items-center gap-2">
@@ -689,13 +719,13 @@ export default function UnitHandoverPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-1"><AlertCircle className="w-4 h-4" /> عيوب أو ملاحظات إضافية</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-1"><AlertCircle className="w-4 h-4 print:hidden" /> عيوب أو ملاحظات إضافية</label>
                 <textarea
                   value={checklist.defects ?? ""}
                   onChange={(e) => updateChecklist("defects", e.target.value)}
                   placeholder="أي عيوب أو ملاحظات أخرى..."
-                  rows={3}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500"
+                  rows={4}
+                  className="handover-print-defects-textarea w-full max-w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 box-border"
                 />
               </div>
             </section>
@@ -719,8 +749,9 @@ export default function UnitHandoverPage() {
                 {saving ? "جاري الحفظ..." : "حفظ وإكمال الاستلام"}
               </button>
               <button
-                type="submit"
+                type="button"
                 disabled={saving}
+                onClick={() => handleSave(false)}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium hover:bg-slate-50 disabled:opacity-60"
               >
                 حفظ كمسودة

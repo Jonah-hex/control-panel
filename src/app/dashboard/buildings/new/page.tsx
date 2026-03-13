@@ -2712,8 +2712,8 @@ export default function NewBuildingPage() {
 
       {/* Modal: تطبيق الدور الأول على المكرر */}
       {showApplyRepeaterModal && applyRepeaterModalInfo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all animate-scaleIn">
+        <div className="dashboard-modal-overlay bg-black/60 z-50 animate-fadeIn">
+          <div className="dashboard-modal-shell max-w-md w-full overflow-hidden rounded-3xl shadow-2xl transform transition-all animate-scaleIn">
             <div className="bg-gradient-to-r from-emerald-500/90 to-teal-500/90 px-6 py-5">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
@@ -2757,8 +2757,8 @@ export default function NewBuildingPage() {
 
       {/* Confirmation Modal */}
       {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all animate-scaleIn">
+        <div className="dashboard-modal-overlay bg-black/60 z-50 animate-fadeIn">
+          <div className="dashboard-modal-shell max-w-md w-full overflow-hidden rounded-3xl shadow-2xl transform transition-all animate-scaleIn max-h-[90vh] flex flex-col">
             {/* Header */}
             <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-5">
               <div className="flex items-center gap-3">
@@ -2773,7 +2773,7 @@ export default function NewBuildingPage() {
             </div>
 
             {/* Body */}
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll dashboard-modal-scroll-gutter-auto">
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 border border-blue-100">
                 <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                   <Building2 className="w-5 h-5 text-blue-600" />
@@ -2818,7 +2818,7 @@ export default function NewBuildingPage() {
             </div>
 
             {/* Footer */}
-            <div className="px-6 pb-6 flex gap-3">
+            <div className="shrink-0 px-6 pb-6 pt-2 flex gap-3 border-t border-slate-100 bg-slate-50/50 rounded-b-3xl">
               <button
                 onClick={() => setShowConfirmModal(false)}
                 className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold flex items-center justify-center gap-2"

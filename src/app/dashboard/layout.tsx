@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useDashboardAuth } from '@/hooks/useDashboardAuth'
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar'
+import { CriticalAlertsDock } from '@/components/dashboard/CriticalAlertsDock'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -33,12 +34,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-50 to-gray-100" dir="rtl">
       {!hideSidebar && (
-        <div className="sticky top-0 self-start flex-shrink-0 h-screen z-30">
+        <div className="sticky top-0 self-start flex-shrink-0 h-screen z-30 print:hidden">
           <DashboardSidebar />
         </div>
       )}
-      <main className="flex-1 min-w-0 overflow-x-hidden">
+      <main className="flex-1 min-w-0 overflow-x-hidden print:min-h-0">
         {children}
+        {!hideSidebar && <div className="print:hidden"><CriticalAlertsDock /></div>}
       </main>
     </div>
   )

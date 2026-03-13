@@ -1152,9 +1152,9 @@ export default function InvestorsPage() {
       if (editingUnit) {
         const updatePayload: Record<string, unknown> = { ...payload };
         if (editingUnit.status !== "resold") {
-          if (formUnitResale.resale_sale_id) {
-            updatePayload.resale_sale_id = formUnitResale.resale_sale_id;
-            updatePayload.status = "resold";
+        if (formUnitResale.resale_sale_id) {
+          updatePayload.resale_sale_id = formUnitResale.resale_sale_id;
+          updatePayload.status = "resold";
             updatePayload.settlement_type = formUnitResale.settlement_type || "with_capital";
           }
         } else if (editingUnit.status === "resold" && formUnitResale.settlement_type) {
@@ -1369,10 +1369,10 @@ export default function InvestorsPage() {
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center justify-center min-w-[3.25rem] px-3 py-1.5 rounded-xl bg-teal-50 text-teal-700 font-semibold text-sm border border-teal-200/60 shadow-sm tabular-nums dir-ltr">
-                                  {row.profit_percentage_to != null && Number(row.profit_percentage_to) !== Number(row.profit_percentage)
-                                    ? `${Number(row.profit_percentage)}%–${Number(row.profit_percentage_to)}%`
-                                    : `${Number(row.profit_percentage)}%`}
-                                </span>
+                                {row.profit_percentage_to != null && Number(row.profit_percentage_to) !== Number(row.profit_percentage)
+                                  ? `${Number(row.profit_percentage)}%–${Number(row.profit_percentage_to)}%`
+                                  : `${Number(row.profit_percentage)}%`}
+                              </span>
                               )}
                             </td>
                             <td className="p-3 text-center text-slate-600">
@@ -1415,9 +1415,9 @@ export default function InvestorsPage() {
                                   <Eye className="w-4 h-4" />
                                 </button>
                                 {canEdit && (
-                                  <button type="button" onClick={() => openEditBuilding(row)} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg" title="تعديل">
-                                    <Pencil className="w-4 h-4" />
-                                  </button>
+                                    <button type="button" onClick={() => openEditBuilding(row)} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg" title="تعديل">
+                                      <Pencil className="w-4 h-4" />
+                                    </button>
                                 )}
                                 {canEdit && (
                                   <button type="button" onClick={() => { setClosingBuildingInvestor(row); const singlePct = row.profit_percentage_to == null || Number(row.profit_percentage_to) === Number(row.profit_percentage); setClosingBuildingPercentage(singlePct ? String(row.profit_percentage) : ""); setClosingSettlementMethod(""); setClosingSettlementAccountIban(""); setClosingSettlementBankName(""); setClosingSettlementType(""); setClosingStep(1); setClosingSettlementCashAmount(""); setClosingSettlementCheckAmount(""); }} className={row.closed_at != null ? "p-2 text-slate-500 hover:bg-slate-100 rounded-lg" : "p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg"} title={row.closed_at != null ? "عرض المخالصة" : "إغلاق الصفقة"}>
@@ -1483,23 +1483,23 @@ export default function InvestorsPage() {
 
             {/* تأكيد الحذف من النظام */}
             {deleteConfirm && (
-              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" onClick={() => setDeleteConfirm(null)} dir="rtl">
-                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                  <div className="px-5 py-4 border-b border-slate-100">
+              <div className="dashboard-modal-overlay-z60" onClick={() => setDeleteConfirm(null)} dir="rtl">
+                <div className="dashboard-modal-shell max-w-sm w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                  <div className="shrink-0 px-6 pt-5 pb-3 border-b border-slate-100 bg-gradient-to-b from-slate-50/95 to-white rounded-t-2xl">
                     <h3 className="text-lg font-bold text-slate-800">تأكيد الحذف من النظام</h3>
                   </div>
-                  <div className="p-5 space-y-4">
+                  <div className="px-6 py-4 overflow-y-auto dashboard-modal-scroll dashboard-modal-scroll-gutter-auto min-h-0 max-h-[min(50vh,320px)]">
                     <p className="text-sm text-slate-600">
                       {deleteConfirm.type === "building" ? "حذف مستثمر العمارة" : "حذف سجل استثمار الوحدة"}: <span className="font-semibold text-slate-800">{deleteConfirm.label || "—"}</span>. لا يمكن التراجع عن هذا الإجراء.
                     </p>
-                    <div className="flex gap-3">
-                      <button type="button" onClick={confirmDeleteFromSystem} className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-medium text-sm hover:bg-red-700 transition">
-                        حذف
-                      </button>
-                      <button type="button" onClick={() => setDeleteConfirm(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-medium text-sm hover:bg-slate-50 transition">
-                        إلغاء
-                      </button>
-                    </div>
+                  </div>
+                  <div className="shrink-0 flex gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl">
+                    <button type="button" onClick={confirmDeleteFromSystem} className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-medium text-sm hover:bg-red-700 shadow-sm">
+                      حذف
+                    </button>
+                    <button type="button" onClick={() => setDeleteConfirm(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium text-sm hover:bg-slate-50 shadow-sm">
+                      إلغاء
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1517,8 +1517,8 @@ export default function InvestorsPage() {
                 ? { years: data.remainingYMD.y, months: data.remainingYMD.m, days: data.remainingYMD.d }
                 : (due ? getRemaining(due, start) : null);
               return (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setViewingBuildingInvestor(null)}>
-                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} dir="rtl">
+              <div className="dashboard-modal-overlay" onClick={() => setViewingBuildingInvestor(null)}>
+                <div className="dashboard-modal-shell max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} dir="rtl">
                   <div className={`px-5 py-4 flex items-center justify-between shrink-0 ${viewingBuildingInvestor.closed_at ? "bg-gradient-to-br from-emerald-600 to-teal-700" : "bg-gradient-to-br from-teal-500 to-cyan-600"}`}>
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
                       {viewingBuildingInvestor.closed_at && <CheckCircle2 className="w-5 h-5 text-emerald-200" />}
@@ -1528,7 +1528,7 @@ export default function InvestorsPage() {
                       <X className="w-5 h-5" />
                     </button>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                  <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll p-5 space-y-4">
                     {viewingBuildingInvestor.closed_at ? (
                       <>
                         <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 space-y-3">
@@ -1691,15 +1691,15 @@ export default function InvestorsPage() {
             })()}
 
             {transferSource && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="dashboard-modal-overlay">
+                <div className="dashboard-modal-shell max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col">
                   <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                     <h3 className="text-lg font-bold text-slate-800">نقل رأس المال إلى عمارة أو وحدة جديدة</h3>
                     <button type="button" onClick={() => setTransferSource(null)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
                       <X className="w-5 h-5" />
                     </button>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll p-4 space-y-4">
                     <p className="text-sm text-slate-600">
                       المستثمر: <strong>{getTransferSourceInvestorName(transferSource)}</strong> — رأس المال المتاح للنقل: <span className="dir-ltr font-semibold text-amber-700">{formatNum(getTransferSourceAvailable(transferSource))} ر.س</span>
                     </p>
@@ -1751,6 +1751,29 @@ export default function InvestorsPage() {
                             <input type="number" min={0} max={100} step={0.5} value={transferProfitPctTo} onChange={(e) => setTransferProfitPctTo(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
                           </div>
                         </div>
+                        {(() => {
+                          const amt = parseInt(transferAmount.replace(/\D/g, ""), 10) || 0;
+                          const pctFrom = parseFloat(transferProfitPct);
+                          const pctToRaw = transferProfitPctTo.trim();
+                          const pctTo = pctToRaw !== "" ? parseFloat(pctToRaw) : null;
+                          if (amt <= 0 || Number.isNaN(pctFrom) || pctFrom < 0 || pctFrom > 100) return null;
+                          const profitMin = (amt * pctFrom) / 100;
+                          const profitMax =
+                            pctTo != null && !Number.isNaN(pctTo) && pctTo >= 0 && pctTo <= 100 && pctTo !== pctFrom
+                              ? (amt * pctTo) / 100
+                              : null;
+                          return (
+                            <div className="rounded-xl border border-teal-200/80 bg-teal-50/90 px-3 py-2.5 space-y-1">
+                              <p className="text-xs font-medium text-teal-800">حسب مبلغ النقل والنسبة المتفق عليها</p>
+                              <p className="text-sm font-semibold text-teal-800 dir-ltr">
+                                الربح المتوقع:{" "}
+                                {profitMax != null
+                                  ? `${formatNum(Math.round(profitMin))} – ${formatNum(Math.round(profitMax))} ر.س`
+                                  : `${formatNum(Math.round(profitMin))} ر.س`}
+                              </p>
+                            </div>
+                          );
+                        })()}
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">تاريخ البدء</label>
@@ -1886,9 +1909,9 @@ export default function InvestorsPage() {
                                   <Eye className="w-4 h-4" />
                                 </button>
                                 {canEdit && (
-                                  <button type="button" onClick={() => openEditUnit(row)} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg" title="تعديل">
-                                    <Pencil className="w-4 h-4" />
-                                  </button>
+                                    <button type="button" onClick={() => openEditUnit(row)} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg" title="تعديل">
+                                      <Pencil className="w-4 h-4" />
+                                    </button>
                                 )}
                                 <button type="button" onClick={() => {
                                   setClosingUnitInvestment({ ...row, buildingName: row.building?.name });
@@ -1905,8 +1928,8 @@ export default function InvestorsPage() {
                                 </button>
                                 {canEdit && (
                                   <button type="button" onClick={() => setDeleteConfirm({ type: "unit", id: row.id, label: row.investor_name })} className="p-2 text-red-600 hover:bg-red-50 rounded-lg" title="حذف">
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
                                 )}
                               </div>
                             </td>
@@ -1925,22 +1948,22 @@ export default function InvestorsPage() {
 
       {/* بطاقة معاينة استثمار الوحدة */}
       {viewingUnitInvestment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setViewingUnitInvestment(null)}>
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} dir="rtl">
+        <div className="dashboard-modal-overlay" onClick={() => setViewingUnitInvestment(null)}>
+          <div className="dashboard-modal-shell max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} dir="rtl">
             <div className="bg-gradient-to-br from-emerald-500 to-teal-600 px-5 py-4 flex items-center justify-between shrink-0">
               <h3 className="text-lg font-bold text-white">بيانات استثمار الوحدة</h3>
               <button type="button" onClick={() => setViewingUnitInvestment(null)} className="p-2 rounded-xl bg-white/20 hover:bg-white/30 text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll p-5 space-y-4">
               {/* 1. بيانات المستثمر */}
               <section className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-2">
                 <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider pb-2 border-b border-slate-200/80">بيانات المستثمر</h4>
                 <div className="grid grid-cols-1 gap-2 text-sm">
-                  <Row label="المستثمر" value={viewingUnitInvestment.investor_name} />
-                  <Row label="الجوال" value={viewingUnitInvestment.investor_phone ?? "—"} dirLtr />
-                  <Row label="رقم الهوية" value={viewingUnitInvestment.investor_id_number ?? "—"} dirLtr />
+                <Row label="المستثمر" value={viewingUnitInvestment.investor_name} />
+                <Row label="الجوال" value={viewingUnitInvestment.investor_phone ?? "—"} dirLtr />
+                <Row label="رقم الهوية" value={viewingUnitInvestment.investor_id_number ?? "—"} dirLtr />
                 </div>
               </section>
 
@@ -1949,7 +1972,7 @@ export default function InvestorsPage() {
                 <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider pb-2 border-b border-slate-200/80">عملية الاستثمار</h4>
                 <div className="grid grid-cols-1 gap-2 text-sm">
                   <Row label="الوحدة / العمارة" value={`وحدة ${viewingUnitInvestment.unit?.unit_number ?? "—"} — د${viewingUnitInvestment.unit?.floor ?? "—"} — ${viewingUnitInvestment.building?.name ?? "—"}`} />
-                  <Row label="سعر الشراء" value={`${formatNum(Number(viewingUnitInvestment.purchase_price))} ر.س`} dirLtr />
+                <Row label="سعر الشراء" value={`${formatNum(Number(viewingUnitInvestment.purchase_price))} ر.س`} dirLtr />
                   {(viewingUnitInvestment as UnitInvestmentRow).purchase_commission != null && Number((viewingUnitInvestment as UnitInvestmentRow).purchase_commission) > 0 && (
                     <>
                       <Row label="عمولة البيع" value={`-${formatNum(Number((viewingUnitInvestment as UnitInvestmentRow).purchase_commission))} ر.س`} dirLtr />
@@ -1963,7 +1986,7 @@ export default function InvestorsPage() {
                   {viewingUnitInvestment.payment_method === "check" && viewingUnitInvestment.payment_check_number && (
                     <Row label="رقم الشيك" value={viewingUnitInvestment.payment_check_number} dirLtr />
                   )}
-                  <Row label="تاريخ الشراء" value={viewingUnitInvestment.purchase_date ? formatDateEn(viewingUnitInvestment.purchase_date) : "—"} dirLtr />
+                <Row label="تاريخ الشراء" value={viewingUnitInvestment.purchase_date ? formatDateEn(viewingUnitInvestment.purchase_date) : "—"} dirLtr />
                   <Row label="حالة مشروع الاستثمار" value={viewingUnitInvestment.status === "resold" ? "تم إعادة البيع" : viewingUnitInvestment.status === "cancelled" ? "ملغي" : "تحت الإنشاء"} />
                   {viewingUnitInvestment.notes && <Row label="ملاحظات" value={viewingUnitInvestment.notes} />}
                 </div>
@@ -2071,8 +2094,8 @@ export default function InvestorsPage() {
 
       {/* نافذة إغلاق صفقة استثمار الوحدة */}
       {closingUnitInvestment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => { setClosingUnitInvestment(null); setClosingUnitSaleId(""); setClosingUnitSettlementType(""); setClosingUnitCommission(""); setClosingUnitAdminFees(""); setClosingUnitStep(1); setClosingUnitSettlementMethod(""); setClosingUnitSettlementAccountIban(""); setClosingUnitSettlementBankName(""); }}>
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} dir="rtl">
+        <div className="dashboard-modal-overlay" onClick={() => { setClosingUnitInvestment(null); setClosingUnitSaleId(""); setClosingUnitSettlementType(""); setClosingUnitCommission(""); setClosingUnitAdminFees(""); setClosingUnitStep(1); setClosingUnitSettlementMethod(""); setClosingUnitSettlementAccountIban(""); setClosingUnitSettlementBankName(""); }}>
+          <div className="dashboard-modal-shell max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} dir="rtl">
             <div className="bg-gradient-to-br from-emerald-600 to-teal-700 px-5 py-4 flex items-center justify-between shrink-0">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5" />
@@ -2082,7 +2105,7 @@ export default function InvestorsPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll p-5 space-y-4">
               <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 space-y-2 text-sm">
                 <p className="font-semibold text-slate-700">بيانات العقد (المتاحة)</p>
                 <div className="grid grid-cols-1 gap-2">
@@ -2147,16 +2170,16 @@ export default function InvestorsPage() {
                     <>
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-slate-700">ربط عملية البيع (مطلوب للإغلاق)</label>
-                        <select
+                      <select
                           value={closingUnitSaleId}
                           onChange={(e) => setClosingUnitSaleId(e.target.value)}
                           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
                         >
                           <option value="">— اختر عملية البيع —</option>
                           {sales.filter((s) => s.unit_id === closingUnitInvestment.unit_id).map((s) => (
-                            <option key={s.id} value={s.id}>بيع بـ {formatNum(Number(s.sale_price))} ر.س</option>
-                          ))}
-                        </select>
+                          <option key={s.id} value={s.id}>بيع بـ {formatNum(Number(s.sale_price))} ر.س</option>
+                        ))}
+                      </select>
                         {closingUnitSaleId && (() => {
                           const sale = sales.find((s) => s.id === closingUnitSaleId);
                           const resalePrice = sale?.sale_price ?? 0;
@@ -2219,8 +2242,8 @@ export default function InvestorsPage() {
                           </button>
                           <button type="button" onClick={() => setClosingUnitSettlementType("with_capital")} className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${closingUnitSettlementType === "with_capital" ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
                             مع رأس المال
-                          </button>
-                        </div>
+                      </button>
+                    </div>
                         {closingUnitSaleId && closingUnitSettlementType && (() => {
                           const sale = sales.find((s) => s.id === closingUnitSaleId);
                           const resalePrice = sale?.sale_price ?? 0;
@@ -2256,13 +2279,13 @@ export default function InvestorsPage() {
                           {([{ value: "حوالة", label: "حوالة" }, { value: "شيك", label: "شيك مصدق" }, { value: "كاش", label: "كاش" }] as const).map(({ value, label }) => (
                             <button key={value} type="button" onClick={() => setClosingUnitSettlementMethod(value)} className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${closingUnitSettlementMethod === value ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>{label}</button>
                           ))}
-                        </div>
+                </div>
                         {closingUnitSettlementMethod === "حوالة" && (
                           <div className="flex flex-wrap items-end gap-2 pt-1">
                             <div className="min-w-0 flex-1 max-w-[300px]">
                               <label className="block text-xs font-medium text-slate-600 mb-0.5">رقم الحساب أو الآيبان</label>
                               <input type="text" value={closingUnitSettlementAccountIban} onChange={(e) => setClosingUnitSettlementAccountIban(e.target.value)} placeholder="رقم الحساب / الآيبان" className="w-full border border-slate-200 rounded-full px-4 py-2 text-sm dir-ltr focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
-                            </div>
+              </div>
                             <div className="min-w-0 flex-1 max-w-[180px]">
                               <label className="block text-xs font-medium text-slate-600 mb-0.5">اسم البنك</label>
                               <input type="text" value={closingUnitSettlementBankName} onChange={(e) => setClosingUnitSettlementBankName(e.target.value)} placeholder="اسم البنك" className="w-full border border-slate-200 rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
@@ -2293,7 +2316,7 @@ export default function InvestorsPage() {
                           <button type="button" onClick={() => setClosingUnitStep(1)} className="px-4 py-2 rounded-full border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50">السابق</button>
                           <button type="button" onClick={() => setClosingUnitStep(3)} disabled={!closingUnitSettlementMethod} className="px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
                             التالي
-                          </button>
+                    </button>
                         </div>
                       </div>
                     );
@@ -2319,13 +2342,13 @@ export default function InvestorsPage() {
                           <button type="button" onClick={() => setClosingUnitStep(2)} className="px-4 py-2 rounded-full border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50">السابق</button>
                           <button type="button" onClick={confirmCloseUnitDeal} disabled={saving} className="px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
                             {saving ? "جاري الإغلاق..." : "تأكيد إغلاق الصفقة"}
-                          </button>
+                    </button>
                         </div>
                       </div>
                     );
                   })()}
-                </>
-              )}
+                  </>
+                )}
             </div>
           </div>
         </div>
@@ -2341,8 +2364,8 @@ export default function InvestorsPage() {
         const pctInRange = !isNaN(pctNum) && pctNum >= Math.min(pctMin, pctMax) && pctNum <= Math.max(pctMin, pctMax);
         const computedProfit = pctInRange && capital > 0 ? Math.round((capital * pctNum) / 100) : null;
         return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => { setClosingBuildingInvestor(null); setClosingBuildingPercentage(""); setClosingSettlementMethod(""); setClosingSettlementAccountIban(""); setClosingSettlementBankName(""); setClosingSettlementType(""); setClosingStep(1); setClosingSettlementCashAmount(""); setClosingSettlementCheckAmount(""); setClosingStep(1); setClosingSettlementCashAmount(""); setClosingSettlementCheckAmount(""); }}>
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} dir="rtl">
+        <div className="dashboard-modal-overlay" onClick={() => { setClosingBuildingInvestor(null); setClosingBuildingPercentage(""); setClosingSettlementMethod(""); setClosingSettlementAccountIban(""); setClosingSettlementBankName(""); setClosingSettlementType(""); setClosingStep(1); setClosingSettlementCashAmount(""); setClosingSettlementCheckAmount(""); setClosingStep(1); setClosingSettlementCashAmount(""); setClosingSettlementCheckAmount(""); }}>
+          <div className="dashboard-modal-shell max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} dir="rtl">
             <div className="bg-gradient-to-br from-emerald-600 to-teal-700 px-5 py-4 flex items-center justify-between shrink-0">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5" />
@@ -2350,9 +2373,9 @@ export default function InvestorsPage() {
               </h3>
               <button type="button" onClick={() => { setClosingBuildingInvestor(null); setClosingBuildingPercentage(""); setClosingSettlementMethod(""); setClosingSettlementAccountIban(""); setClosingSettlementBankName(""); setClosingSettlementType(""); setClosingStep(1); setClosingSettlementCashAmount(""); setClosingSettlementCheckAmount(""); setClosingStep(1); setClosingSettlementCashAmount(""); setClosingSettlementCheckAmount(""); }} className="p-2 rounded-xl bg-white/20 hover:bg-white/30 text-white transition-colors">
                 <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                </button>
+              </div>
+            <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll p-6 space-y-5">
               <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 space-y-2 text-sm">
                 <p className="font-semibold text-slate-700">بيانات العقد (المتاحة)</p>
                 <div className="grid grid-cols-1 gap-2">
@@ -2360,13 +2383,13 @@ export default function InvestorsPage() {
                   <div className="flex justify-between"><span className="text-slate-500">المستثمر</span><span className="font-medium">{closingBuildingInvestor.investor_name}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">نسبة الربح المتفق عليها</span><span className="font-medium">{closingBuildingInvestor.profit_percentage_to != null && Number(closingBuildingInvestor.profit_percentage_to) !== Number(closingBuildingInvestor.profit_percentage) ? `${closingBuildingInvestor.profit_percentage}%–${closingBuildingInvestor.profit_percentage_to}%` : `${closingBuildingInvestor.profit_percentage}%`}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">الربح المتوقع (من النسبة)</span><span className="font-medium dir-ltr">{closingBuildingInvestor.total_invested_amount != null && closingBuildingInvestor.profit_percentage != null ? (() => { const a = Number(closingBuildingInvestor.total_invested_amount); const from = (a * Number(closingBuildingInvestor.profit_percentage)) / 100; const to = closingBuildingInvestor.profit_percentage_to != null ? (a * Number(closingBuildingInvestor.profit_percentage_to)) / 100 : null; return to != null ? `${formatNum(Math.round(from))} – ${formatNum(Math.round(to))} ر.س` : `${formatNum(Math.round(from))} ر.س`; })() : "—"}</span></div>
-                </div>
-              </div>
+            </div>
+          </div>
               {closingBuildingInvestor.closed_at ? (
                 <div className="rounded-xl border border-emerald-200/80 overflow-hidden shadow-sm">
                   <div className="bg-gradient-to-l from-emerald-500 to-teal-500 px-4 py-3 text-center">
                     <p className="text-lg font-bold text-white tracking-wide">مخالصة</p>
-                  </div>
+        </div>
                   <div className="bg-emerald-50/90 p-4 space-y-2 text-sm">
                   {closingBuildingInvestor.settlement_method && (
                     <p className="text-emerald-800 font-semibold pb-2 border-b border-emerald-100/80">تم المخالصة بـ {settlementMethodLabel(closingBuildingInvestor.settlement_method)}</p>
@@ -2547,15 +2570,15 @@ export default function InvestorsPage() {
         const expectedFrom = amount > 0 && !isNaN(pctFrom) ? (amount * pctFrom) / 100 : null;
         const expectedTo = hasRange ? (amount * pctTo) / 100 : null;
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setModalOpen(null)}>
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()} dir="rtl">
+          <div className="dashboard-modal-overlay" onClick={() => setModalOpen(null)}>
+            <div className="dashboard-modal-shell max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} dir="rtl">
               <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
                 <h3 className="text-lg font-bold text-slate-800">{editingBuilding ? "تعديل مستثمر بالعمارة" : "إضافة مستثمر بالعمارة"}</h3>
                 <button type="button" onClick={() => setModalOpen(null)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
                   <X className="w-5 h-5 text-slate-600" />
                 </button>
               </div>
-              <div className="overflow-y-auto flex-1 p-4 sm:p-5 space-y-4">
+              <div className="overflow-y-auto dashboard-modal-scroll flex-1 min-h-0 p-4 sm:p-5 space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">العمارة</label>
                   <select
@@ -2685,19 +2708,19 @@ export default function InvestorsPage() {
                         placeholder="على بنك"
                         className="w-full max-w-[280px] border border-slate-200 rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
                       />
-                    </div>
+                </div>
                   )}
                   {formBuilding.payment_method === "check" && (
                     <div className="grid grid-cols-2 gap-3 pt-1">
-                      <div>
+                <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">رقم الشيك</label>
-                        <input
-                          type="text"
+                  <input
+                    type="text"
                           value={formBuilding.payment_check_number}
                           onChange={(e) => setFormBuilding((p) => ({ ...p, payment_check_number: e.target.value }))}
                           placeholder="رقم الشيك"
-                          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm dir-ltr focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
-                        />
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm dir-ltr focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                  />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">صورة الشيك</label>
@@ -2829,8 +2852,8 @@ className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 roun
 
       {/* Modal: استثمار وحدة */}
       {modalOpen === "unit" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setModalOpen(null)}>
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} dir="rtl">
+        <div className="dashboard-modal-overlay" onClick={() => setModalOpen(null)}>
+          <div className="dashboard-modal-shell max-w-md w-full p-6 max-h-[90vh] overflow-y-auto overflow-x-hidden dashboard-modal-scroll" onClick={(e) => e.stopPropagation()} dir="rtl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-slate-800">{editingUnit ? "تعديل استثمار الوحدة" : "إضافة استثمار وحدة"}</h3>
               <button type="button" onClick={() => setModalOpen(null)} className="p-2 hover:bg-slate-100 rounded-lg">
@@ -2869,10 +2892,10 @@ className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 roun
                           return byFloor !== 0 ? byFloor : Number(a.unit_number) - Number(b.unit_number);
                         })
                         .map((u) => (
-                          <option key={u.id} value={u.id}>
+                        <option key={u.id} value={u.id}>
                             وحدة {u.unit_number} — د{u.floor}
-                          </option>
-                        ))}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </>
@@ -2919,15 +2942,15 @@ className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 roun
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
+              <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">سعر الشراء (ر.س)</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={formUnit.purchase_price ? formatNum(parseInt(formUnit.purchase_price.replace(/\D/g, ""), 10) || 0) : ""}
-                    onChange={(e) => setFormUnit((p) => ({ ...p, purchase_price: e.target.value.replace(/\D/g, "") }))}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm dir-ltr"
-                  />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={formUnit.purchase_price ? formatNum(parseInt(formUnit.purchase_price.replace(/\D/g, ""), 10) || 0) : ""}
+                  onChange={(e) => setFormUnit((p) => ({ ...p, purchase_price: e.target.value.replace(/\D/g, "") }))}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm dir-ltr"
+                />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">عمولة البيع (ر.س)</label>
@@ -3089,21 +3112,21 @@ className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 roun
                     </>
                   ) : (
                     <>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">ربط بعملية إعادة البيع (اختياري)</label>
-                        <select
-                          value={formUnitResale.resale_sale_id}
-                          onChange={(e) => setFormUnitResale((p) => ({ ...p, resale_sale_id: e.target.value }))}
-                          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
-                        >
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">ربط بعملية إعادة البيع (اختياري)</label>
+                  <select
+                    value={formUnitResale.resale_sale_id}
+                    onChange={(e) => setFormUnitResale((p) => ({ ...p, resale_sale_id: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
+                  >
                           <option value="">— بدون ربط —</option>
-                          {sales.filter((s) => s.unit_id === editingUnit.unit_id).map((s) => (
-                            <option key={s.id} value={s.id}>
-                              بيع بـ {formatNum(Number(s.sale_price))} ر.س
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-xs text-slate-500 mt-1">عند الربط يُحسب الربح تلقائياً (سعر البيع − سعر الشراء)</p>
+                    {sales.filter((s) => s.unit_id === editingUnit.unit_id).map((s) => (
+                      <option key={s.id} value={s.id}>
+                        بيع بـ {formatNum(Number(s.sale_price))} ر.س
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-500 mt-1">عند الربط يُحسب الربح تلقائياً (سعر البيع − سعر الشراء)</p>
                       </div>
                       {formUnitResale.resale_sale_id && (
                         <div>

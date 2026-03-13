@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { isInvalidSessionError } from '@/lib/supabase/auth-errors'
 
 export type PermissionKey =
   | 'dashboard'
@@ -80,7 +81,19 @@ export function useDashboardAuth(): UseDashboardAuthResult {
 
   useEffect(() => {
     const load = async () => {
-      const { data: { user: u } } = await supabase.auth.getUser()
+      const { data: { user: u }, error: authErr } = await supabase.auth.getUser()
+      if (authErr && isInvalidSessionError(authErr)) {
+        await supabase.auth.signOut({ scope: 'local' })
+        setUser(null)
+        setEffectiveOwnerId(null)
+        setEmployeePermissions(null)
+        setCurrentUserDisplayName('')
+        setReady(true)
+        if (typeof window !== 'undefined' && window.location.pathname.startsWith('/dashboard')) {
+          window.location.replace('/login?reason=session_expired')
+        }
+        return
+      }
       if (!u) {
         setUser(null)
         setEffectiveOwnerId(null)

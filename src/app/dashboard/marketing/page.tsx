@@ -41,8 +41,10 @@ export default function MarketingPage() {
     );
   }
 
-  const cardBase = "group relative bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg border border-gray-200 overflow-hidden transition-all duration-300";
-  const cardOverlay = "absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-600 opacity-0 group-hover:opacity-80 transition-opacity duration-300";
+  const cardBase =
+    "group relative bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg border border-gray-200 overflow-hidden transition-all duration-300 select-none cursor-pointer";
+  const cardOverlay =
+    "absolute inset-0 z-[1] bg-gradient-to-br from-amber-500 to-orange-600 opacity-0 group-hover:opacity-80 transition-opacity duration-300 pointer-events-none";
   const iconBox = "w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/20";
 
   return (
@@ -60,13 +62,15 @@ export default function MarketingPage() {
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_70%_0%,rgba(245,158,11,0.08),transparent)]" />
           <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-4 sm:px-5 sm:py-4">
             <MarketingLogo />
-            <Link
-              href="/dashboard"
-              className="flex-shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              لوحة التحكم
-            </Link>
+            <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
+              >
+                <LayoutDashboard className="w-4 h-4 shrink-0 text-slate-600" />
+                لوحة التحكم
+              </Link>
+            </div>
           </div>
         </header>
 
@@ -80,10 +84,10 @@ export default function MarketingPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
           <Link
             href="/dashboard/reservations"
-            className={`${cardBase} p-6 hover:shadow-xl hover:-translate-y-1 cursor-pointer`}
+            className={`${cardBase} p-6 hover:shadow-xl hover:-translate-y-1`}
           >
-            <div className={cardOverlay} />
-            <div className="relative z-10 text-center">
+            <div className={cardOverlay} aria-hidden />
+            <div className="relative z-[2] text-center">
               <div className={`${iconBox} group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
                 <Calendar className="w-8 h-8 text-white" />
               </div>
@@ -98,10 +102,10 @@ export default function MarketingPage() {
 
           <Link
             href="/dashboard/sales"
-            className={`${cardBase} p-6 hover:shadow-xl hover:-translate-y-1 cursor-pointer`}
+            className={`${cardBase} p-6 hover:shadow-xl hover:-translate-y-1`}
           >
-            <div className={cardOverlay} />
-            <div className="relative z-10 text-center">
+            <div className={cardOverlay} aria-hidden />
+            <div className="relative z-[2] text-center">
               <div className={`${iconBox} group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
                 <RiyalIcon className="w-8 h-8 text-white" />
               </div>
@@ -116,10 +120,10 @@ export default function MarketingPage() {
 
           <Link
             href="/dashboard/marketing/marketers"
-            className={`${cardBase} p-6 hover:shadow-xl hover:-translate-y-1 cursor-pointer`}
+            className={`${cardBase} p-6 hover:shadow-xl hover:-translate-y-1`}
           >
-            <div className={cardOverlay} />
-            <div className="relative z-10 text-center">
+            <div className={cardOverlay} aria-hidden />
+            <div className="relative z-[2] text-center">
               <div className={`${iconBox} group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
                 <UserPlus className="w-8 h-8 text-white" />
               </div>
@@ -134,10 +138,10 @@ export default function MarketingPage() {
 
           <Link
             href="/dashboard/marketing/reports"
-            className={`${cardBase} p-6 hover:shadow-xl hover:-translate-y-1 cursor-pointer`}
+            className={`${cardBase} p-6 hover:shadow-xl hover:-translate-y-1`}
           >
-            <div className={cardOverlay} />
-            <div className="relative z-10 text-center">
+            <div className={cardOverlay} aria-hidden />
+            <div className="relative z-[2] text-center">
               <div className={`${iconBox} group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
                 <LineChart className="w-8 h-8 text-white" />
               </div>

@@ -44,8 +44,10 @@ export default function OwnersInvestorsPage() {
     );
   }
 
-  const cardBase = "group relative bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg border border-gray-200 overflow-hidden transition-all duration-300";
-  const cardOverlay = "absolute inset-0 bg-gradient-to-br from-teal-500 to-cyan-600 opacity-0 group-hover:opacity-80 transition-opacity duration-300";
+  const cardBase =
+    "group relative bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg border border-gray-200 overflow-hidden transition-all duration-300 select-none cursor-pointer";
+  const cardOverlay =
+    "absolute inset-0 z-[1] bg-gradient-to-br from-teal-500 to-cyan-600 opacity-0 group-hover:opacity-80 transition-opacity duration-300 pointer-events-none";
   const iconBox = "w-16 h-16 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/20";
 
   return (
@@ -87,10 +89,10 @@ export default function OwnersInvestorsPage() {
           {canAccessOwners && (
             <Link
               href="/dashboard/owners-investors/owners"
-              className={`${cardBase} p-6 hover:shadow-xl hover:-translate-y-1 cursor-pointer`}
+              className={`${cardBase} p-6 hover:shadow-xl hover:-translate-y-1`}
             >
-              <div className={cardOverlay} />
-              <div className="relative z-10 text-center">
+              <div className={cardOverlay} aria-hidden />
+              <div className="relative z-[2] text-center">
                 <div className={`${iconBox} group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
                   <Home className="w-8 h-8 text-white" />
                 </div>
@@ -108,10 +110,10 @@ export default function OwnersInvestorsPage() {
           {canAccessInvestors && (
             <Link
               href="/dashboard/owners-investors/investors"
-              className={`${cardBase} p-6 hover:shadow-xl hover:-translate-y-1 cursor-pointer`}
+              className={`${cardBase} p-6 hover:shadow-xl hover:-translate-y-1`}
             >
-              <div className={cardOverlay} />
-              <div className="relative z-10 text-center">
+              <div className={cardOverlay} aria-hidden />
+              <div className="relative z-[2] text-center">
                 <div className={`${iconBox} group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
                   <TrendingUp className="w-8 h-8 text-white" />
                 </div>
@@ -129,10 +131,10 @@ export default function OwnersInvestorsPage() {
           {canAccessInvestors && (
             <Link
               href="/dashboard/owners-investors/analytics"
-              className={`${cardBase} p-6 hover:shadow-xl hover:-translate-y-1 cursor-pointer`}
+              className={`${cardBase} p-6 hover:shadow-xl hover:-translate-y-1`}
             >
-              <div className={cardOverlay} />
-              <div className="relative z-10 text-center">
+              <div className={cardOverlay} aria-hidden />
+              <div className="relative z-[2] text-center">
                 <div className={`${iconBox} group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
                   <BarChart3 className="w-8 h-8 text-white" />
                 </div>

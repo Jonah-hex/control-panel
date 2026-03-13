@@ -662,20 +662,20 @@ function UnitsFilterContent() {
       </div>
 
       {selectedUnit && (
-        <>
-          <div
-            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
-            onClick={() => setSelectedUnit(null)}
-            aria-hidden="true"
-          />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div
+          className="dashboard-modal-overlay items-start justify-center overflow-y-auto py-6 sm:py-10 sm:items-center min-h-0"
+          onClick={() => setSelectedUnit(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="unit-preview-title"
+        >
             <div
-              className="bg-white rounded-3xl shadow-2xl border-2 border-emerald-200/30 overflow-hidden max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              className="bg-white rounded-3xl shadow-2xl border-2 border-emerald-200/30 w-full max-w-2xl max-h-[min(90vh,calc(100dvh-3rem))] flex flex-col overflow-hidden sm:my-0 shrink-0"
               onClick={(e) => e.stopPropagation()}
               dir="rtl"
             >
-              <div className="sticky top-0 z-10 bg-gradient-to-br from-emerald-500 to-teal-500 px-6 py-4 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-white">
+              <div className="shrink-0 z-10 bg-gradient-to-br from-emerald-500 to-teal-500 px-6 py-4 flex items-center justify-between rounded-t-3xl">
+                <h2 id="unit-preview-title" className="text-xl font-bold text-white">
                   معاينة الوحدة — {selectedUnit.unit_number}
                   {selectedUnit.building?.name && (
                     <span className="block text-sm font-normal text-emerald-100 mt-0.5">
@@ -686,13 +686,13 @@ function UnitsFilterContent() {
                 <button
                   type="button"
                   onClick={() => setSelectedUnit(null)}
-                  className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition"
+                  className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition shrink-0"
                   aria-label="إغلاق"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="p-6 bg-gradient-to-b from-white to-gray-50 space-y-6 border-t-2 border-gray-200">
+              <div className="p-6 bg-gradient-to-b from-white to-gray-50 space-y-6 border-t-2 border-gray-200 overflow-y-auto overflow-x-hidden dashboard-modal-scroll dashboard-modal-scroll-gutter-auto max-h-[calc(90vh-5.75rem)] rounded-b-3xl">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <span className="text-xs font-semibold text-gray-500 flex items-center gap-1">
@@ -813,8 +813,7 @@ function UnitsFilterContent() {
                 </div>
               </div>
             </div>
-          </div>
-        </>
+        </div>
       )}
   </div>
   )

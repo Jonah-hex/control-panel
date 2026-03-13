@@ -20,6 +20,7 @@ import {
   MapPin,
   ClipboardCheck,
   CalendarClock,
+  Search,
 } from "lucide-react";
 import { RiyalIcon } from "@/components/icons/RiyalIcon";
 import { UnitStatusBadge } from "@/components/UnitStatusBadge";
@@ -68,6 +69,42 @@ type SaleLinkedReservation = {
 
 type BuildingOption = { id: string; name: string };
 
+type DateRangePreset = "all" | "today" | "yesterday" | "last_7" | "last_14" | "this_month" | "last_30" | "last_month" | "custom";
+
+function getDateRangeForPreset(preset: string): { dateFrom: string; dateTo: string } | null {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const toStr = (d: Date) => d.toISOString().slice(0, 10);
+  const addDays = (d: Date, n: number) => {
+    const x = new Date(d);
+    x.setDate(x.getDate() + n);
+    return x;
+  };
+  switch (preset) {
+    case "today":
+      return { dateFrom: toStr(today), dateTo: toStr(today) };
+    case "yesterday": {
+      const y = addDays(today, -1);
+      return { dateFrom: toStr(y), dateTo: toStr(y) };
+    }
+    case "last_7":
+      return { dateFrom: toStr(addDays(today, -6)), dateTo: toStr(today) };
+    case "last_14":
+      return { dateFrom: toStr(addDays(today, -13)), dateTo: toStr(today) };
+    case "this_month":
+      return { dateFrom: toStr(new Date(today.getFullYear(), today.getMonth(), 1)), dateTo: toStr(today) };
+    case "last_30":
+      return { dateFrom: toStr(addDays(today, -29)), dateTo: toStr(today) };
+    case "last_month": {
+      const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const last = new Date(today.getFullYear(), today.getMonth(), 0);
+      return { dateFrom: toStr(first), dateTo: toStr(last) };
+    }
+    default:
+      return null;
+  }
+}
+
 type ReservationRow = {
   id: string;
   unit_id: string;
@@ -100,16 +137,122 @@ export default function SalesPage() {
   const SALES_PAGE_SIZES = [10, 25, 50, 100] as const;
   const RESERVATIONS_PAGE_SIZES = [6, 10, 25, 50, 100] as const;
 
-  const salesTotalPages = Math.max(1, Math.ceil(sales.length / salesPageSize));
-  const reservationsTotalPages = Math.max(1, Math.ceil(reservations.length / reservationsPageSize));
+  const [resFilterBuilding, setResFilterBuilding] = useState("");
+  const [resSearch, setResSearch] = useState("");
+  const [resDatePreset, setResDatePreset] = useState<DateRangePreset>("all");
+  const [resDateFrom, setResDateFrom] = useState("");
+  const [resDateTo, setResDateTo] = useState("");
+
+  const [salesFilterBuilding, setSalesFilterBuilding] = useState("");
+  const [salesSearch, setSalesSearch] = useState("");
+  const [salesDatePreset, setSalesDatePreset] = useState<DateRangePreset>("all");
+  const [salesDateFrom, setSalesDateFrom] = useState("");
+  const [salesDateTo, setSalesDateTo] = useState("");
+  const [salesPaymentFilter, setSalesPaymentFilter] = useState<"all" | "paid" | "remaining">("all");
+
+  const applyResDatePreset = (preset: DateRangePreset) => {
+    setResDatePreset(preset);
+    if (preset === "all") {
+      setResDateFrom("");
+      setResDateTo("");
+      return;
+    }
+    if (preset === "custom") return;
+    const r = getDateRangeForPreset(preset);
+    if (r) {
+      setResDateFrom(r.dateFrom);
+      setResDateTo(r.dateTo);
+    }
+  };
+  const applySalesDatePreset = (preset: DateRangePreset) => {
+    setSalesDatePreset(preset);
+    if (preset === "all") {
+      setSalesDateFrom("");
+      setSalesDateTo("");
+      return;
+    }
+    if (preset === "custom") return;
+    const r = getDateRangeForPreset(preset);
+    if (r) {
+      setSalesDateFrom(r.dateFrom);
+      setSalesDateTo(r.dateTo);
+    }
+  };
+
+  const reservationsFiltered = useMemo(() => {
+    let list = reservations;
+    if (resFilterBuilding) list = list.filter((r) => r.building_id === resFilterBuilding);
+    if (resSearch.trim()) {
+      const q = resSearch.trim().toLowerCase();
+      list = list.filter(
+        (r) =>
+          (r.customer_name || "").toLowerCase().includes(q) ||
+          (r.customer_phone || "").replace(/\s/g, "").includes(q.replace(/\s/g, "")) ||
+          String(r.receipt_number || "").toLowerCase().includes(q) ||
+          (r.building && typeof r.building === "object" && "name" in r.building && String(r.building.name).toLowerCase().includes(q))
+      );
+    }
+    if (resDateFrom || resDateTo) {
+      list = list.filter((r) => {
+        const d = (r.reservation_date || "").slice(0, 10);
+        if (!d) return false;
+        if (resDateFrom && d < resDateFrom) return false;
+        if (resDateTo && d > resDateTo) return false;
+        return true;
+      });
+    }
+    return list;
+  }, [reservations, resFilterBuilding, resSearch, resDateFrom, resDateTo]);
+
+  const salesFiltered = useMemo(() => {
+    let list = sales;
+    if (salesFilterBuilding) list = list.filter((s) => s.building_id === salesFilterBuilding);
+    if (salesSearch.trim()) {
+      const q = salesSearch.trim().toLowerCase();
+      list = list.filter(
+        (s) =>
+          (s.buyer_name || "").toLowerCase().includes(q) ||
+          (s.buyer_phone || "").replace(/\s/g, "").includes(q.replace(/\s/g, "")) ||
+          (s.buildings && typeof s.buildings === "object" && "name" in s.buildings && String(s.buildings.name).toLowerCase().includes(q))
+      );
+    }
+    if (salesDateFrom || salesDateTo) {
+      list = list.filter((s) => {
+        const d = (s.sale_date || "").slice(0, 10);
+        if (!d) return false;
+        if (salesDateFrom && d < salesDateFrom) return false;
+        if (salesDateTo && d > salesDateTo) return false;
+        return true;
+      });
+    }
+    if (salesPaymentFilter === "paid") {
+      list = list.filter((s) => {
+        const st = (s.payment_status || "").toLowerCase();
+        return st.includes("paid") || st.includes("مكتمل") || st.includes("complete") || (!s.remaining_payment || Number(s.remaining_payment) <= 0);
+      });
+    } else if (salesPaymentFilter === "remaining") {
+      list = list.filter((s) => s.remaining_payment != null && Number(s.remaining_payment) > 0);
+    }
+    return list;
+  }, [sales, salesFilterBuilding, salesSearch, salesDateFrom, salesDateTo, salesPaymentFilter]);
+
+  const salesTotalPages = Math.max(1, Math.ceil(salesFiltered.length / salesPageSize));
+  const reservationsTotalPages = Math.max(1, Math.ceil(reservationsFiltered.length / reservationsPageSize));
   const salesPaginated = useMemo(
-    () => sales.slice((salesPage - 1) * salesPageSize, salesPage * salesPageSize),
-    [sales, salesPage, salesPageSize]
+    () => salesFiltered.slice((salesPage - 1) * salesPageSize, salesPage * salesPageSize),
+    [salesFiltered, salesPage, salesPageSize]
   );
   const reservationsPaginated = useMemo(
-    () => reservations.slice((reservationsPage - 1) * reservationsPageSize, reservationsPage * reservationsPageSize),
-    [reservations, reservationsPage, reservationsPageSize]
+    () => reservationsFiltered.slice((reservationsPage - 1) * reservationsPageSize, reservationsPage * reservationsPageSize),
+    [reservationsFiltered, reservationsPage, reservationsPageSize]
   );
+
+  useEffect(() => {
+    setReservationsPage(1);
+  }, [resFilterBuilding, resSearch, resDateFrom, resDateTo]);
+  useEffect(() => {
+    setSalesPage(1);
+  }, [salesFilterBuilding, salesSearch, salesDateFrom, salesDateTo, salesPaymentFilter]);
 
   useEffect(() => {
     if (salesPage > salesTotalPages && salesTotalPages >= 1) setSalesPage(1);
@@ -458,7 +601,7 @@ export default function SalesPage() {
       setSales(rows);
       setPostponeDueDateOpen(false);
       setPostponeNewDueDate("");
-      showToast("تم تأجيل استحقاق المبلغ المتبقي إلى " + new Date(dueDateIso).toLocaleDateString("ar-SA", { day: "numeric", month: "long", year: "numeric" }));
+      showToast("تم تأجيل استحقاق المبلغ المتبقي إلى " + new Date(dueDateIso).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }));
     } catch {
       showToast("حدث خطأ أثناء التأجيل", "error");
     } finally {
@@ -588,17 +731,81 @@ export default function SalesPage() {
                   </span>
                   وحدات محجوزة
                   {reservations.length > 0 && (
-                    <span className="text-sm font-normal text-slate-500 font-mono">— {reservations.length.toLocaleString("en")} حجز</span>
+                    <span className="text-sm font-normal text-slate-500 font-mono">
+                      — {reservationsFiltered.length.toLocaleString("en")}
+                      {reservationsFiltered.length !== reservations.length ? ` من ${reservations.length.toLocaleString("en")}` : ""} حجز
+                    </span>
                   )}
                 </h2>
                 <p className="text-sm text-slate-500 mt-0.5">إتمام البيع أو استلام الوحدة من هنا</p>
               </div>
+              {!reservationsLoading && reservations.length > 0 && (
+                <div className="px-4 sm:px-6 py-3 border-b border-slate-100 bg-slate-50/95">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                    <div className="relative sm:col-span-2">
+                      <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="عميل، جوال، سند، عمارة…"
+                        value={resSearch}
+                        onChange={(e) => setResSearch(e.target.value)}
+                        className="w-full h-10 pr-10 pl-4 rounded-full border border-slate-200/90 bg-white text-sm shadow-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400/80"
+                      />
+                    </div>
+                    <select
+                      value={resFilterBuilding}
+                      onChange={(e) => setResFilterBuilding(e.target.value)}
+                      className="h-10 min-h-10 px-4 rounded-full border border-slate-200/90 bg-white text-sm shadow-sm focus:ring-2 focus:ring-amber-500/20 cursor-pointer"
+                    >
+                      <option value="">كل العماير</option>
+                      {buildings.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={resDatePreset}
+                      onChange={(e) => applyResDatePreset(e.target.value as DateRangePreset)}
+                      className="w-full h-10 min-h-10 min-w-0 px-4 rounded-full border border-slate-200/90 bg-white text-sm shadow-sm focus:ring-2 focus:ring-amber-500/20"
+                    >
+                      <option value="all">كل المدة · تاريخ الحجز</option>
+                      <option value="today">اليوم</option>
+                      <option value="yesterday">أمس</option>
+                      <option value="last_7">آخر 7 أيام</option>
+                      <option value="last_14">آخر 14 يوماً</option>
+                      <option value="this_month">هذا الشهر</option>
+                      <option value="last_30">آخر 30 يوماً</option>
+                      <option value="last_month">الشهر الماضي</option>
+                      <option value="custom">مخصص</option>
+                    </select>
+                  </div>
+                  {resDatePreset === "custom" && (
+                    <div className="mt-2 flex flex-nowrap items-center gap-3 overflow-x-auto pb-0.5">
+                      <span className="text-xs font-medium text-slate-500 shrink-0">من</span>
+                      <input
+                        type="date"
+                        value={resDateFrom}
+                        onChange={(e) => { setResDateFrom(e.target.value); setResDatePreset("custom"); }}
+                        className="h-9 min-w-[9.5rem] flex-1 sm:flex-none sm:w-40 px-3 rounded-full border border-slate-200/90 bg-white text-xs shadow-sm"
+                      />
+                      <span className="text-xs font-medium text-slate-500 shrink-0">إلى</span>
+                      <input
+                        type="date"
+                        value={resDateTo}
+                        onChange={(e) => { setResDateTo(e.target.value); setResDatePreset("custom"); }}
+                        className="h-9 min-w-[9.5rem] flex-1 sm:flex-none sm:w-40 px-3 rounded-full border border-slate-200/90 bg-white text-xs shadow-sm"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
               {reservationsLoading ? (
                 <div className="flex justify-center py-10">
                   <div className="animate-spin w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full" />
                 </div>
               ) : reservations.length === 0 ? (
                 <div className="text-center py-10 text-slate-500 text-sm">لا توجد وحدات محجوزة حالياً — يمكن إنشاء حجوزات من إدارة التسويق والمبيعات / الحجوزات</div>
+              ) : reservationsFiltered.length === 0 ? (
+                <div className="text-center py-10 text-slate-500 text-sm">لا نتائج تطابق البحث أو الفلتر — جرّب تغيير المعايير</div>
               ) : (
                 <>
                   <div className="overflow-auto max-h-[22rem] border-b border-slate-100" style={{ minHeight: "8rem" }}>
@@ -631,14 +838,14 @@ export default function SalesPage() {
                               {r.deposit_amount != null ? Number(r.deposit_amount).toLocaleString("en") : "—"}
                             </td>
                             <td className="p-3 text-slate-600 text-sm font-mono">{formatReceiptNumberDisplay(r.receipt_number)}</td>
-                            <td className="p-3">
-                              <div className="flex flex-wrap items-center justify-center gap-2">
+                            <td className="p-3 align-middle">
+                              <div className="flex flex-wrap items-center justify-center gap-1.5">
                                 <Link
                                   href={r.unit && typeof r.unit === "object" && "id" in r.unit ? `/dashboard/sales/handover/${(r.unit as TransferUnit).id}` : "#"}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition"
+                                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border shadow-sm bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300 transition whitespace-nowrap"
                                   title="استلام ومعاينة الوحدة (قبل إتمام البيع)"
                                 >
-                                  <ClipboardCheck className="w-4 h-4" />
+                                  <ClipboardCheck className="w-3.5 h-3.5 shrink-0 text-slate-500" aria-hidden />
                                   استلام الوحدة
                                 </Link>
                                 <button
@@ -648,9 +855,9 @@ export default function SalesPage() {
                                       openTransferForUnit(r.unit as TransferUnit, (r.building && typeof r.building === "object" && "name" in r.building ? String(r.building.name) : "") || "");
                                     }
                                   }}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition"
+                                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border shadow-sm bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100 hover:border-amber-300 transition whitespace-nowrap"
                                 >
-                                  <ArrowRightLeft className="w-4 h-4" />
+                                  <ArrowRightLeft className="w-3.5 h-3.5 shrink-0 text-amber-700" aria-hidden />
                                   إتمام البيع
                                 </button>
                               </div>
@@ -660,7 +867,7 @@ export default function SalesPage() {
                       </tbody>
                     </table>
                   </div>
-                  {reservations.length > 0 && (
+                  {reservationsFiltered.length > 0 && (
                     <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-amber-50/30">
                       <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
                         <span>عرض</span>
@@ -674,7 +881,7 @@ export default function SalesPage() {
                           ))}
                         </select>
                         <span className="font-mono">
-                          {((reservationsPage - 1) * reservationsPageSize + 1).toLocaleString("en")} - {Math.min(reservationsPage * reservationsPageSize, reservations.length).toLocaleString("en")}
+                          {((reservationsPage - 1) * reservationsPageSize + 1).toLocaleString("en")} - {Math.min(reservationsPage * reservationsPageSize, reservationsFiltered.length).toLocaleString("en")}
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
@@ -713,15 +920,98 @@ export default function SalesPage() {
                   </span>
                   سجل المبيعات
                   {sales.length > 0 && (
-                    <span className="text-sm font-normal text-slate-500 font-mono">— {sales.length.toLocaleString("en")} عملية</span>
+                    <span className="text-sm font-normal text-slate-500 font-mono">
+                      — {salesFiltered.length.toLocaleString("en")}
+                      {salesFiltered.length !== sales.length ? ` من ${sales.length.toLocaleString("en")}` : ""} عملية
+                    </span>
                   )}
                 </h2>
                 <p className="text-sm text-slate-500 mt-0.5">عرض وتفاصيل عمليات البيع المكتملة</p>
               </div>
+              {!loading && sales.length > 0 && (
+                <div className="px-4 sm:px-6 py-3 border-b border-slate-100 bg-slate-50/95">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                    <div className="relative sm:col-span-2">
+                      <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="مشتري، جوال، عمارة…"
+                        value={salesSearch}
+                        onChange={(e) => setSalesSearch(e.target.value)}
+                        className="w-full h-10 pr-10 pl-4 rounded-full border border-slate-200/90 bg-white text-sm shadow-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400/80"
+                      />
+                    </div>
+                    <select
+                      value={salesFilterBuilding}
+                      onChange={(e) => setSalesFilterBuilding(e.target.value)}
+                      className="h-10 min-h-10 px-4 rounded-full border border-slate-200/90 bg-white text-sm shadow-sm focus:ring-2 focus:ring-amber-500/20"
+                    >
+                      <option value="">كل العماير</option>
+                      {buildings.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={salesPaymentFilter}
+                      onChange={(e) => setSalesPaymentFilter(e.target.value as "all" | "paid" | "remaining")}
+                      className="h-10 min-h-10 px-4 rounded-full border border-slate-200/90 bg-white text-sm shadow-sm focus:ring-2 focus:ring-amber-500/20"
+                    >
+                      <option value="all">كل حالات الدفع</option>
+                      <option value="paid">مكتمل / مدفوع</option>
+                      <option value="remaining">متبقي (جزئي)</option>
+                    </select>
+                    <select
+                      value={salesDatePreset}
+                      onChange={(e) => applySalesDatePreset(e.target.value as DateRangePreset)}
+                      className="w-full h-10 min-h-10 min-w-0 px-4 rounded-full border border-slate-200/90 bg-white text-sm shadow-sm focus:ring-2 focus:ring-amber-500/20"
+                    >
+                      <option value="all">كل المدة · تاريخ البيع</option>
+                      <option value="today">اليوم</option>
+                      <option value="yesterday">أمس</option>
+                      <option value="last_7">آخر 7 أيام</option>
+                      <option value="last_14">آخر 14 يوماً</option>
+                      <option value="this_month">هذا الشهر</option>
+                      <option value="last_30">آخر 30 يوماً</option>
+                      <option value="last_month">الشهر الماضي</option>
+                      <option value="custom">مخصص</option>
+                    </select>
+                  </div>
+                  {salesDatePreset === "custom" && (
+                    <div className="mt-2 flex flex-nowrap items-center gap-3 overflow-x-auto pb-0.5">
+                      <span className="text-xs font-medium text-slate-500 shrink-0">من</span>
+                      <input
+                        type="date"
+                        value={salesDateFrom}
+                        onChange={(e) => { setSalesDateFrom(e.target.value); setSalesDatePreset("custom"); }}
+                        className="h-9 min-w-[9.5rem] flex-1 sm:flex-none sm:w-40 px-3 rounded-full border border-slate-200/90 bg-white text-xs shadow-sm"
+                      />
+                      <span className="text-xs font-medium text-slate-500 shrink-0">إلى</span>
+                      <input
+                        type="date"
+                        value={salesDateTo}
+                        onChange={(e) => { setSalesDateTo(e.target.value); setSalesDatePreset("custom"); }}
+                        className="h-9 min-w-[9.5rem] flex-1 sm:flex-none sm:w-40 px-3 rounded-full border border-slate-200/90 bg-white text-xs shadow-sm"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
               {loading ? (
                 <div className="flex justify-center items-center py-16">
                   <div className="animate-spin w-10 h-10 border-2 border-amber-500 border-t-transparent rounded-full" />
                 </div>
+              ) : sales.length === 0 && !loading ? (
+                <div className="text-center py-16 text-slate-500">
+                  <RiyalIcon className="w-14 h-14 mx-auto mb-3 text-slate-300" />
+                  <p className="font-medium">
+                    {salesError ? "تعذر تحميل سجل المبيعات" : "لا توجد مبيعات مسجلة"}
+                  </p>
+                  <p className="text-sm mt-1">
+                    {salesError ? salesError : "استخدم «إتمام نقل ملكية» أو الوحدات المحجوزة أعلاه لتسجيل أول عملية بيع"}
+                  </p>
+                </div>
+              ) : salesFiltered.length === 0 ? (
+                <div className="text-center py-16 text-slate-500 text-sm">لا نتائج تطابق البحث أو الفلتر — جرّب تغيير المعايير</div>
               ) : (
                 <>
                   <div className="overflow-auto max-h-[30rem] border-b border-slate-100" style={{ minHeight: "12rem" }}>
@@ -793,7 +1083,7 @@ export default function SalesPage() {
                       </tbody>
                     </table>
                   </div>
-                  {sales.length > 0 && (
+                  {salesFiltered.length > 0 && (
                     <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50">
                       <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
                         <span>عرض</span>
@@ -807,7 +1097,7 @@ export default function SalesPage() {
                           ))}
                         </select>
                         <span className="font-mono">
-                          {((salesPage - 1) * salesPageSize + 1).toLocaleString("en")} - {Math.min(salesPage * salesPageSize, sales.length).toLocaleString("en")}
+                          {((salesPage - 1) * salesPageSize + 1).toLocaleString("en")} - {Math.min(salesPage * salesPageSize, salesFiltered.length).toLocaleString("en")}
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
@@ -831,17 +1121,6 @@ export default function SalesPage() {
                           التالي
                         </button>
                       </div>
-                    </div>
-                  )}
-                  {sales.length === 0 && !loading && (
-                    <div className="text-center py-16 text-slate-500">
-                      <RiyalIcon className="w-14 h-14 mx-auto mb-3 text-slate-300" />
-                      <p className="font-medium">
-                        {salesError ? "تعذر تحميل سجل المبيعات" : "لا توجد مبيعات مسجلة"}
-                      </p>
-                      <p className="text-sm mt-1">
-                        {salesError ? salesError : "استخدم «إتمام نقل ملكية» أو الوحدات المحجوزة أعلاه لتسجيل أول عملية بيع"}
-                      </p>
                     </div>
                   )}
                 </>
@@ -912,7 +1191,7 @@ export default function SalesPage() {
                             <button
                               type="button"
                               onClick={() => openTransferForUnit(u, buildings.find((b) => b.id === selectedBuildingId)?.name ?? "")}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition"
+                              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition"
                             >
                               <ArrowRightLeft className="w-4 h-4" />
                               نقل ملكية
@@ -933,8 +1212,8 @@ export default function SalesPage() {
       {/* مودال تفاصيل عملية البيع — الطباعة عبر نافذة A4 */}
       {selectedSale && (
         <>
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-sm" onClick={() => setSelectedSale(null)}>
-            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative" onClick={(e) => e.stopPropagation()}>
+          <div className="dashboard-modal-overlay bg-slate-900/30" onClick={() => setSelectedSale(null)}>
+            <div className="dashboard-modal-shell max-w-lg w-full max-h-[90vh] overflow-y-auto overflow-x-hidden dashboard-modal-scroll p-6 relative" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-end gap-2 mb-4">
                 <div className="flex items-center gap-2">
                   <button
@@ -1112,13 +1391,18 @@ export default function SalesPage() {
                             {confirmingRemaining ? "جاري التأكيد..." : "تأكيد تحصيل المتبقي"}
                           </button>
                           {confirmRemainingCollectOpen && (
-                            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={() => setConfirmRemainingCollectOpen(false)}>
-                              <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-                                <p className="text-slate-800 font-medium text-center">
-                                  تأكيد استحقاق المبلغ: <span className="dir-ltr font-bold text-emerald-700">{Number(selectedSale.remaining_payment).toLocaleString("en")} ر.س</span>
-                                </p>
-                                <p className="text-sm text-slate-500 text-center">هل أنت متأكد من تأكيد تحصيل المبلغ المتبقي؟ سيتم تحديث حالة الدفع إلى مكتمل.</p>
-                                <div className="flex gap-3">
+                            <div className="dashboard-modal-overlay-z60 bg-slate-900/40 backdrop-blur-sm" onClick={() => setConfirmRemainingCollectOpen(false)}>
+                              <div className="dashboard-modal-shell max-w-md w-full flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} dir="rtl">
+                                <div className="shrink-0 px-6 pt-5 pb-3 border-b border-emerald-100 bg-gradient-to-b from-emerald-50/95 to-white rounded-t-2xl">
+                                  <p className="text-slate-800 font-medium text-center text-sm">تأكيد تحصيل المتبقي</p>
+                                </div>
+                                <div className="px-6 py-4 space-y-3 overflow-y-auto dashboard-modal-scroll dashboard-modal-scroll-gutter-auto max-h-[40vh]">
+                                  <p className="text-slate-800 font-medium text-center">
+                                    المبلغ: <span className="dir-ltr font-bold text-emerald-700">{Number(selectedSale.remaining_payment).toLocaleString("en")} ر.س</span>
+                                  </p>
+                                  <p className="text-sm text-slate-500 text-center">هل أنت متأكد؟ سيتم تحديث حالة الدفع إلى مكتمل.</p>
+                                </div>
+                                <div className="shrink-0 flex gap-3 px-6 py-4 border-t border-emerald-100/80 bg-emerald-50/30 rounded-b-2xl">
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -1126,14 +1410,14 @@ export default function SalesPage() {
                                       handleConfirmRemainingCollected();
                                     }}
                                     disabled={confirmingRemaining}
-                                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 shadow-sm"
                                   >
                                     {confirmingRemaining ? "جاري..." : "تأكيد"}
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => setConfirmRemainingCollectOpen(false)}
-                                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50"
+                                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 shadow-sm"
                                   >
                                     إلغاء
                                   </button>
@@ -1227,25 +1511,36 @@ export default function SalesPage() {
         </>
       )}
 
-      {/* مودال إتمام نقل الملكية */}
+      {/* مودال إتمام نقل الملكية — نفس غلاف النوافذ الموحّد */}
       {transferUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md" onClick={closeTransferModal}>
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
-              <h2 className="text-base font-bold text-slate-800">نقل الملكية</h2>
-              <button type="button" onClick={closeTransferModal} className="p-2 rounded-lg hover:bg-slate-200/80 text-slate-500 hover:text-slate-700 transition" aria-label="إغلاق">
+        <div className="app-modal-root dashboard-modal-overlay" onClick={closeTransferModal}>
+          <div
+            className="dashboard-modal-shell max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            dir="rtl"
+          >
+            <div className="shrink-0 flex items-center justify-between px-6 pt-5 pb-3 border-b border-slate-100 bg-gradient-to-b from-amber-50/90 to-white rounded-t-2xl">
+              <h2 className="text-lg font-bold text-slate-800">نقل الملكية</h2>
+              <button
+                type="button"
+                onClick={closeTransferModal}
+                className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition"
+                aria-label="إغلاق"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-6">
-            <TransferOwnershipForm
-              unit={transferUnit}
-              buildingId={transferUnit.building_id}
-              buildingName={transferBuildingName}
-              onSuccess={handleTransferSuccess}
-              onCancel={closeTransferModal}
-              compact
-            />
+            <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll dashboard-modal-scroll-gutter-auto px-6 py-4">
+              <div className="space-y-1 pe-0.5">
+                <TransferOwnershipForm
+                  unit={transferUnit}
+                  buildingId={transferUnit.building_id}
+                  buildingName={transferBuildingName}
+                  onSuccess={handleTransferSuccess}
+                  onCancel={closeTransferModal}
+                  compact
+                />
+              </div>
             </div>
           </div>
         </div>

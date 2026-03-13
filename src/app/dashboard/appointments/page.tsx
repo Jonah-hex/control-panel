@@ -32,6 +32,7 @@ type AppointmentType =
   | "contract_signing"
   | "other";
 type AppointmentStatus = "scheduled" | "completed" | "cancelled" | "no_show";
+type AppointmentPriority = "low" | "normal" | "high" | "urgent";
 
 interface Appointment {
   id: string;
@@ -42,6 +43,7 @@ interface Appointment {
   building_id: string | null;
   notes: string | null;
   status: AppointmentStatus;
+  priority?: AppointmentPriority;
   created_at: string;
   created_by?: string | null;
   created_by_name?: string | null;
@@ -67,6 +69,13 @@ const STATUS_LABELS: Record<AppointmentStatus, string> = {
   no_show: "لم يحضر",
 };
 
+const PRIORITY_LABELS: Record<AppointmentPriority, string> = {
+  low: "منخفض",
+  normal: "عادي",
+  high: "عالي — تنبيه حرج عند اقتراب الموعد",
+  urgent: "عاجل — تنبيه حرج",
+};
+
 export default function AppointmentsPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -84,6 +93,7 @@ export default function AppointmentsPage() {
     type: "viewing" as AppointmentType,
     building_id: "",
     notes: "",
+    priority: "normal" as AppointmentPriority,
   });
   const [saving, setSaving] = useState(false);
   const [viewingAppointment, setViewingAppointment] = useState<Appointment | null>(null);
@@ -96,7 +106,7 @@ export default function AppointmentsPage() {
     const { data, error } = await supabase
       .from("dashboard_appointments")
       .select(`
-        id, owner_id, title, scheduled_at, type, building_id, notes, status, created_at, created_by, created_by_name,
+        id, owner_id, title, scheduled_at, type, building_id, notes, status, priority, created_at, created_by, created_by_name,
         buildings ( id, name )
       `)
       .eq("owner_id", effectiveOwnerId)
@@ -154,6 +164,7 @@ export default function AppointmentsPage() {
       type: "viewing",
       building_id: "",
       notes: "",
+      priority: "normal",
     });
     setModalOpen(true);
   };
@@ -168,6 +179,7 @@ export default function AppointmentsPage() {
       type: a.type,
       building_id: a.building_id || "",
       notes: a.notes || "",
+      priority: (a.priority as AppointmentPriority) || "normal",
     });
     setModalOpen(true);
   };
@@ -188,6 +200,7 @@ export default function AppointmentsPage() {
           type: form.type,
           building_id: form.building_id || null,
           notes: form.notes.trim() || null,
+          priority: form.priority,
         })
         .eq("id", editingId);
       setSaving(false);
@@ -208,6 +221,7 @@ export default function AppointmentsPage() {
       type: form.type,
       building_id: form.building_id || null,
       notes: form.notes.trim() || null,
+      priority: form.priority,
       status: "scheduled",
       created_by: (await supabase.auth.getUser()).data.user?.id,
       created_by_name: currentUserDisplayName?.trim() || null,
@@ -342,6 +356,16 @@ export default function AppointmentsPage() {
                         <span className="px-2 py-0.5 rounded-lg bg-gray-100 text-gray-600 text-xs">
                           {STATUS_LABELS[a.status]}
                         </span>
+                        {(a.priority === "high" || a.priority === "urgent") && (
+                          <span className="px-2 py-0.5 rounded-lg bg-rose-100 text-rose-800 text-xs font-medium">
+                            {a.priority === "urgent" ? "عاجل" : "عالي"}
+                          </span>
+                        )}
+                        {(a.priority === "low" || !a.priority || a.priority === "normal") && a.status === "scheduled" && (
+                          <span className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600 text-xs">
+                            {PRIORITY_LABELS[(a.priority as AppointmentPriority) || "normal"].split(" —")[0]}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <Eye className="w-5 h-5 text-slate-400 shrink-0 ms-auto opacity-60 group-hover:opacity-100 transition-opacity" aria-hidden />
@@ -396,14 +420,14 @@ export default function AppointmentsPage() {
       {/* بطاقة عرض تفاصيل الموعد */}
       {viewingAppointment && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          className="dashboard-modal-overlay"
           onClick={() => setViewingAppointment(null)}
           role="dialog"
           aria-modal="true"
           aria-labelledby="appointment-detail-title"
         >
           <div
-            className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto overflow-x-hidden"
+            className="dashboard-modal-shell max-w-md w-full max-h-[90vh] overflow-y-auto overflow-x-hidden dashboard-modal-scroll"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex items-center justify-between rounded-t-2xl z-10">
@@ -505,10 +529,16 @@ export default function AppointmentsPage() {
       )}
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">{editingId ? "تعديل الموعد" : "موعد جديد"}</h3>
-            <div className="space-y-4">
+        <div className="dashboard-modal-overlay">
+          <div
+            className="dashboard-modal-shell max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden"
+            dir="rtl"
+          >
+            <div className="shrink-0 px-6 pt-6 pb-3 border-b border-slate-100 bg-gradient-to-b from-slate-50/90 to-white rounded-t-2xl">
+              <h3 className="text-lg font-bold text-gray-800">{editingId ? "تعديل الموعد" : "موعد جديد"}</h3>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll dashboard-modal-scroll-gutter-auto px-6 py-4">
+            <div className="space-y-4 pe-1">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">العنوان *</label>
                 <input
@@ -565,6 +595,21 @@ export default function AppointmentsPage() {
                 </select>
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">الأولوية</label>
+                <select
+                  value={form.priority}
+                  onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value as AppointmentPriority }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2"
+                >
+                  {Object.entries(PRIORITY_LABELS).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  عالي/عاجل: تنبيه بالغ الأهمية عند اقتراب الموعد. عادي/منخفض: تذكير في جرس التنبيهات.
+                </p>
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
                 <textarea
                   value={form.notes}
@@ -575,19 +620,20 @@ export default function AppointmentsPage() {
                 />
               </div>
             </div>
-            <div className="flex gap-3 mt-6">
+            </div>
+            <div className="shrink-0 flex gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl">
               <button
                 type="button"
                 onClick={saveAppointment}
                 disabled={saving || !form.title.trim()}
-                className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-medium disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-medium disabled:opacity-50 shadow-sm"
               >
                 {saving ? "جاري الحفظ..." : "حفظ"}
               </button>
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700"
+                className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-gray-700 shadow-sm"
               >
                 إلغاء
               </button>

@@ -522,26 +522,29 @@ export default function UnitMaintenancePage() {
       {/* modal إضافة طلب */}
       {showAddModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+          className="dashboard-modal-overlay cursor-pointer"
           onClick={() => !saving && setShowAddModal(false)}
           role="dialog"
           aria-modal="true"
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+            className="dashboard-modal-shell max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden cursor-default"
             onClick={(e) => e.stopPropagation()}
+            dir="rtl"
           >
-            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+            <div className="shrink-0 px-6 pt-5 pb-3 border-b border-emerald-100 bg-gradient-to-b from-emerald-50/90 to-white rounded-t-2xl flex items-center justify-between">
               <h3 className="font-bold text-slate-800">إضافة طلب صيانة</h3>
               <button
                 type="button"
                 onClick={() => !saving && setShowAddModal(false)}
-                className="p-2 rounded-lg text-slate-500 hover:bg-slate-100"
+                className="p-2 rounded-xl text-slate-600 hover:bg-emerald-100"
+                aria-label="إغلاق"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleAddRequest} className="p-6 space-y-4">
+            <form onSubmit={handleAddRequest} className="flex flex-col flex-1 min-h-0">
+            <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll dashboard-modal-scroll-gutter-auto px-6 py-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">عنوان الطلب *</label>
                 <input
@@ -599,18 +602,19 @@ export default function UnitMaintenancePage() {
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-slate-800 dir-ltr"
                 />
               </div>
-              <div className="flex gap-2 pt-2">
+            </div>
+              <div className="shrink-0 flex gap-2 px-6 py-4 border-t border-emerald-100/80 bg-emerald-50/30 rounded-b-2xl">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-medium hover:bg-slate-50"
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium hover:bg-slate-50 shadow-sm"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
                   disabled={saving || !form.title.trim()}
-                  className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 disabled:opacity-50"
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 disabled:opacity-50 shadow-sm"
                 >
                   {saving ? "جاري الحفظ..." : "إضافة الطلب"}
                 </button>

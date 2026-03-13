@@ -396,10 +396,13 @@ export default function TasksPage() {
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">مهمة / ملاحظة جديدة</h3>
-            <div className="space-y-4">
+        <div className="dashboard-modal-overlay">
+          <div className="dashboard-modal-shell max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden" dir="rtl">
+            <div className="shrink-0 px-6 pt-6 pb-3 border-b border-slate-100 bg-gradient-to-b from-slate-50/90 to-white rounded-t-2xl">
+              <h3 className="text-lg font-bold text-gray-800">مهمة / ملاحظة جديدة</h3>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll px-6 py-4">
+            <div className="space-y-4 pe-1">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">العنوان *</label>
                 <input
@@ -459,19 +462,20 @@ export default function TasksPage() {
                 </select>
               </div>
             </div>
-            <div className="flex gap-3 mt-6">
+            </div>
+            <div className="shrink-0 flex gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl">
               <button
                 type="button"
                 onClick={saveTask}
                 disabled={saving || !form.title.trim()}
-                className="flex-1 py-2.5 rounded-xl bg-amber-600 text-white font-medium disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-xl bg-amber-600 text-white font-medium disabled:opacity-50 shadow-sm"
               >
                 {saving ? "جاري الحفظ..." : "إرسال"}
               </button>
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700"
+                className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-gray-700 shadow-sm"
               >
                 إلغاء
               </button>
@@ -481,10 +485,13 @@ export default function TasksPage() {
       )}
 
       {scheduleForTaskId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">جدولة موعد من المهمة</h3>
-            <div className="space-y-4">
+        <div className="dashboard-modal-overlay">
+          <div className="dashboard-modal-shell max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden" dir="rtl">
+            <div className="shrink-0 px-6 pt-6 pb-3 border-b border-slate-100 bg-gradient-to-b from-slate-50/90 to-white rounded-t-2xl">
+              <h3 className="text-lg font-bold text-gray-800">جدولة موعد من المهمة</h3>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll px-6 py-4">
+            <div className="space-y-4 pe-1">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">عنوان الموعد</label>
                 <input
@@ -529,12 +536,13 @@ export default function TasksPage() {
                 </select>
               </div>
             </div>
-            <div className="flex gap-3 mt-6">
+            </div>
+            <div className="shrink-0 flex gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl">
               <button
                 type="button"
                 onClick={saveSchedule}
                 disabled={saving || !scheduleForm.title.trim()}
-                className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-medium disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
               >
                 <Send className="w-4 h-4" />
                 {saving ? "جاري الحفظ..." : "إنشاء الموعد"}
@@ -542,7 +550,7 @@ export default function TasksPage() {
               <button
                 type="button"
                 onClick={() => setScheduleForTaskId(null)}
-                className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700"
+                className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-gray-700 shadow-sm"
               >
                 إلغاء
               </button>

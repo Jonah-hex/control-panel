@@ -424,28 +424,28 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
 
       {/* مودال التعديل */}
       {editUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-6">
+        <div className="dashboard-modal-overlay" onClick={(e) => e.target === e.currentTarget && !saving && closeEditModal()}>
+          <div className="dashboard-modal-shell max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} dir="rtl">
+            <div className="shrink-0 px-6 pt-5 pb-3 border-b border-teal-100 bg-gradient-to-b from-teal-50/95 to-white rounded-t-2xl flex items-center justify-between gap-2">
               <h3 className="text-lg font-bold text-teal-800">
                 بيانات الصك — الوحدة {editUnit.unit_number}
               </h3>
               <button
                 onClick={closeEditModal}
-                className="p-2 rounded-lg hover:bg-slate-100 text-slate-500"
+                className="p-2 rounded-xl hover:bg-teal-100 text-slate-600 shrink-0"
                 disabled={saving}
+                aria-label="إغلاق"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-
+            <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll dashboard-modal-scroll-gutter-auto px-6 py-4">
             {saveError && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
                 {saveError}
               </div>
             )}
-
-            <div className="space-y-4">
+            <div className="space-y-4 pe-1">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   <span className="flex items-center gap-2">
@@ -508,19 +508,19 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
                 )}
               </div>
             </div>
-
-            <div className="flex gap-3 mt-6">
+            </div>
+            <div className="shrink-0 flex gap-3 px-6 py-4 border-t border-teal-100 bg-teal-50/40 rounded-b-2xl">
               <button
                 onClick={handleSaveEdit}
                 disabled={saving}
-                className="flex-1 px-4 py-2.5 bg-gradient-to-br from-teal-500 to-teal-600 text-white rounded-xl font-medium hover:from-teal-600 hover:to-teal-700 disabled:opacity-60 transition"
+                className="flex-1 px-4 py-2.5 bg-gradient-to-br from-teal-500 to-teal-600 text-white rounded-xl font-medium hover:from-teal-600 hover:to-teal-700 disabled:opacity-60 shadow-sm"
               >
                 {saving ? "جاري الحفظ..." : "حفظ"}
               </button>
               <button
                 onClick={closeEditModal}
                 disabled={saving}
-                className="px-4 py-2.5 bg-slate-200 text-slate-700 rounded-xl font-medium hover:bg-slate-300 disabled:opacity-60 transition"
+                className="px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl font-medium hover:bg-slate-50 disabled:opacity-60 shadow-sm"
               >
                 إلغاء
               </button>
@@ -531,22 +531,22 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
 
       {/* نافذة معاينة بيانات المالك */}
       {viewOwnerUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer" onClick={() => { setViewOwnerUnit(null); setViewOwnerHandoverDate(null); }}>
+        <div className="dashboard-modal-overlay cursor-pointer" onClick={() => { setViewOwnerUnit(null); setViewOwnerHandoverDate(null); }}>
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6"
+            className="dashboard-modal-shell max-w-sm w-full max-h-[90vh] flex flex-col overflow-hidden cursor-default"
             onClick={(e) => e.stopPropagation()}
+            dir="rtl"
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-teal-800">
-                <span className="flex items-center gap-2">
-                  <User className="w-5 h-5" />
-                  بيانات المالك — الوحدة {viewOwnerUnit.unit_number}
-                </span>
+            <div className="shrink-0 px-6 pt-5 pb-3 border-b border-teal-100 bg-gradient-to-b from-teal-50/95 to-white rounded-t-2xl flex items-center justify-between gap-2">
+              <h3 className="text-lg font-bold text-teal-800 flex items-center gap-2 min-w-0">
+                  <User className="w-5 h-5 shrink-0" />
+                  <span className="truncate">بيانات المالك — {viewOwnerUnit.unit_number}</span>
               </h3>
-              <button onClick={() => { setViewOwnerUnit(null); setViewOwnerHandoverDate(null); }} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500">
+              <button onClick={() => { setViewOwnerUnit(null); setViewOwnerHandoverDate(null); }} className="p-2 rounded-xl hover:bg-teal-100 text-slate-600 shrink-0" aria-label="إغلاق">
                 <X className="w-5 h-5" />
               </button>
             </div>
+            <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll dashboard-modal-scroll-gutter-auto px-6 py-4 rounded-b-2xl">
             <div className="space-y-3 text-sm">
               <div className="flex justify-between items-center gap-3 py-2 border-b border-slate-100">
                 <span className="text-slate-600 shrink-0">اسم المالك الأول</span>
@@ -598,6 +598,7 @@ export default function BuildingDeedsPanel({ buildingId, openTransferUnitId }: B
                   </a>
                 </div>
               )}
+            </div>
             </div>
           </div>
         </div>

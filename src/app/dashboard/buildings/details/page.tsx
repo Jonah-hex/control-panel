@@ -1417,11 +1417,11 @@ function DetailsContent() {
         {guardIdPreview && (
           <>
             <div
-              className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm cursor-pointer"
+              className="app-modal-root fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm cursor-pointer"
               onClick={() => setGuardIdPreview(null)}
               aria-hidden="true"
             />
-            <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 cursor-pointer" onClick={() => setGuardIdPreview(null)}>
+            <div className="app-modal-root fixed inset-0 z-[101] flex items-center justify-center p-4 cursor-pointer" onClick={() => setGuardIdPreview(null)}>
               <div className="relative flex flex-col items-center" onClick={e => e.stopPropagation()}>
                 <img
                   src={guardIdPreview}

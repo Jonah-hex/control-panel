@@ -35,6 +35,20 @@ label[for] {
   cursor: pointer;
 }
 
+/* شريط لوحة التحكم: يد على كامل الصف — بدون تحديد نص يشبه المحرر */
+.dashboard-sidebar-nav a,
+.dashboard-sidebar-nav button {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.dashboard-sidebar-nav a *,
+.dashboard-sidebar-nav button * {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* Animated gradient للخلفية الرئيسية */
 @keyframes gradient-animation {
   0% {
@@ -806,6 +820,114 @@ button:focus-visible {
   scrollbar-color: #cbd5e1 transparent;
 }
 
+/*
+ * نوافذ المنصة — توحيد الشكل فقط (overlay + غلاف البطاقة + تمرير أنيق).
+ * شريط التمرير محايد (رمادي) عمداً: لا يسرق هوية لون الصفحة (كهربائي، كهرماني، زمردي…).
+ */
+@layer components {
+  .dashboard-modal-overlay {
+    @apply fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-[2px];
+  }
+  .dashboard-modal-overlay-z60 {
+    @apply fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-[2px];
+  }
+  .dashboard-modal-shell {
+    @apply bg-white rounded-2xl shadow-xl border border-slate-200/80 ring-1 ring-slate-900/5;
+  }
+}
+
+/*
+ * app-modal-root — قاعدة ثابتة لكل نافذة: قفل تمرير الخلفية + سكرول داخل النافذة فقط.
+ * استخدم: className="app-modal-root …" على الطبقة الخارجية الثابتة لأي نافذة.
+ * يُدمج تلقائياً مع dashboard-modal-overlay / z60 (انظر الأسفل).
+ */
+html:has(.app-modal-root),
+html:has(.dashboard-modal-overlay),
+html:has(.dashboard-modal-overlay-z60) {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+.app-modal-root,
+.dashboard-modal-overlay,
+.dashboard-modal-overlay-z60 {
+  overscroll-behavior: contain;
+  touch-action: none;
+}
+.app-modal-root > *,
+.dashboard-modal-overlay > *,
+.dashboard-modal-overlay-z60 > * {
+  touch-action: auto;
+}
+.dashboard-modal-scroll,
+.appointment-modal-scroll {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+}
+/* بدون حجز دائم لمسار الشريط — يقلل الفراغ الفارغ عندما لا يوجد تمرير (معاينة وحدة، إلخ) */
+.dashboard-modal-scroll-gutter-auto {
+  scrollbar-gutter: auto;
+}
+/* اختياري — شريط تمرير بلسان لون الصفحة (يُضاف على حاوية التمرير فقط في تلك الصفحة) */
+.dashboard-modal-scroll-accent-amber {
+  scrollbar-color: #f59e0b #fffbeb;
+}
+.dashboard-modal-scroll-accent-amber::-webkit-scrollbar-track {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+.dashboard-modal-scroll-accent-amber::-webkit-scrollbar-thumb {
+  background: #fbbf24;
+  border-color: #fffbeb;
+}
+.dashboard-modal-scroll-accent-amber::-webkit-scrollbar-thumb:hover {
+  background: #f59e0b;
+}
+.dashboard-modal-scroll-accent-blue {
+  scrollbar-color: #3b82f6 #eff6ff;
+}
+.dashboard-modal-scroll-accent-blue::-webkit-scrollbar-track {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+.dashboard-modal-scroll-accent-blue::-webkit-scrollbar-thumb {
+  background: #60a5fa;
+  border-color: #eff6ff;
+}
+.dashboard-modal-scroll-accent-blue::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6;
+}
+.dashboard-modal-scroll::-webkit-scrollbar,
+.appointment-modal-scroll::-webkit-scrollbar {
+  width: 7px;
+}
+.dashboard-modal-scroll::-webkit-scrollbar-button,
+.appointment-modal-scroll::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
+}
+.dashboard-modal-scroll::-webkit-scrollbar-track,
+.appointment-modal-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 9999px;
+  margin: 10px 0;
+  border: 1px solid #e2e8f0;
+}
+.dashboard-modal-scroll::-webkit-scrollbar-thumb,
+.appointment-modal-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+  border: 2px solid #f1f5f9;
+  min-height: 48px;
+}
+.dashboard-modal-scroll::-webkit-scrollbar-thumb:hover,
+.appointment-modal-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
 /* Animation للـ gradient backgrounds */
 @keyframes gradient-shift {
   0% {
@@ -1040,5 +1162,230 @@ main {
   main.reports-print section {
     margin-bottom: 14px !important;
     break-inside: avoid;
+  }
+  /* شريط ملخص الوحدات — بدون هذا لا تظهر ألوان الشريط في معاينة الطباعة */
+  main.reports-print .units-status-bar-track,
+  main.reports-print .units-status-bar-track > * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* جرس تنبيهات — اهتزاز وتوهج عند وجود تنبيهات بالغة الأهمية */
+@keyframes dashboard-bell-shake {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  20% {
+    transform: rotate(14deg);
+  }
+  40% {
+    transform: rotate(-12deg);
+  }
+  60% {
+    transform: rotate(10deg);
+  }
+  80% {
+    transform: rotate(-6deg);
+  }
+}
+@keyframes dashboard-bell-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+  }
+}
+.dashboard-bell-urgent {
+  animation: dashboard-bell-shake 0.6s ease-in-out infinite;
+  box-shadow: 0 0 12px 2px rgba(234, 88, 12, 0.35), 0 0 20px 4px rgba(245, 158, 11, 0.2) !important;
+  border-color: rgb(251 191 36) !important;
+  background: linear-gradient(135deg, rgb(255 251 235), rgb(254 243 199)) !important;
+  color: rgb(180 83 9) !important;
+}
+.dashboard-bell-urgent svg {
+  animation: dashboard-bell-shake 1.2s ease-in-out infinite;
+}
+
+/* إغلاق تنبيه حرج — تلاشٍ فقط */
+.critical-alert-card-exit {
+  pointer-events: none !important;
+  opacity: 0 !important;
+  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.critical-alert-row-exit {
+  opacity: 0 !important;
+  max-height: 0 !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  overflow: hidden !important;
+  transition:
+    opacity 0.28s ease-out,
+    max-height 0.3s ease-out,
+    margin 0.28s ease-out,
+    padding 0.28s ease-out !important;
+}
+
+/* —— طباعة نموذج استلام الوحدة: A4، هوامش سخية، بدون قصّ —— */
+@media print {
+  @page {
+    size: A4 portrait;
+    /* هوامش أكبر أعلى/أسفل لتفادي القصّ في المعاينة والـ PDF */
+    margin: 22mm 14mm 24mm 14mm;
+  }
+  html {
+    scroll-padding-top: 0;
+  }
+  body {
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  body,
+  main.flex-1 {
+    overflow: visible !important;
+    overflow-x: visible !important;
+  }
+  .unit-handover-print-root {
+    background: #fff !important;
+    min-height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  /* عرض = كامل منطقة الطباعة (بدون عمود ضيق يزيد القصّ على الجانب) */
+  .unit-handover-print-root .unit-handover-print-inner {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 2mm !important;
+    box-sizing: border-box !important;
+  }
+  /* بدون إطار خارجي — فقط حدود حقول الإدخال (المربعات) */
+  .unit-handover-print-card {
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+  }
+  .unit-handover-print-banner {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    background: linear-gradient(to left, #fff7ed, #fffbeb) !important;
+    border: none !important;
+    border-bottom: 1px solid #e7e5e4 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .unit-handover-print-root .unit-handover-print-form {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 6px 8px 10px !important;
+    margin: 0 !important;
+  }
+  .unit-handover-print-title-print {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    padding: 0 6px !important;
+  }
+  .unit-handover-print-root .unit-handover-print-form input[type="date"] {
+    border-radius: 0.75rem !important;
+    padding: 0.5rem 1rem !important;
+    min-height: 2.75rem !important;
+  }
+  .unit-handover-print-root input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0 !important;
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+  .unit-handover-print-root .unit-handover-print-form input[type="radio"],
+  .unit-handover-print-root .unit-handover-print-form input[type="checkbox"] {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    width: 12px !important;
+    height: 12px !important;
+    min-width: 12px !important;
+    margin: 0 3px !important;
+    border: 1px solid #334155 !important;
+    background: #fff !important;
+    vertical-align: middle !important;
+    flex-shrink: 0 !important;
+  }
+  .unit-handover-print-root .unit-handover-print-form input[type="radio"] {
+    border-radius: 50% !important;
+  }
+  .unit-handover-print-root .unit-handover-print-form input[type="checkbox"] {
+    border-radius: 2px !important;
+  }
+  .unit-handover-print-root .unit-handover-print-form input[type="radio"]:checked,
+  .unit-handover-print-root .unit-handover-print-form input[type="checkbox"]:checked {
+    background: #fff !important;
+    background-image: none !important;
+  }
+  .unit-handover-print-root .handover-print-defects-textarea {
+    min-height: 5rem !important;
+    max-height: none !important;
+    overflow: visible !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .unit-handover-print-root .unit-handover-print-form input::placeholder,
+  .unit-handover-print-root .unit-handover-print-form textarea::placeholder {
+    color: transparent !important;
+    opacity: 0 !important;
+  }
+  .unit-handover-print-root .unit-handover-print-form input:not([type="radio"]):not([type="checkbox"]):not(.handover-date-input),
+  .unit-handover-print-root .unit-handover-print-form textarea,
+  .unit-handover-print-root .unit-handover-print-form select {
+    border: 1px solid #94a3b8 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    outline: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .unit-handover-print-root .handover-date-input {
+    width: 15.5rem !important;
+    max-width: 100% !important;
+    border: 1px solid #94a3b8 !important;
+    background: #fff !important;
+    box-sizing: border-box !important;
+  }
+  .unit-handover-print-root .unit-handover-print-form section {
+    background: #fff !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 8px 0 !important;
+    margin-bottom: 6px !important;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+  .unit-handover-print-root .handover-print-keep-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .unit-handover-print-root .handover-print-section-flow {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+  .unit-handover-print-root .handover-print-subblock {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 6px !important;
+    padding-bottom: 4px !important;
+    border: none !important;
   }
 }

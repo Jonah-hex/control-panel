@@ -244,36 +244,44 @@ export default function MarketersPage() {
       <div className="max-w-4xl mx-auto relative">
         <header className="relative rounded-2xl overflow-hidden mb-8 shadow-lg border border-gray-200/90 bg-gradient-to-br from-white to-gray-50">
           <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-600 opacity-10" />
-          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 sm:p-6">
-            <div className="flex items-center gap-3">
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-4 sm:px-5 sm:py-4">
+            <div className="flex items-center gap-3 min-w-0">
               <Link
                 href="/dashboard/marketing"
-                className="flex items-center justify-center w-10 h-10 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition"
+                className="p-2 rounded-xl border border-slate-200 bg-white/80 text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition shrink-0"
+                aria-label="رجوع"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-5 h-5 rtl:rotate-180" />
               </Link>
-              <div className={iconBox}>
+              <div className={`${iconBox} !w-12 !h-12 sm:!w-14 sm:!h-14 rounded-xl [&_svg]:!w-6 [&_svg]:!h-6`}>
                 <Users className="w-6 h-6 text-white" />
               </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-800 tracking-tight">قسم المسوقين</h1>
-                <p className="text-xs sm:text-sm text-gray-500 mt-0.5">إدارة قائمة المسوقين وربطهم بالحجوزات والمبيعات</p>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-bold text-gray-800 tracking-tight leading-tight">قسم المسوقين</h1>
+                <p className="text-xs text-gray-500 mt-0.5 leading-snug">إدارة قائمة المسوقين وربطهم بالحجوزات والمبيعات</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
               <Link
                 href="/dashboard/marketing"
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 transition"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition"
               >
-                <LayoutDashboard className="w-4 h-4" />
+                <LayoutDashboard className="w-4 h-4 shrink-0 text-slate-600" />
                 إدارة التسويق والمبيعات
+              </Link>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
+              >
+                <LayoutDashboard className="w-4 h-4 shrink-0 text-slate-600" />
+                لوحة التحكم
               </Link>
               <button
                 type="button"
                 onClick={openAdd}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-medium text-sm shadow-lg shadow-amber-500/25 hover:from-amber-600 hover:to-orange-700 transition"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-amber-600/25 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-medium text-sm shadow-sm hover:from-amber-600 hover:to-orange-700 transition"
               >
-                <UserPlus className="w-4 h-4" />
+                <UserPlus className="w-4 h-4 shrink-0" />
                 إضافة مسوق
               </button>
             </div>
@@ -473,18 +481,20 @@ export default function MarketersPage() {
 
       {/* modal add / edit */}
       {(modalOpen === "add" || modalOpen === "edit") && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={closeModal}>
+        <div className="dashboard-modal-overlay" onClick={closeModal}>
           <div
-            className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-gray-200"
+            className="dashboard-modal-shell w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
+            dir="rtl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-5">
+            <div className="shrink-0 px-6 pt-5 pb-3 border-b border-amber-100 bg-gradient-to-b from-amber-50/95 to-white rounded-t-2xl flex items-center justify-between gap-2">
               <h3 className="text-lg font-bold text-gray-800">{modalOpen === "add" ? "إضافة مسوق" : "تعديل المسوق"}</h3>
-              <button type="button" onClick={closeModal} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500">
+              <button type="button" onClick={closeModal} className="p-2 rounded-xl hover:bg-amber-100 text-gray-600 shrink-0" aria-label="إغلاق">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="space-y-4">
+            <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll dashboard-modal-scroll-gutter-auto px-6 py-4">
+            <div className="space-y-4 pe-1">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">اسم المسوق *</label>
                 <input
@@ -539,16 +549,17 @@ export default function MarketersPage() {
                 />
               </div>
             </div>
-            <div className="flex gap-3 mt-6">
+            </div>
+            <div className="shrink-0 flex gap-3 px-6 py-4 border-t border-amber-100/80 bg-amber-50/40 rounded-b-2xl">
               <button
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="flex-1 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-medium hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 transition"
+                className="flex-1 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-medium hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 shadow-sm"
               >
                 {saving ? "جاري الحفظ..." : "حفظ"}
               </button>
-              <button type="button" onClick={closeModal} className="px-5 py-2.5 border border-gray-200 rounded-xl font-medium text-gray-700 hover:bg-gray-50">
+              <button type="button" onClick={closeModal} className="px-5 py-2.5 border border-slate-200 bg-white rounded-xl font-medium text-gray-700 hover:bg-slate-50 shadow-sm">
                 إلغاء
               </button>
             </div>

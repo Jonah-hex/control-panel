@@ -1059,11 +1059,11 @@ path.unshift(stripNumbering(f.name));
 
       {/* تأكيد استعادة تنظيم الملفات */}
       {restoreConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl">
-          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200">
-            <div className="p-6">
+        <div className="dashboard-modal-overlay bg-black/40" dir="rtl">
+          <div className="dashboard-modal-shell max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="shrink-0 px-6 pt-5 pb-3 border-b border-teal-100 bg-gradient-to-b from-teal-50/90 to-white rounded-t-2xl">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-teal-50 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-xl bg-teal-50 flex items-center justify-center shrink-0">
                   <RotateCcw className="w-6 h-6 text-teal-600" />
                 </div>
                 <div>
@@ -1071,11 +1071,11 @@ path.unshift(stripNumbering(f.name));
                   <p className="text-sm text-slate-600 mt-1">هل تريد استعادة تنظيم الملفات؟</p>
                 </div>
               </div>
-              <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                 إعادة إنشاء المجلدات المحذوفة (فارغة)
               </p>
             </div>
-            <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
+            <div className="shrink-0 flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4 bg-slate-50/50 rounded-b-2xl">
               <button
                 type="button"
                 onClick={() => setRestoreConfirmOpen(false)}
@@ -1105,11 +1105,11 @@ path.unshift(stripNumbering(f.name));
 
       {/* تأكيد حذف المحدد */}
       {confirmBulkDeleteOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl">
-          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200">
-            <div className="p-6">
+        <div className="dashboard-modal-overlay bg-black/40" dir="rtl">
+          <div className="dashboard-modal-shell max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="shrink-0 px-6 pt-5 pb-3 border-b border-red-100 bg-gradient-to-b from-red-50/50 to-white rounded-t-2xl">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
                   <Trash2 className="w-6 h-6 text-red-600" />
                 </div>
                 <div>
@@ -1124,7 +1124,7 @@ path.unshift(stripNumbering(f.name));
                 ].filter(Boolean).join(" و")}؟ سيتم حذف محتويات المجلدات أيضاً.
               </p>
             </div>
-            <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
+            <div className="shrink-0 flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4 bg-slate-50/50 rounded-b-2xl">
               <button
                 type="button"
                 onClick={() => setConfirmBulkDeleteOpen(false)}
@@ -1146,11 +1146,11 @@ path.unshift(stripNumbering(f.name));
 
       {/* تأكيد الحذف */}
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl">
-          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-gray-200">
-            <div className="p-6">
+        <div className="dashboard-modal-overlay bg-black/40" dir="rtl">
+          <div className="dashboard-modal-shell max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="shrink-0 px-6 pt-5 pb-3 border-b border-red-100 bg-gradient-to-b from-red-50/50 to-white rounded-t-2xl">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
                   <Trash2 className="w-6 h-6 text-red-600" />
                 </div>
                 <div>
@@ -1166,7 +1166,7 @@ path.unshift(stripNumbering(f.name));
                   : <>هل أنت متأكد من حذف الملف <span className="font-bold text-gray-900">&quot;{confirmDelete.doc.file_name}&quot;</span>؟</>}
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
+            <div className="shrink-0 flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4 bg-slate-50/50 rounded-b-2xl">
               <button type="button" onClick={closeConfirmModal} className="px-4 py-2 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition">
                 إلغاء
               </button>
@@ -1180,13 +1180,13 @@ path.unshift(stripNumbering(f.name));
 
       {/* نافذة نقل المجلد */}
       {moveFolder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl">
-          <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-gray-200">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-bold text-gray-900">نقل المجلد &quot;{stripNumbering(moveFolder.name)}&quot;</h3>
-              <button type="button" onClick={() => setMoveFolder(null)} className="p-1 text-slate-500 hover:bg-slate-100 rounded-lg">×</button>
+        <div className="dashboard-modal-overlay bg-black/40" dir="rtl">
+          <div className="dashboard-modal-shell max-w-sm w-full max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="shrink-0 p-4 border-b border-teal-100 bg-gradient-to-b from-teal-50/80 to-white rounded-t-2xl flex items-center justify-between gap-2">
+              <h3 className="font-bold text-gray-900 text-sm min-w-0">نقل المجلد &quot;{stripNumbering(moveFolder.name)}&quot;</h3>
+              <button type="button" onClick={() => setMoveFolder(null)} className="p-2 text-slate-500 hover:bg-teal-100 rounded-xl shrink-0" aria-label="إغلاق">×</button>
             </div>
-            <div className="p-4 max-h-64 overflow-y-auto space-y-1">
+            <div className="p-4 max-h-64 overflow-y-auto space-y-1 dashboard-modal-scroll dashboard-modal-scroll-gutter-auto rounded-b-2xl">
               <button
                 type="button"
                 className="flex items-center gap-2 w-full px-3 py-2 text-right text-sm rounded-lg hover:bg-teal-50 text-slate-700"
@@ -1211,13 +1211,13 @@ path.unshift(stripNumbering(f.name));
 
       {/* نافذة نقل الملف */}
       {moveDocument && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl">
-          <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-gray-200">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-bold text-gray-900 truncate">نقل الملف &quot;{moveDocument.file_name}&quot;</h3>
-              <button type="button" onClick={() => setMoveDocument(null)} className="p-1 text-slate-500 hover:bg-slate-100 rounded-lg">×</button>
+        <div className="dashboard-modal-overlay bg-black/40" dir="rtl">
+          <div className="dashboard-modal-shell max-w-sm w-full max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="shrink-0 p-4 border-b border-teal-100 bg-gradient-to-b from-teal-50/80 to-white rounded-t-2xl flex items-center justify-between gap-2">
+              <h3 className="font-bold text-gray-900 truncate text-sm min-w-0">نقل الملف &quot;{moveDocument.file_name}&quot;</h3>
+              <button type="button" onClick={() => setMoveDocument(null)} className="p-2 text-slate-500 hover:bg-teal-100 rounded-xl shrink-0" aria-label="إغلاق">×</button>
             </div>
-            <div className="p-4 max-h-64 overflow-y-auto space-y-1">
+            <div className="p-4 max-h-64 overflow-y-auto space-y-1 dashboard-modal-scroll dashboard-modal-scroll-gutter-auto rounded-b-2xl">
               <button
                 type="button"
                 className="flex items-center gap-2 w-full px-3 py-2 text-right text-sm rounded-lg hover:bg-teal-50 text-slate-700"
@@ -1243,7 +1243,7 @@ path.unshift(stripNumbering(f.name));
       {/* PDF Preview modal */}
       {previewDoc && previewUrl && (
         <>
-          <div className="fixed inset-0 bg-black/50 z-40" onClick={closePreview} aria-hidden />
+          <div className="app-modal-root fixed inset-0 bg-black/50 z-40" onClick={closePreview} aria-hidden />
           <div className="fixed inset-4 sm:inset-8 z-50 bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2 border-b bg-slate-50">
               <span className="text-sm font-medium text-slate-700 truncate">{previewDoc.file_name}</span>

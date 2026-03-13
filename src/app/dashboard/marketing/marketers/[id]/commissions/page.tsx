@@ -162,30 +162,43 @@ export default function MarketerCommissionsPage() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-amber-50/40 p-4 sm:p-6 lg:p-8" dir="rtl">
       <div className="max-w-4xl mx-auto relative">
-        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard/marketing/marketers"
-              className="p-2 rounded-xl border border-slate-200 bg-white/80 text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </Link>
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
-                <RiyalIcon className="w-6 h-6" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-slate-800">سجل المسوق</h1>
+        <header className="relative rounded-2xl overflow-hidden mb-8 shadow-lg border border-gray-200/90 bg-gradient-to-br from-white to-gray-50">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-600 opacity-10" />
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-4 sm:px-5 sm:py-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <Link
+                href="/dashboard/marketing/marketers"
+                className="p-2 rounded-xl border border-slate-200 bg-white/80 text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition shrink-0"
+                aria-label="رجوع"
+              >
+                <ChevronLeft className="w-5 h-5 rtl:rotate-180" />
+              </Link>
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                  <RiyalIcon className="w-6 h-6" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-slate-800">سجل المسوق</h1>
+                </div>
               </div>
             </div>
+            <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+              <Link
+                href="/dashboard/marketing"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition"
+              >
+                <LayoutDashboard className="w-4 h-4 shrink-0 text-slate-600" />
+                إدارة التسويق والمبيعات
+              </Link>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
+              >
+                <LayoutDashboard className="w-4 h-4 shrink-0 text-slate-600" />
+                لوحة التحكم
+              </Link>
+            </div>
           </div>
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-sm font-medium"
-          >
-            <LayoutDashboard className="w-4 h-4" />
-            لوحة التحكم
-          </Link>
         </header>
 
         {/* بطاقة بيانات المسوق */}

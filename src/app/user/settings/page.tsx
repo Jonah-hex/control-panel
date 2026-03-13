@@ -611,21 +611,15 @@ export default function AdvancedSettingsPage() {
 
       {/* مودال ملخص صلاحيات الموظف */}
       {permissionsSummaryEmp && (
-        <>
-          <div
-            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm cursor-pointer"
-            onClick={() => setPermissionsSummaryEmp(null)}
-            aria-hidden
-          />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="dashboard-modal-overlay overflow-y-auto py-8" onClick={() => setPermissionsSummaryEmp(null)}>
             <div
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+              className="dashboard-modal-shell w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden my-auto"
               onClick={(e) => e.stopPropagation()}
               role="dialog"
               aria-modal="true"
               aria-labelledby="permissions-summary-title"
             >
-              <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+              <div className="shrink-0 border-b border-teal-100 bg-gradient-to-b from-teal-50/90 to-white px-6 py-4 flex items-center justify-between rounded-t-2xl">
                 <h3 id="permissions-summary-title" className="font-bold text-slate-800 flex items-center gap-2">
                   <ListChecks className="w-5 h-5 text-teal-600" />
                   ملخص الصلاحيات
@@ -633,13 +627,13 @@ export default function AdvancedSettingsPage() {
                 <button
                   type="button"
                   onClick={() => setPermissionsSummaryEmp(null)}
-                  className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition"
+                  className="p-2 text-slate-500 hover:bg-teal-100 rounded-xl transition"
                   aria-label="إغلاق"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="p-6 space-y-4">
+              <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll dashboard-modal-scroll-gutter-auto p-6 space-y-4">
                 <div className="space-y-1.5 pb-2 border-b border-slate-100">
                   <p className="text-sm font-medium text-slate-800">{permissionsSummaryEmp.full_name}</p>
                   <p className="text-sm text-slate-600">المسمى الوظيفي: {permissionsSummaryEmp.job_title || '—'}</p>
@@ -714,32 +708,26 @@ export default function AdvancedSettingsPage() {
               </div>
             </div>
           </div>
-        </>
       )}
 
       {/* مودال إضافة/تعديل موظف */}
       {modalOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm cursor-pointer"
-            onClick={() => !saveLoading && setModalOpen(false)}
-            aria-hidden
-          />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="dashboard-modal-overlay overflow-y-auto py-8" onClick={() => !saveLoading && setModalOpen(false)}>
             <div
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+              className="dashboard-modal-shell w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden my-auto"
               onClick={(e) => e.stopPropagation()}
               role="dialog"
               aria-modal="true"
               aria-labelledby="employee-modal-title"
             >
-              <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4">
+              <div className="shrink-0 border-b border-teal-100 bg-gradient-to-b from-teal-50/90 to-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
                 <h3 id="employee-modal-title" className="font-bold text-slate-800">
                   {editingId ? 'تعديل الموظف' : 'إضافة موظف'}
                 </h3>
+                <button type="button" onClick={() => !saveLoading && setModalOpen(false)} className="p-2 rounded-xl hover:bg-teal-100 text-slate-600" aria-label="إغلاق"><X className="w-5 h-5" /></button>
               </div>
 
-              <div className="p-6 space-y-5">
+              <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll dashboard-modal-scroll-gutter-auto p-6 space-y-5">
                 {saveError && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
                     {saveError}
@@ -917,11 +905,11 @@ export default function AdvancedSettingsPage() {
                 </div>
               </div>
 
-              <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-4 flex justify-end gap-2">
+              <div className="shrink-0 border-t border-teal-100 bg-teal-50/30 px-6 py-4 flex justify-end gap-2 rounded-b-2xl">
                 <button
                   type="button"
                   onClick={() => !saveLoading && setModalOpen(false)}
-                  className="px-4 py-2.5 text-slate-700 hover:bg-slate-100 rounded-xl transition font-medium"
+                  className="px-4 py-2.5 text-slate-700 hover:bg-white rounded-xl transition font-medium border border-slate-200 bg-white"
                 >
                   إلغاء
                 </button>
@@ -929,7 +917,7 @@ export default function AdvancedSettingsPage() {
                   type="button"
                   onClick={saveEmployee}
                   disabled={saveLoading}
-                  className="px-4 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition font-medium disabled:opacity-50 flex items-center gap-2"
+                  className="px-4 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition font-medium disabled:opacity-50 flex items-center gap-2 shadow-sm"
                 >
                   {saveLoading ? (
                     <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
@@ -939,7 +927,6 @@ export default function AdvancedSettingsPage() {
               </div>
             </div>
           </div>
-        </>
       )}
     </div>
   )

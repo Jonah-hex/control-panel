@@ -1103,17 +1103,23 @@ export default function ReservationsPage() {
         </div>
       </div>
 
-      {/* مودال إنشاء حجز */}
+      {/* مودال إنشاء حجز — نفس هيكل المواعيد/المهام + لون كهربائي للتمرير (صفحة الحجوزات) */}
       {createOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="dashboard-modal-overlay" onClick={(e) => e.target === e.currentTarget && setCreateOpen(false)}>
+          <div
+            className="dashboard-modal-shell max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden"
+            dir="rtl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="shrink-0 px-6 pt-6 pb-3 border-b border-amber-100 bg-gradient-to-b from-amber-50/95 to-white rounded-t-2xl flex items-center justify-between gap-3">
               <h2 className="text-lg font-bold text-gray-800">حجز وحدة جديدة</h2>
-              <button type="button" onClick={() => setCreateOpen(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+              <button type="button" onClick={() => setCreateOpen(false)} className="p-2 rounded-xl hover:bg-amber-100/80 text-gray-600 shrink-0" aria-label="إغلاق">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleCreate} className="p-4 space-y-4">
+            <form onSubmit={handleCreate} className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden dashboard-modal-scroll dashboard-modal-scroll-gutter-auto px-6 py-4">
+              <div className="space-y-4 pe-1">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">العمارة</label>
                 <select
@@ -1411,18 +1417,20 @@ export default function ReservationsPage() {
                   placeholder="ملاحظات اختيارية"
                 />
               </div>
-              <div className="flex gap-3 pt-2">
+              </div>
+              </div>
+              <div className="shrink-0 flex gap-3 px-6 py-4 border-t border-amber-100/80 bg-amber-50/40 rounded-b-2xl">
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-medium hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 shadow-amber-500/25"
+                  className="flex-1 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-medium hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 shadow-sm"
                 >
                   {saving ? "جاري الحفظ..." : createForm.deposit_receipt_method === "none" ? "إنشاء الحجز (بدون عربون)" : "إنشاء الحجز وإصدار سند العربون"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setCreateOpen(false)}
-                  className="px-4 py-2.5 border border-gray-200 rounded-xl font-medium hover:bg-gray-50"
+                  className="px-4 py-2.5 border border-slate-200 bg-white rounded-xl font-medium hover:bg-slate-50 shadow-sm"
                 >
                   إلغاء
                 </button>
@@ -1434,8 +1442,8 @@ export default function ReservationsPage() {
 
       {/* مودال إلغاء الحجز */}
       {cancelOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+        <div className="dashboard-modal-overlay" onClick={(e) => e.target === e.currentTarget && (setCancelOpen(null), setCancelReason(""))}>
+          <div className="dashboard-modal-shell max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-gray-800 mb-2">إلغاء الحجز</h3>
             <p className="text-sm text-gray-600 mb-4">
               الوحدة {getUnit(cancelOpen)?.unit_number} — العميل {cancelOpen.customer_name}. سيتم تحرير الوحدة وإرجاعها إلى «متاحة».
@@ -1472,15 +1480,25 @@ export default function ReservationsPage() {
 
       {/* مودال استرداد العربون (حجز ملغي + كان مدفوع بعربون) */}
       {refundOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
-            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-amber-100 text-amber-700">
-                <ArrowRightLeft className="w-5 h-5" strokeWidth={2.5} />
-              </span>
-              استرداد العربون
-            </h3>
-            <div className="space-y-4 mb-6">
+        <div className="dashboard-modal-overlay" onClick={(e) => e.target === e.currentTarget && setRefundOpen(null)}>
+          <div
+            className="dashboard-modal-shell max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden"
+            dir="rtl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="shrink-0 px-6 pt-6 pb-3 border-b border-amber-100 bg-gradient-to-b from-amber-50/95 to-white rounded-t-2xl flex items-center justify-between gap-3">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-amber-100 text-amber-700">
+                  <ArrowRightLeft className="w-5 h-5" strokeWidth={2.5} />
+                </span>
+                استرداد العربون
+              </h3>
+              <button type="button" onClick={() => { setRefundOpen(null); setRefundBankName(""); setRefundIban(""); }} className="p-2 rounded-xl hover:bg-amber-100/80 text-gray-600 shrink-0" aria-label="إغلاق">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto dashboard-modal-scroll dashboard-modal-scroll-gutter-auto px-6 py-4">
+            <div className="space-y-4">
               <div className="bg-slate-50 rounded-xl p-4 space-y-2">
                 <p className="text-xs font-semibold text-slate-500 uppercase">العميل</p>
                 <p className="font-medium">{refundOpen.customer_name}</p>
@@ -1528,11 +1546,12 @@ export default function ReservationsPage() {
                 </div>
               )}
             </div>
-            <div className="flex gap-3 mt-6">
-              <button type="button" onClick={handleRefundSubmit} disabled={refundSaving} className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl font-medium hover:bg-amber-700 disabled:opacity-50">
+            </div>
+            <div className="shrink-0 flex gap-3 px-6 py-4 border-t border-amber-100/80 bg-amber-50/40 rounded-b-2xl">
+              <button type="button" onClick={handleRefundSubmit} disabled={refundSaving} className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl font-medium hover:bg-amber-700 disabled:opacity-50 shadow-sm">
                 {refundSaving ? "جاري..." : "تأكيد استرداد العربون"}
               </button>
-              <button type="button" onClick={() => { setRefundOpen(null); setRefundBankName(""); setRefundIban(""); }} className="px-4 py-2.5 border border-gray-200 rounded-xl font-medium hover:bg-gray-50">إلغاء</button>
+              <button type="button" onClick={() => { setRefundOpen(null); setRefundBankName(""); setRefundIban(""); }} className="px-4 py-2.5 border border-slate-200 bg-white rounded-xl font-medium hover:bg-slate-50 shadow-sm">إلغاء</button>
             </div>
           </div>
         </div>
@@ -1540,7 +1559,7 @@ export default function ReservationsPage() {
 
       {/* معاينة سند العربون — التنسيق للطباعة في globals.css (طباعة صفحة واحدة، بدون ختم مائي، نصوص مناسبة) */}
       {receiptPreview && (
-          <div className="receipt-modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 print:bg-transparent print:p-0 print:block" onClick={() => setReceiptPreview(null)}>
+          <div className="app-modal-root receipt-modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 print:bg-transparent print:p-0 print:block" onClick={() => setReceiptPreview(null)}>
             <div
               className="relative bg-white rounded-2xl shadow-xl w-full max-w-[420px] print:max-w-[210mm] p-6 print:p-4 border border-gray-200 print:shadow-none print:border-0 print:rounded-none receipt-unified print:break-inside-avoid"
               onClick={(e) => e.stopPropagation()}

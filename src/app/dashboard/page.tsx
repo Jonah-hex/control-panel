@@ -48,6 +48,7 @@ import {
 import { RiyalIcon } from '@/components/icons/RiyalIcon'
 import { showToast } from '@/app/dashboard/buildings/details/toast'
 import { useSubscription } from '@/hooks/useSubscription'
+import { useCriticalAlertsCount } from '@/components/dashboard/CriticalAlertsDock'
 
 interface Building {
   id: string
@@ -166,6 +167,8 @@ export default function DashboardPage() {
   const [salesWithRemaining, setSalesWithRemaining] = useState<Array<{ id: string; building_id: string; remaining_payment: number; remaining_payment_due_date?: string | null; buyer_name?: string | null }>>([])
   const [buildingInvestorsWithDueDate, setBuildingInvestorsWithDueDate] = useState<Array<{ id: string; building_id: string; investor_name: string; investment_due_date: string }>>([])
   const [upcomingAppointments, setUpcomingAppointments] = useState<Array<{ id: string; title: string; scheduled_at: string; type: string; buildings?: { name: string } | null }>>([])
+  /** مواعيد عادي/منخفض ضمن ±يومين — تظهر في جرس التنبيهات فقط (ليس الحرجة) */
+  const [appointmentBellReminders, setAppointmentBellReminders] = useState<Array<{ id: string; title: string; scheduled_at: string; buildings?: { name: string } | null }>>([])
   const [tasksCount, setTasksCount] = useState(0)
 
   const router = useRouter()
@@ -240,11 +243,12 @@ export default function DashboardPage() {
   useEffect(() => {
     if (effectiveOwnerId) {
       fetchBuildings()
+      const APPT_BELL_WINDOW = 2
       const fetchUpcomingAppointments = async () => {
         try {
           const { data } = await supabase
             .from('dashboard_appointments')
-            .select('id, title, scheduled_at, type, buildings ( name )')
+            .select('id, title, scheduled_at, type, priority, buildings ( name )')
             .eq('owner_id', effectiveOwnerId)
             .eq('status', 'scheduled')
             .gte('scheduled_at', new Date().toISOString())
@@ -262,7 +266,45 @@ export default function DashboardPage() {
           setUpcomingAppointments([])
         }
       }
+      const fetchAppointmentBellReminders = async () => {
+        try {
+          const from = new Date()
+          from.setDate(from.getDate() - APPT_BELL_WINDOW)
+          from.setHours(0, 0, 0, 0)
+          const to = new Date()
+          to.setDate(to.getDate() + APPT_BELL_WINDOW + 1)
+          const { data } = await supabase
+            .from('dashboard_appointments')
+            .select('id, title, scheduled_at, priority, buildings ( name )')
+            .eq('owner_id', effectiveOwnerId)
+            .eq('status', 'scheduled')
+            .in('priority', ['low', 'normal'])
+            .gte('scheduled_at', from.toISOString())
+            .lte('scheduled_at', to.toISOString())
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          const out: Array<{ id: string; title: string; scheduled_at: string; buildings?: { name: string } | null }> = []
+          for (const a of data || []) {
+            if (!a.scheduled_at) continue
+            const due = new Date(a.scheduled_at)
+            due.setHours(0, 0, 0, 0)
+            const daysUntil = Math.ceil((due.getTime() - today.getTime()) / 86400000)
+            if (daysUntil < -APPT_BELL_WINDOW || daysUntil > APPT_BELL_WINDOW) continue
+            const b = a.buildings
+            out.push({
+              id: a.id,
+              title: a.title,
+              scheduled_at: a.scheduled_at,
+              buildings: Array.isArray(b) ? (b[0] ?? null) : b ?? null
+            })
+          }
+          setAppointmentBellReminders(out)
+        } catch {
+          setAppointmentBellReminders([])
+        }
+      }
       fetchUpcomingAppointments()
+      fetchAppointmentBellReminders()
       const fetchTasksCount = async () => {
         try {
           const { count, error } = await supabase
@@ -279,6 +321,7 @@ export default function DashboardPage() {
       fetchTasksCount()
     } else {
       setUpcomingAppointments([])
+      setAppointmentBellReminders([])
       setTasksCount(0)
     }
   }, [effectiveOwnerId])
@@ -641,7 +684,15 @@ export default function DashboardPage() {
   const filteredSalesWithRemaining = can('sales') ? (salesWithRemaining || []).slice(0, 8) : []
   const remainingPaymentNotificationsCount = filteredRemainingPaymentCollectedLogs.length + filteredRemainingPaymentCollectedLateLogs.length + filteredSalesWithRemaining.length
 
-  const notificationsCount = filteredElectricityReminders.length + filteredReservationReminders.length + filteredAssociationEndReminders.length + filteredMissingMeterReminders.length + filteredInvestmentEndReminders.length + reservationActivityCount + remainingPaymentNotificationsCount
+  const criticalAlertsCount = useCriticalAlertsCount(
+    salesWithRemaining,
+    reservations,
+    can('sales'),
+    can('reservations'),
+    employeePermissions
+  )
+
+  const notificationsCount = filteredElectricityReminders.length + filteredReservationReminders.length + filteredAssociationEndReminders.length + filteredMissingMeterReminders.length + filteredInvestmentEndReminders.length + reservationActivityCount + remainingPaymentNotificationsCount + appointmentBellReminders.length
 
   // قائمة معرفات الإشعارات الحالية (لحساب غير المقروءة)
   const currentNotificationIds = useMemo(() => {
@@ -656,8 +707,12 @@ export default function DashboardPage() {
     filteredRemainingPaymentCollectedLogs.forEach((log: { id: string }) => ids.push(`remaining-collected-${log.id}`))
     filteredRemainingPaymentCollectedLateLogs.forEach((log: { id: string }) => ids.push(`remaining-collected-late-${log.id}`))
     filteredSalesWithRemaining.forEach((s: { id: string }) => ids.push(`sale-remaining-${s.id}`))
+    appointmentBellReminders.forEach((a) => {
+      const d = (a.scheduled_at || '').slice(0, 10)
+      ids.push(`appt-bell-${a.id}-${d}`)
+    })
     return ids
-  }, [filteredAssociationEndReminders, filteredInvestmentEndReminders, filteredReservationReminders, filteredElectricityReminders, filteredMissingMeterReminders, reservationActivityForBell, filteredRemainingPaymentCollectedLogs, filteredRemainingPaymentCollectedLateLogs, filteredSalesWithRemaining])
+  }, [filteredAssociationEndReminders, filteredInvestmentEndReminders, filteredReservationReminders, filteredElectricityReminders, filteredMissingMeterReminders, reservationActivityForBell, filteredRemainingPaymentCollectedLogs, filteredRemainingPaymentCollectedLateLogs, filteredSalesWithRemaining, appointmentBellReminders])
 
   const unreadCount = useMemo(() => {
     return currentNotificationIds.filter((id) => !readNotificationIds.has(id)).length
@@ -697,6 +752,7 @@ export default function DashboardPage() {
     | { type: 'remaining-collected'; sortTime: string; key: string; log: (typeof remainingPaymentCollectedLogs)[0] }
     | { type: 'remaining-late'; sortTime: string; key: string; log: (typeof remainingPaymentCollectedLateLogs)[0] }
     | { type: 'sale-remaining'; sortTime: string; key: string; sale: (typeof salesWithRemaining)[0] }
+    | { type: 'appt-bell'; sortTime: string; key: string; appt: { id: string; title: string; scheduled_at: string; buildings?: { name: string } | null } }
   const sortedNotifications = useMemo((): NotificationItem[] => {
     const fallbackTime = '1970-01-01T00:00:00Z' // تنبيهات بدون تاريخ تُعرض في النهاية
     const items: NotificationItem[] = []
@@ -731,6 +787,10 @@ export default function DashboardPage() {
     ;(filteredSalesWithRemaining || []).forEach((s) => {
       items.push({ type: 'sale-remaining', sortTime: (s as { created_at?: string }).created_at || fallbackTime, key: `sale-remaining-${s.id}`, sale: s })
     })
+    appointmentBellReminders.forEach((a) => {
+      const d = (a.scheduled_at || '').slice(0, 10)
+      items.push({ type: 'appt-bell', sortTime: a.scheduled_at, key: `appt-bell-${a.id}-${d}`, appt: a })
+    })
     return items.sort((a, b) => new Date(b.sortTime).getTime() - new Date(a.sortTime).getTime())
   }, [
     filteredAssociationEndReminders,
@@ -743,6 +803,7 @@ export default function DashboardPage() {
     filteredRemainingPaymentCollectedLateLogs,
     filteredSalesWithRemaining,
     reservations,
+    appointmentBellReminders,
   ])
 
   const markAllNotificationsRead = () => {
@@ -1218,11 +1279,19 @@ export default function DashboardPage() {
                   className={`relative flex items-center justify-center w-11 h-11 rounded-2xl border transition-all duration-200 overflow-visible shadow-sm ${
                     notificationsOpen
                       ? 'border-amber-200 bg-amber-50/90 text-amber-600'
-                      : 'border-white/80 bg-white/70 text-gray-600 hover:bg-white hover:border-slate-200'
+                      : criticalAlertsCount > 0
+                        ? 'dashboard-bell-urgent'
+                        : 'border-white/80 bg-white/70 text-gray-600 hover:bg-white hover:border-slate-200'
                   }`}
                   aria-expanded={notificationsOpen}
                   aria-haspopup="true"
-                  aria-label={unreadCount > 0 ? `${unreadCount} تنبيه غير مقروء` : 'التنبيهات'}
+                  aria-label={
+                    criticalAlertsCount > 0
+                      ? `تنبيهات — ${criticalAlertsCount} بالغة الأهمية`
+                      : unreadCount > 0
+                        ? `${unreadCount} تنبيه غير مقروء`
+                        : 'التنبيهات'
+                  }
                 >
                   <Bell className="w-5 h-5 flex-shrink-0" />
                 </button>
@@ -1236,7 +1305,7 @@ export default function DashboardPage() {
                 )}
                 {notificationsOpen && (
                   <>
-                    <div className="fixed inset-0 z-40 cursor-pointer" onClick={() => setNotificationsOpen(false)} aria-hidden="true" />
+                    <div className="app-modal-root fixed inset-0 z-40 cursor-pointer" onClick={() => setNotificationsOpen(false)} aria-hidden="true" />
                     <div className="absolute left-0 mt-2 w-[22rem] max-h-[28rem] overflow-hidden bg-white rounded-2xl shadow-xl border border-gray-200 z-50" dir="rtl">
                       {/* رأس القائمة */}
                       <div className="bg-gradient-to-b from-amber-50 to-white border-b border-amber-100/80 px-4 py-4">
@@ -1253,15 +1322,16 @@ export default function DashboardPage() {
                             <button
                               type="button"
                               onClick={markAllNotificationsRead}
-                              className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition border border-emerald-200/60"
+                              className="flex-shrink-0 inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-[11px] sm:text-xs font-semibold text-emerald-800 bg-white shadow-sm shadow-slate-900/5 ring-1 ring-emerald-200/70 hover:bg-emerald-50/90 hover:ring-emerald-300/50 active:scale-[0.98] transition"
                             >
+                              <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" aria-hidden />
                               تحديد الكل كمقروء
                             </button>
                           )}
                         </div>
                       </div>
                       {/* محتوى القائمة */}
-                      <div className="max-h-80 overflow-y-auto py-1">
+                      <div className="max-h-80 overflow-y-auto overflow-x-hidden dashboard-modal-scroll py-1 rounded-lg">
                         {notificationsCount === 0 ? (
                           <div className="px-5 py-8 text-center">
                             <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 text-gray-400 mb-3">
@@ -1272,7 +1342,7 @@ export default function DashboardPage() {
                         ) : (
                           <div className="divide-y divide-gray-100">
                             {sortedNotifications.map((item) => {
-                              const timeLabel = item.type === 'assoc' ? item.endDate : item.type === 'inv-due' ? item.dueDate : item.type === 'res-expired' ? (item.reservation.expiry_date || item.reservation.created_at) : item.type === 'elec' ? null : item.type === 'meter-missing' ? null : item.type === 'sale-remaining' ? (item.sale as { created_at?: string }).created_at : (item as { log?: { created_at: string } }).log?.created_at
+                              const timeLabel = item.type === 'assoc' ? item.endDate : item.type === 'inv-due' ? item.dueDate : item.type === 'res-expired' ? (item.reservation.expiry_date || item.reservation.created_at) : item.type === 'elec' ? null : item.type === 'meter-missing' ? null : item.type === 'sale-remaining' ? (item.sale as { created_at?: string }).created_at : item.type === 'appt-bell' ? item.appt.scheduled_at : (item as { log?: { created_at: string } }).log?.created_at
                               const displayTime = item.type === 'elec' ? 'خلال فترة الفاتورة (26 — 10)' : timeLabel ? formatNotificationTime(timeLabel) : null
                               return (
                                 <div key={item.key} className="flex items-start gap-3 px-4 py-3.5 hover:bg-gray-50/70 transition">
@@ -1378,6 +1448,17 @@ export default function DashboardPage() {
                                       </div>
                                     </Link>
                                   )}
+                                  {item.type === 'appt-bell' && (
+                                    <Link href="/dashboard/appointments" onClick={() => setNotificationsOpen(false)} className="flex items-start gap-3 flex-1 min-w-0">
+                                      <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600"><Calendar className="w-5 h-5" /></span>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800">تذكير موعد (عادي)</p>
+                                        <p className="text-xs text-gray-600 mt-0.5">{item.appt.title}{item.appt.buildings?.name ? ` — ${item.appt.buildings.name}` : ''}</p>
+                                        <p className="text-[11px] text-slate-500 mt-0.5">المواعيد — أولوية عالية تظهر في التنبيه الحرج</p>
+                                        {displayTime && <p className="text-[11px] text-gray-400 mt-1">{displayTime}</p>}
+                                      </div>
+                                    </Link>
+                                  )}
                                 </div>
                               )
                             })}
@@ -1442,7 +1523,7 @@ export default function DashboardPage() {
 
       {/* القائمة الجانبية للجوال */}
       {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 md:hidden cursor-pointer" onClick={() => setSidebarOpen(false)}>
+        <div className="app-modal-root fixed inset-0 bg-black/50 backdrop-blur-sm z-30 md:hidden cursor-pointer" onClick={() => setSidebarOpen(false)}>
           <div className="fixed right-0 top-0 bottom-0 w-64 bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-gray-100">
               <div className="flex items-center justify-between">

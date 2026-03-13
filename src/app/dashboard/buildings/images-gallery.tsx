@@ -402,7 +402,7 @@ export default function ImagesGallery({
 
       {/* لايت بوكس */}
       {currentUrl && lightboxIndex !== null && (
-        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-sm flex flex-col" dir="ltr">
+        <div className="app-modal-root fixed inset-0 z-[100] bg-black/95 backdrop-blur-sm flex flex-col" dir="ltr">
           <div className="flex items-center justify-between p-4 bg-black/40">
             <span className="text-white font-medium">
               {lightboxIndex + 1} / {images.length}
